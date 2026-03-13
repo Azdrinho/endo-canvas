@@ -1382,21 +1382,41 @@ const generatePortraitTemplate = (
 };
 
 // --- SIGNATURE RENDERER ---
-const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hideIcons: boolean = false, links?: { [key: string]: string }) => {
+const generateSignatureTemplate = (
+  employee: Employee, 
+  config: CanvasConfig, 
+  hideIcons: boolean = false, 
+  links?: { [key: string]: string },
+  isDept: boolean = false,
+  deptName: string = ''
+) => {
   const noise = getNoiseOverlay();
   
   // Banner Version Only (Dimensions 600x150)
-  const firstName = employee.name.split(' ')[0];
-  const lastName = employee.name.split(' ').slice(1).join(' ');
-  const fullName = firstName + ' ' + lastName;
+  let displayNameHtml = '';
+  let displayRoleHtml = '';
+
+  if (isDept) {
+    const nameParts = deptName.split(' ');
+    const firstName = nameParts[0];
+    const restName = nameParts.slice(1).join(' ');
+    displayNameHtml = restName ? `${firstName.toUpperCase()}<br/>${restName.toUpperCase()}` : firstName.toUpperCase();
+    displayRoleHtml = ''; // Hide role for department signature
+  } else {
+    const firstName = employee.name.split(' ')[0];
+    const lastName = employee.name.split(' ').slice(1).join(' ');
+    displayNameHtml = `${firstName.toUpperCase()}<br/>${lastName.toUpperCase()}`;
+    displayRoleHtml = employee.role.toUpperCase();
+  }
 
   let titleSize = '34px';
-  if (fullName.length > 15) titleSize = '28px';
-  if (fullName.length > 20) titleSize = '24px';
-  if (fullName.length > 25) titleSize = '20px';
+  const nameLen = isDept ? deptName.length : employee.name.length;
+  if (nameLen > 15) titleSize = '28px';
+  if (nameLen > 20) titleSize = '24px';
+  if (nameLen > 25) titleSize = '20px';
 
   // Dynamic Role Size Logic to avoid Logo Overlap
-  const roleLen = employee.role.length;
+  const roleLen = isDept ? 0 : employee.role.length;
   let roleFontSize = '16px';
   if (roleLen > 25) roleFontSize = '14px';
   if (roleLen > 35) roleFontSize = '12px';
@@ -1457,12 +1477,12 @@ const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hid
        <!-- TEXT OVERLAY (Always visible, icons conditional) -->
        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding-right: 40px; box-sizing: border-box; z-index: 10;">
           <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-             ${firstName.toUpperCase()}<br/>
-             ${lastName.toUpperCase()}
+             ${displayNameHtml}
            </h1>
+           ${displayRoleHtml ? `
            <p class="mont-light signature-text-remove" style="font-size: ${roleFontSize}; color: #ffffff; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; opacity: 1; line-height: 1.1; text-align: right;">
-             ${employee.role}
-           </p>
+             ${displayRoleHtml}
+           </p>` : ''}
            ${iconsHtml}
        </div>
     </div>
@@ -1480,7 +1500,9 @@ export const generateCardCanvas = (
   isExportMode: boolean = false, 
   links?: { [key: string]: string }, 
   providerFormat: ProviderFormat = 'post-sq',
-  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center'
+  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center',
+  isDept: boolean = false,
+  deptName: string = ''
 ): string => {
   let cardHtml = '';
   
@@ -1492,7 +1514,7 @@ export const generateCardCanvas = (
              cardHtml = generateMonthGroupTemplate(data, config, language);
          }
       } else {
-         return generateCardCanvas(data[0], config, type, orientation, language);
+         return generateCardCanvas(data[0], config, type, orientation, language, isExportMode, links, providerFormat, welcomeTextAlignment, isDept, deptName);
       }
   } else {
       const employee = data;
@@ -1631,7 +1653,7 @@ export const generateCardCanvas = (
         case TemplateType.NEWSLETTER:
           // Signature doesn't use the translation logic for titles usually, or name/role are dynamic
           // isExportMode in this context is now 'hideIcons'
-          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links);
+          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links, isDept, deptName);
           break;
         
         case TemplateType.NEW_PROVIDER:

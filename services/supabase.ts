@@ -6,8 +6,8 @@ import { Employee } from '../types';
 // The provided keys look different. Please ensure you have the correct Project URL and Anon Key.
 // For now, we will use placeholders for the URL and the provided key as the Anon Key.
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_7HoIOpT8gj8LvBHVwbltiA_gYquJTgH';
+const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
+const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_7HoIOpT8gj8LvBHVwbltiA_gYquJTgH';
 
 // Create a dummy client if URL is missing to prevent crash during dev/build
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

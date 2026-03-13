@@ -205,6 +205,43 @@ const calculateTenure = (dateStr: string): string => {
   return `${years} ${years === 1 ? 'ANO' : 'ANOS'}`;
 };
 
+const calculateAge = (birthDate: string): number | null => {
+  if (!birthDate) return null;
+  try {
+    let birth: Date;
+    if (birthDate.includes('/')) {
+      const parts = birthDate.split('/');
+      if (parts.length === 3) {
+        let [day, month, year] = parts.map(Number);
+        if (year < 100) {
+          const currentYear = new Date().getFullYear() % 100;
+          year += (year > currentYear + 1 ? 1900 : 2000);
+        }
+        birth = new Date(year, month - 1, day);
+      } else if (parts.length === 2) {
+        // Just DD/MM, can't calculate age
+        return null;
+      } else {
+        return null;
+      }
+    } else {
+      birth = new Date(birthDate);
+    }
+    
+    if (isNaN(birth.getTime())) return null;
+
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  } catch (e) {
+    return null;
+  }
+};
+
 // --- ANIMATED SWITCH COMPONENT ---
 const ThemeSwitch = React.memo(({ isDarkMode, toggle }: { isDarkMode: boolean, toggle: () => void }) => {
   return (
@@ -373,6 +410,8 @@ export default function App() {
   const [includeInfoInHtml, setIncludeInfoInHtml] = useState(true); // NEW Toggle for text info
   const [hasCopied, setHasCopied] = useState<string | null>(null); 
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [isDepartmentSignature, setIsDepartmentSignature] = useState(false);
+  const [departmentName, setDepartmentName] = useState('');
 
   // --- SLIDE PRESENTATION STATE ---
   const [slides, setSlides] = useState<Slide[]>(INITIAL_SLIDES);
@@ -555,9 +594,9 @@ export default function App() {
     });
 
     if (currentCanvasData && !isBulkMode && selectedTemplate !== TemplateType.PRESENTATION) {
-      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, welcomeTextAlignment));
+      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, welcomeTextAlignment, isDepartmentSignature, departmentName));
     }
-  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, welcomeTextAlignment]);
+  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, welcomeTextAlignment, isDepartmentSignature, departmentName]);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -670,6 +709,17 @@ export default function App() {
                 const newTenure = calculateTenure(value);
                 if (newTenure) updated.tenure = newTenure;
             }
+            if (field === 'birthDate' && value) {
+                // Keep dateStr (DD/MM) in sync with birthDate (YYYY-MM-DD)
+                try {
+                    const date = new Date(value);
+                    const day = String(date.getDate() + 1).padStart(2, '0'); // Fix for local date offset
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    updated.dateStr = `${day}/${month}`;
+                } catch (err) {
+                    console.error("Error syncing dateStr:", err);
+                }
+            }
             return updated;
         }
         return e;
@@ -706,6 +756,11 @@ export default function App() {
   }, []);
 
   const handleWheel = (e: React.WheelEvent) => {
+    // Prevent zoom if scrolling inside popups or sidebars
+    if ((e.target as HTMLElement).closest('.signature-controls') || 
+        (e.target as HTMLElement).closest('.custom-scrollbar')) {
+      return;
+    }
     const step = 0.1;
     const delta = e.deltaY < 0 ? step : -step;
     handleZoom(delta);
@@ -947,7 +1002,6 @@ export default function App() {
              quality: 1.0,
              pixelRatio: 2,
              cacheBust: false,
-             useCORS: true, 
              skipAutoScale: true
         });
 
@@ -1048,7 +1102,9 @@ export default function App() {
     hideIcons: boolean, 
     showInfo: boolean,
     linksMap: Record<string, string> = signatureLinks,
-    activeKeys: string[] = activeSocials
+    activeKeys: string[] = activeSocials,
+    isDept: boolean = isDepartmentSignature,
+    deptName: string = departmentName
   ) => {
     // Prepare Data
     const bannerUrl = url || 'https://salsa-tech.com/wp-content/uploads/2022/assinatura/email-signature_background.png';
@@ -1080,19 +1136,32 @@ export default function App() {
     let contentHtml = '';
     
     if (showInfo) {
-        // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
-        const nameParts = targetEmployee.name.split(' ');
-        const firstName = nameParts[0];
-        const restName = nameParts.slice(1).join(' ');
-        const displayName = restName ? `${firstName}<br/>${restName}` : firstName;
+        let displayName = '';
+        let displayRole = '';
+
+        if (isDept) {
+            const nameParts = deptName.split(' ');
+            const firstName = nameParts[0];
+            const restName = nameParts.slice(1).join(' ');
+            displayName = restName ? `${firstName}<br/>${restName}` : firstName;
+            displayRole = ''; // Hide role for department signature
+        } else {
+            // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
+            const nameParts = targetEmployee.name.split(' ');
+            const firstName = nameParts[0];
+            const restName = nameParts.slice(1).join(' ');
+            displayName = restName ? `${firstName}<br/>${restName}` : firstName;
+            displayRole = targetEmployee.role;
+        }
 
         contentHtml += `
             <p style="font-family: 'Arial Black', Arial, sans-serif; font-size: 24px; font-weight: 900; text-transform: uppercase; color: #ffffff; margin: 0; line-height: 1; mso-line-height-rule: exactly;">
                 ${displayName}
             </p>
+            ${displayRole ? `
             <p style="font-family: Arial, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #ffffff; margin: 5px 0 10px 0;">
-                ${targetEmployee.role}
-            </p>
+                ${displayRole}
+            </p>` : ''}
         `;
     }
 
@@ -1192,7 +1261,8 @@ export default function App() {
                       }
 
                       const role = row['Job Position'] || row['Role'] || row['Cargo'] || 'Employee';
-                      const admission = row['Start Date'] || row['Admission'] || row['Admissão'] || '';
+                      const admission = row['Start Date'] || row['Admission'] || row['Admissão'] || row['Admission Date'] || '';
+                      const birthday = row['Birthday'] || row['Aniversário'] || row['Birth Date'] || '01/01';
 
                       return {
                           id: `imported-${Date.now()}-${idx}`,
@@ -1200,7 +1270,8 @@ export default function App() {
                           role: role,
                           previousRole: row['Previous Role'] || row['Cargo Anterior'] || '',
                           photoUrl: row['Photo'] || row['Foto'] || 'https://via.placeholder.com/150',
-                          dateStr: row['Birthday'] || row['Aniversário'] || '01/01',
+                          dateStr: birthday,
+                          birthDate: (birthday.length > 5) ? birthday : '', // If it looks like a full date
                           admissionDate: admission,
                           tenure: calculateTenure(admission),
                           photoScale: 1,
@@ -1621,7 +1692,23 @@ export default function App() {
                           <div className="space-y-3">
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><User size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.name} onChange={(e) => updateEmployee(selectedEmployee.id, 'name', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Full Name" /></div>
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Briefcase size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.role} onChange={(e) => updateEmployee(selectedEmployee.id, 'role', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Role" /></div>
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
+                                
+                                  <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}>
+                                      <Calendar size={16} className="opacity-40 mr-3 text-white" />
+                                      <div className="flex-1 flex items-center justify-between">
+                                          <input 
+                                              value={selectedEmployee.dateStr} 
+                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} 
+                                              className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" 
+                                              placeholder="Birthday (DD/MM/YY)" 
+                                          />
+                                          {calculateAge(selectedEmployee.dateStr) !== null && (
+                                              <span className="text-[10px] font-bold text-white/40 whitespace-nowrap ml-2">
+                                                  {calculateAge(selectedEmployee.dateStr)} ANOS
+                                              </span>
+                                          )}
+                                      </div>
+                                  </div>
                                 
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
 
@@ -1895,9 +1982,42 @@ export default function App() {
                                                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Hide Icons in Export</span>
                                                     <ThemeSwitch isDarkMode={!hideIconsForExport} toggle={() => setHideIconsForExport(!hideIconsForExport)} />
                                                 </label>
-                                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                <p className="text-[10px] text-slate-400 leading-relaxed border-b border-white/5 pb-4">
                                                     Toggle ON if you want the downloaded image to be clean (no icons), so they can be added as clickable links below.
                                                 </p>
+
+                                                <label className="flex items-center justify-between cursor-pointer">
+                                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Department Signature</span>
+                                                    <ThemeSwitch 
+                                                        isDarkMode={isDepartmentSignature} 
+                                                        toggle={() => {
+                                                            const newValue = !isDepartmentSignature;
+                                                            setIsDepartmentSignature(newValue);
+                                                            if (newValue) {
+                                                                // Auto-fill company links
+                                                                setSignatureLinks({
+                                                                    ...signatureLinks,
+                                                                    linkedin: 'https://www.linkedin.com/company/salsa-technology/',
+                                                                    website: 'https://salsatechnology.com',
+                                                                    instagram: 'https://www.instagram.com/salsatechnology/'
+                                                                });
+                                                                setActiveSocials(['linkedin', 'website', 'instagram']);
+                                                            }
+                                                        }} 
+                                                    />
+                                                </label>
+                                                {isDepartmentSignature && (
+                                                    <div className="mt-2 animate-in slide-in-from-top-2 duration-200">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Department Name</label>
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="e.g. MARKETING"
+                                                            value={departmentName}
+                                                            onChange={(e) => setDepartmentName(e.target.value.toUpperCase())}
+                                                            className="w-full bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-cyan-500/50 text-slate-700 dark:text-white transition-colors"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="mt-4 p-3">
