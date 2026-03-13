@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://vitejs.dev/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Endo Canvas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Mont Regular"', '"Mont"', 'Inter', 'sans-serif'],
+              'mont-light': ['"Mont ExtraLight DEMO"', '"Mont"', 'sans-serif'],
+              'mont-semibold': ['"Mont SemiBold"', '"Mont"', 'sans-serif'],
+            },
+            colors: {
+              cyan: {
+                400: '#22d3ee',
+                500: '#06b6d4',
+              },
+              purple: {
+                500: '#a855f7',
+                600: '#9333ea',
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css' crossorigin="anonymous">
+    <style>
+      @import url(https://db.onlinewebfonts.com/c/6cce6b8c74a8ac84c45963dbac1e025a?family=Mont+Regular);
+      @import url(https://db.onlinewebfonts.com/c/38d16ae93a514dfd43dfd4aa13f280fc?family=Mont+Heavy);
+      @import url(https://db.onlinewebfonts.com/c/41fc8c954e9cc6cb6a52e93c07d6e2c8?family=Mont+ExtraLight+DEMO);
+      @import url(https://db.onlinewebfonts.com/c/303ff8c2975f30a5d6de8572b6b3fd15?family=Mont+SemiBold);
+
+      /* LOAD AKIRA EXPANDED SUPER BOLD - EXACT USER DEFINITION */
+      @font-face {
+          font-family: "AkiraExpanded-SuperBold";
+          src: url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.eot");
+          src: url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.eot?#iefix")format("embedded-opentype"),
+          url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.woff2")format("woff2"),
+          url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.woff")format("woff"),
+          url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.ttf")format("truetype"),
+          url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.svg#AkiraExpanded-SuperBold")format("svg");
+      }
+
+      body {
+        font-family: "Mont Regular", "Mont", 'Inter', sans-serif;
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563; 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #06b6d4; 
+      }
+
+      /* Animated Header Gradient with Glassmorphism */
+      .header-gradient {
+        /* Colors: Cyan (#22d3ee) and Purple (#594B98) alternating. 
+           Using rgba for glassmorphism transparency (85% opacity). 
+           #594B98 -> R:89 G:75 B:152
+           4-point gradient. */
+        background: linear-gradient(-45deg, 
+          rgba(34, 211, 238, 0.85), 
+          rgba(89, 75, 152, 0.85), 
+          rgba(6, 182, 212, 0.85), 
+          rgba(89, 75, 152, 0.85)
+        );
+        background-size: 400% 400%;
+        animation: headerGradientAnim 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        
+        /* Glassmorphism Effect */
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Animated Button Gradient (Same colors, slightly more opaque, no border bottom) */
+      .btn-gradient {
+        background: linear-gradient(-45deg, 
+          rgba(34, 211, 238, 0.95), 
+          rgba(89, 75, 152, 0.95), 
+          rgba(6, 182, 212, 0.95), 
+          rgba(89, 75, 152, 0.95)
+        );
+        background-size: 400% 400%;
+        animation: headerGradientAnim 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.25);
+      }
+
+      @keyframes headerGradientAnim {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      /* --- ANIMATED BACKGROUND GRID --- */
+      
+      /* Grid Lines Definition */
+      .grid-lines-white {
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+      }
+      .grid-lines-black {
+        background-image:
+          linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+      }
+
+      /* Animated Mask */
+      .animate-grid-mask {
+        /* Creates bands of high/low opacity that move diagonally */
+        -webkit-mask-image: repeating-linear-gradient(
+          120deg,
+          rgba(0,0,0,0.2) 0%,
+          rgba(0,0,0,0.2) 15%,
+          rgba(0,0,0,1) 30%,
+          rgba(0,0,0,0.2) 45%
+        );
+        mask-image: repeating-linear-gradient(
+          120deg,
+          rgba(0,0,0,0.2) 0%,
+          rgba(0,0,0,0.2) 15%,
+          rgba(0,0,0,1) 30%,
+          rgba(0,0,0,0.2) 45%
+        );
+        -webkit-mask-size: 200% 200%;
+        mask-size: 200% 200%;
+        animation: gridGradientMove 20s linear infinite alternate;
+      }
+
+      @keyframes gridGradientMove {
+        0% { mask-position: 0% 0%; }
+        100% { mask-position: 100% 100%; }
+      }
+      
+      /* --- 3D ROTATION ANIMATION --- */
+      .canvas-perspective {
+        perspective: 2000px;
+        width: 100%;
+        height: 100%;
+      }
+      .canvas-animated {
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        transform-style: preserve-3d;
+        backface-visibility: hidden;
+      }
+
+      /* Custom Range Slider */
+      .styled-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+        height: 24px; /* Taller touch target */
+        cursor: pointer;
+        touch-action: none;
+      }
+      .styled-slider:focus {
+        outline: none;
+      }
+      
+      /* Webkit Track */
+      .styled-slider::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px; /* Slightly thicker track */
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+      }
+      
+      /* Webkit Thumb */
+      .styled-slider::-webkit-slider-thumb {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #22d3ee;
+        border: 2px solid #ffffff;
+        cursor: grab;
+        -webkit-appearance: none;
+        margin-top: -7px; /* (6px track - 20px thumb) / 2 = -7px */
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5), 0 0 15px rgba(34, 211, 238, 0.6);
+        transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .styled-slider::-webkit-slider-thumb:active {
+        transform: scale(1.2);
+        cursor: grabbing;
+        background: #ffffff;
+      }
+
+      /* Firefox Track */
+      .styled-slider::-moz-range-track {
+        width: 100%;
+        height: 6px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+      }
+
+      /* Firefox Thumb */
+      .styled-slider::-moz-range-thumb {
+        height: 20px;
+        width: 20px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        background: #22d3ee;
+        cursor: grab;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5), 0 0 15px rgba(34, 211, 238, 0.6);
+        transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .styled-slider::-moz-range-thumb:active {
+        transform: scale(1.2);
+        cursor: grabbing;
+        background: #ffffff;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "html-to-image": "https://esm.sh/html-to-image@1.11.11",
+    "pptxgenjs": "https://esm.sh/pptxgenjs@3.12.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <!-- SVG Symbols for Switch Animation -->
+    <svg style="display: none;">
+      <symbol id="light" viewBox="0 0 24 24">
+        <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(0,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(45,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(90,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(135,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(180,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(225,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(270,12,12)" />
+          <line x1="12" y1="17" x2="12" y2="20" transform="rotate(315,12,12)" />
+        </g>
+        <circle fill="currentColor" cx="12" cy="12" r="5" />
+      </symbol>
+      <symbol id="dark" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M15.1,14.9c-3-0.5-5.5-3-6-6C8.8,7.1,9.1,5.4,9.9,4c0.4-0.8-0.4-1.7-1.2-1.4C4.6,4,1.8,7.9,2,12.5c0.2,5.1,4.4,9.3,9.5,9.5c4.5,0.2,8.5-2.6,9.9-6.6c0.3-0.8-0.6-1.7-1.4-1.2C18.6,14.9,16.9,15.2,15.1,14.9z" />
+      </symbol>
+    </svg>
+
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
