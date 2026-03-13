@@ -65,7 +65,10 @@ import {
   Grid,
   Rotate3D,
   Type,
-  Settings // Added Settings Icon
+  Settings, // Added Settings Icon
+  AlignLeft,
+  AlignCenter,
+  AlignRight
 } from 'lucide-react';
 
 // --- DATA INITIALIZATION ---
@@ -306,6 +309,7 @@ export default function App() {
   const [orientation, setOrientation] = useState<Orientation>('portrait');
   const [providerFormat, setProviderFormat] = useState<ProviderFormat>('post-sq');
   const [language, setLanguage] = useState<Language>('en'); 
+  const [welcomeTextAlignment, setWelcomeTextAlignment] = useState<'left' | 'center' | 'right'>('center');
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(INITIAL_EMPLOYEES[0].id);
   const [sidebarDataView, setSidebarDataView] = useState<'LIST' | 'DETAIL'>('LIST');
@@ -551,9 +555,9 @@ export default function App() {
     });
 
     if (currentCanvasData && !isBulkMode && selectedTemplate !== TemplateType.PRESENTATION) {
-      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat));
+      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, welcomeTextAlignment));
     }
-  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat]);
+  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, welcomeTextAlignment]);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -1947,6 +1951,24 @@ export default function App() {
 
                     {(!isPresentation && !isSignature && !isNewProvider) && (
                         <div className="absolute top-6 right-8 z-30 flex gap-2">
+                            {/* WELCOME TEXT ALIGNMENT (Landscape Only) */}
+                            {selectedTemplate === TemplateType.WELCOME && orientation === 'landscape' && (
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center">
+                                    {(['left', 'center', 'right'] as const).map((align) => (
+                                        <button
+                                            key={align}
+                                            onClick={() => setWelcomeTextAlignment(align)}
+                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${welcomeTextAlignment === align ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                            title={`Align ${align}`}
+                                        >
+                                            {align === 'left' && <AlignLeft size={14} />}
+                                            {align === 'center' && <AlignCenter size={14} />}
+                                            {align === 'right' && <AlignRight size={14} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* LANGUAGE SWITCHER */}
                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center">
                                 {(['en', 'pt', 'es'] as Language[]).map((lang) => (

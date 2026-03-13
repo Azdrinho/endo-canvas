@@ -1160,7 +1160,8 @@ const generateLandscapeTemplate = (
   showConfetti: boolean = true,
   purpleColor: string = '#9333ea', 
   nameBottomOffset: string | null = null, 
-  customBackground: string | null = null 
+  customBackground: string | null = null,
+  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center'
 ) => {
   const cardBg = '#f1f1f1';
   const fadeColor = '#ffffff';
@@ -1219,15 +1220,42 @@ const generateLandscapeTemplate = (
   const leftPanelJustify = 'center'; 
   const leftPanelPadding = '0 20px';
 
+  const isWelcome = sphereVariant === 'welcome';
+  
+  // Dynamic font size logic for description
+  const desc = employee.description || 'Bem-vindo ao time! Estamos felizes em ter você conosco.';
+  const charCount = desc.length;
+  let descFontSize = 13;
+  if (charCount > 260) {
+    // Decrease font size proportionally after 260 chars
+    const excess = charCount - 260;
+    descFontSize = Math.max(8, 13 - Math.floor(excess / 40)); 
+  }
+
+  const welcomeContent = isWelcome ? `
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; margin-top: 10px;">
+      <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        ${titleHtml}
+      </h1>
+      <div style="background: rgba(255, 255, 255, 0.5); padding: 12px 20px; border-radius: 8px; width: 85%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 10; border: 1px solid rgba(255,255,255,1); box-sizing: border-box;">
+        <p class="mont-font" style="margin: 0; font-size: ${descFontSize}px; color: #1f2937; line-height: 1.5; text-align: ${welcomeTextAlignment}; font-weight: 500; word-break: break-word; overflow-wrap: break-word;">
+          ${desc}
+        </p>
+      </div>
+    </div>
+  ` : `
+    <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      ${titleHtml}
+    </h1>
+  `;
+
   return `
     <div id="capture-target" style="width: 740px; height: 360px; background: ${cardBg}; position: relative; display: flex; flex-direction: row; overflow: hidden; box-sizing: border-box;">
        <div style="width: 55%; height: 100%; background: ${leftPanelGradient}; position: relative; display: flex; align-items: center; justify-content: ${leftPanelJustify}; padding: ${leftPanelPadding}; box-sizing: border-box; overflow: hidden; z-index: 20;">
           ${noise}
           ${spheres}
           ${logo}
-          <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            ${titleHtml}
-          </h1>
+          ${welcomeContent}
        </div>
        <div style="width: 45%; height: 100%; background: ${cardBg}; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
           <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
@@ -1443,7 +1471,17 @@ const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hid
 
 // --- MAIN GENERATOR ---
 
-export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq'): string => {
+export const generateCardCanvas = (
+  data: Employee | Employee[], 
+  config: CanvasConfig, 
+  type: TemplateType, 
+  orientation: Orientation = 'portrait', 
+  language: Language = 'en', 
+  isExportMode: boolean = false, 
+  links?: { [key: string]: string }, 
+  providerFormat: ProviderFormat = 'post-sq',
+  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center'
+): string => {
   let cardHtml = '';
   
   if (Array.isArray(data)) {
@@ -1519,7 +1557,10 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
             'welcome', 
             employee.role.toUpperCase(), 
             false, 
-            '#594C99' 
+            '#594C99',
+            null,
+            null,
+            welcomeTextAlignment
           );
           break;
 
