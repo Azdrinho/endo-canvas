@@ -30,40 +30,6 @@ interface EmployeeManagerProps {
   onAddEmployee: () => void;
 }
 
-const calculateAge = (birthDate: string): number | null => {
-  if (!birthDate) return null;
-  try {
-    let birth: Date;
-    if (birthDate.includes('/')) {
-      const parts = birthDate.split('/');
-      if (parts.length === 3) {
-        let [day, month, year] = parts.map(Number);
-        if (year < 100) {
-          const currentYear = new Date().getFullYear() % 100;
-          year += (year > currentYear + 1 ? 1900 : 2000);
-        }
-        birth = new Date(year, month - 1, day);
-      } else {
-        return null;
-      }
-    } else {
-      birth = new Date(birthDate);
-    }
-    
-    if (isNaN(birth.getTime())) return null;
-
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
-  } catch (e) {
-    return null;
-  }
-};
-
 export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   employees,
   onClose,
@@ -82,9 +48,10 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Derived Data
-  const uniqueRoles = Array.from(new Set(employees.map(e => e.role).filter(Boolean))).sort();
+  const uniqueRoles = Array.from(new Set(employees.filter(e => e.id !== 'hiring-generic').map(e => e.role).filter(Boolean))).sort();
 
   const filteredEmployees = employees
+    .filter(emp => emp.id !== 'hiring-generic')
     .filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             emp.role.toLowerCase().includes(searchQuery.toLowerCase());
@@ -113,17 +80,17 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     });
 
   const handleExportCSV = () => {
-      const headers = ['ID', 'Name', 'Role', 'Department', 'Status', 'Admission', 'Birthday'];
+      const headers = ['ID', 'Name', 'Role', 'Department', 'Status', 'Admission Date', 'Birth Date'];
       const csvContent = [
           headers.join(','),
           ...filteredEmployees.map(e => [
-              `"${e.id}"`,
+              e.id,
               `"${e.name}"`,
               `"${e.role}"`,
               `"${e.department || ''}"`,
-              `"${e.status || 'Active'}"`,
-              `"${e.admissionDate || ''}"`,
-              `"${e.birthDate || e.dateStr || ''}"`
+              e.status || 'Active',
+              e.admissionDate || '',
+              e.birthDate || ''
           ].join(','))
       ].join('\n');
   
@@ -347,16 +314,9 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                   <h3 className={`font-bold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{emp.name}</h3>
                   <p className={`text-xs uppercase tracking-wide truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{emp.role}</p>
                   
-                  <div className={`mt-3 pt-3 border-t flex flex-col gap-1 text-xs ${isDarkMode ? 'border-white/10 text-gray-500' : 'border-gray-100 text-gray-400'}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1"><Calendar size={12}/> {emp.dateStr}</span>
-                      {(emp.birthDate || emp.dateStr) && calculateAge(emp.birthDate || emp.dateStr) !== null && (
-                        <span className="font-medium text-cyan-500">{calculateAge(emp.birthDate || emp.dateStr)} anos</span>
-                      )}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1"><Clock size={12}/> {emp.tenure || 'N/A'}</span>
-                    </div>
+                  <div className={`mt-3 pt-3 border-t flex justify-between items-center text-xs ${isDarkMode ? 'border-white/10 text-gray-500' : 'border-gray-100 text-gray-400'}`}>
+                    <span className="flex items-center gap-1"><Calendar size={12}/> {emp.dateStr}</span>
+                    <span className="flex items-center gap-1"><Clock size={12}/> {emp.tenure || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -370,7 +330,6 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                   <th className="px-6 py-4">Employee</th>
                   <th className="px-6 py-4">Role</th>
                   <th className="px-6 py-4">Birthday</th>
-                  <th className="px-6 py-4">Age</th>
                   <th className="px-6 py-4">Admission</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -386,7 +345,6 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     </td>
                     <td className="px-6 py-4">{emp.role}</td>
                     <td className="px-6 py-4">{emp.dateStr}</td>
-                    <td className="px-6 py-4">{calculateAge(emp.birthDate || emp.dateStr) || '--'}</td>
                     <td className="px-6 py-4">{emp.admissionDate}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

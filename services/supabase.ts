@@ -6,8 +6,8 @@ import { Employee } from '../types';
 // The provided keys look different. Please ensure you have the correct Project URL and Anon Key.
 // For now, we will use placeholders for the URL and the provided key as the Anon Key.
 
-const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_7HoIOpT8gj8LvBHVwbltiA_gYquJTgH';
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_7HoIOpT8gj8LvBHVwbltiA_gYquJTgH';
 
 // Create a dummy client if URL is missing to prevent crash during dev/build
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -100,6 +100,92 @@ export const deleteEmployee = async (id: string) => {
     console.error('Error deleting employee:', error);
     throw error;
   }
+};
+
+export const fetchHiringImages = async (): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('hiring_images')
+    .select('url')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching hiring images:', error);
+    return [];
+  }
+
+  return data.map((row: any) => row.url);
+};
+
+export const addHiringImage = async (url: string) => {
+  const { error } = await supabase
+    .from('hiring_images')
+    .insert([{ url }]);
+
+  if (error) {
+    console.error('Error adding hiring image:', error);
+    throw error;
+  }
+};
+
+export const deleteHiringImage = async (url: string) => {
+  console.log('Attempting to delete hiring image:', url);
+  
+  // 1. Delete from the database
+  const { error } = await supabase
+    .from('hiring_images')
+    .delete()
+    .eq('url', url);
+
+  if (error) {
+    console.error('Error deleting hiring image from DB:', error);
+    throw error;
+  }
+
+  // 2. Try to delete the actual file from storage to free up space
+  try {
+    const urlParts = url.split('/EndoCanvas/');
+    if (urlParts.length === 2) {
+      const filePath = urlParts[1];
+      console.log('Deleting from storage:', filePath);
+      const { error: storageError } = await supabase.storage
+        .from('EndoCanvas')
+        .remove([filePath]);
+        
+      if (storageError) {
+        console.error('Error deleting from storage:', storageError);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to parse and delete storage file', err);
+  }
+};
+
+export const uploadHiringImageToStorage = async (file: File): Promise<string> => {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('File size must be less than 5MB');
+  }
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `hiring-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `hiring_images/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('EndoCanvas')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+
+  if (uploadError) {
+    console.error('Error uploading hiring image:', uploadError);
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from('EndoCanvas')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
 };
 
 export const uploadEmployeePhoto = async (file: File, employeeId: string): Promise<string> => {

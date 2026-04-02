@@ -983,7 +983,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     <div className="flex w-full h-full bg-[#1e1e1e] text-white overflow-hidden relative" ref={containerRef}>
         
         <div 
-            className="flex-1 relative overflow-hidden bg-[#121212] cursor-grab active:cursor-grabbing"
+            className={`flex-1 relative overflow-hidden bg-[#121212] ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
             onMouseDown={handleWrapperMouseDown}
             onWheel={handleWheel}
         >

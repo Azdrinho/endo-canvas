@@ -18,6 +18,11 @@ import {
   Download,
   X
 } from 'lucide-react';
+import { 
+  ResponsiveContainer,
+  AreaChart,
+  Area
+} from 'recharts';
 
 interface EmployeeEditorProps {
   employee: Employee;
@@ -29,6 +34,21 @@ interface EmployeeEditorProps {
 }
 
 const MOODS = ['😄', '😊', '😐', '😔', '😡', '❤️', '👍', '☕', '⚡', '⭐'];
+
+const DUMMY_DATA = [
+  { name: 'Jan', value: 4000 },
+  { name: 'Feb', value: 3000 },
+  { name: 'Mar', value: 5000 },
+  { name: 'Apr', value: 2780 },
+  { name: 'May', value: 1890 },
+  { name: 'Jun', value: 2390 },
+  { name: 'Jul', value: 3490 },
+  { name: 'Aug', value: 4000 },
+  { name: 'Sep', value: 3000 },
+  { name: 'Oct', value: 2000 },
+  { name: 'Nov', value: 2780 },
+  { name: 'Dec', value: 1890 },
+];
 
 type Tab = 'PROFILE' | 'ONBOARDING';
 
@@ -44,7 +64,6 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
   const [formData, setFormData] = useState<Partial<Employee>>({
     name: employee.name,
     role: employee.role,
-    dateStr: employee.dateStr,
     admissionDate: employee.admissionDate,
     birthDate: employee.birthDate || '', 
     photoUrl: employee.photoUrl,
@@ -66,59 +85,22 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const calculateAgeFromStr = (dateStr: string): number | null => {
-      if (!dateStr) return null;
-      try {
-        let birth: Date;
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            let [day, month, year] = parts.map(Number);
-            if (year < 100) {
-              const currentYear = new Date().getFullYear() % 100;
-              year += (year > currentYear + 1 ? 1900 : 2000);
-            }
-            birth = new Date(year, month - 1, day);
-          } else {
-            return null;
-          }
-        } else {
-          birth = new Date(dateStr);
-        }
-        
-        if (isNaN(birth.getTime())) return null;
-
-        const today = new Date();
-        let age = today.getFullYear() - birth.getFullYear();
-        const m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-          age--;
-        }
-        return age;
-      } catch (e) {
-        return null;
+    if (formData.birthDate) {
+      const birth = new Date(formData.birthDate);
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        calculatedAge--;
       }
-    };
-
-    const calculatedAge = calculateAgeFromStr(formData.birthDate || formData.dateStr || '');
-    setAge(calculatedAge);
-  }, [formData.birthDate, formData.dateStr]);
+      setAge(calculatedAge);
+    } else {
+        setAge(null);
+    }
+  }, [formData.birthDate]);
 
   const handleChange = (field: keyof Employee, value: any) => {
-    setFormData(prev => {
-        const updated = { ...prev, [field]: value };
-        if (field === 'birthDate' && value) {
-            try {
-                const date = new Date(value);
-                const day = String(date.getDate() + 1).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                updated.dateStr = `${day}/${month}`;
-            } catch (err) {
-                console.error("Error syncing dateStr:", err);
-            }
-        }
-        return updated;
-    });
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSocialChange = (platform: 'linkedin' | 'instagram' | 'twitter', value: string) => {
@@ -227,20 +209,6 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
                                   />
                               </div>
                               <div>
-                                  <div className="flex justify-between items-center mb-3">
-                                      <label className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Nascimento:</label>
-                                      {age !== null && (
-                                          <span className="text-[10px] font-bold text-cyan-500 uppercase tracking-wider">{age} ANOS</span>
-                                      )}
-                                  </div>
-                                  <input 
-                                      value={formData.dateStr || ''}
-                                      onChange={(e) => handleChange('dateStr', e.target.value)}
-                                      className={`w-full rounded-lg px-6 py-4 text-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${isDarkMode ? 'bg-white/5 text-white' : 'bg-gray-100 text-gray-800'}`}
-                                      placeholder="DD/MM/YY"
-                                  />
-                              </div>
-                              <div>
                                   <label className={`block text-sm font-bold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Data de Entrada:</label>
                                   <input 
                                       value={formData.admissionDate || ''}
@@ -326,17 +294,50 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
                       {/* Age Block */}
                       <div className={`p-8 shadow-sm flex flex-col items-center justify-center relative min-h-[200px] rounded-2xl ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
                           <span className={`absolute top-6 left-6 text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Idade:</span>
-                          <div className="flex flex-col items-center w-full">
-                              <div className={`text-9xl font-medium tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  {age !== null ? age : '--'}
-                              </div>
+                          <div className={`text-9xl font-medium tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {age !== null ? age : '--'}
+                          </div>
+                          
+                          <div className="absolute bottom-4 right-6">
                               <input 
-                                  type="text"
-                                  value={formData.dateStr || ''}
-                                  onChange={(e) => handleChange('dateStr', e.target.value)}
-                                  className={`mt-2 text-sm font-bold bg-transparent border-none outline-none text-center uppercase tracking-widest w-full opacity-50 focus:opacity-100 transition-opacity ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
-                                  placeholder="DD/MM/YY"
+                                  type="date"
+                                  value={formData.birthDate || ''}
+                                  onChange={(e) => handleChange('birthDate', e.target.value)}
+                                  className={`text-xs bg-transparent outline-none text-right w-28 cursor-pointer ${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
                               />
+                          </div>
+                      </div>
+
+                      {/* Performance Chart Block */}
+                      <div className={`md:col-span-3 p-8 shadow-sm text-white min-h-[260px] flex flex-col relative overflow-hidden rounded-2xl ${isDarkMode ? 'bg-gradient-to-br from-cyan-700 to-purple-900' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
+                          <div className="flex justify-between items-center mb-6 z-10">
+                              <span className="font-medium text-xl">Performance:</span>
+                              <div className="flex gap-8 text-xs font-bold opacity-60">
+                                  <span>DAY</span>
+                                  <span>WEEK</span>
+                                  <span>MONTH</span>
+                                  <span className="text-white opacity-100">YEAR</span>
+                              </div>
+                          </div>
+                          
+                          <div className="flex-1 w-full h-full absolute inset-0 pt-20">
+                              <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={DUMMY_DATA}>
+                                      <defs>
+                                          <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                                              <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
+                                              <stop offset="95%" stopColor="#ffffff" stopOpacity={0}/>
+                                          </linearGradient>
+                                      </defs>
+                                      <Area 
+                                          type="monotone" 
+                                          dataKey="value" 
+                                          stroke="#ffffff" 
+                                          strokeWidth={4}
+                                          fill="url(#colorVal)" 
+                                      />
+                                  </AreaChart>
+                              </ResponsiveContainer>
                           </div>
                       </div>
                   </div>

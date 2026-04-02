@@ -1,9 +1,10 @@
 
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { motion } from 'motion/react';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, Slide, ProviderFormat, ProviderGridConfig } from './types';
 import { generateCardCanvas } from './services/emailTemplate'; 
-import { supabase, fetchEmployees, upsertEmployee, deleteEmployee } from './services/supabase';
+import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage } from './services/supabase';
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { SlideEditor } from './components/SlideEditor';
@@ -65,10 +66,7 @@ import {
   Grid,
   Rotate3D,
   Type,
-  Settings, // Added Settings Icon
-  AlignLeft,
-  AlignCenter,
-  AlignRight
+  Settings // Added Settings Icon
 } from 'lucide-react';
 
 // --- DATA INITIALIZATION ---
@@ -109,6 +107,18 @@ const INITIAL_EMPLOYEES: Employee[] = [
     dateStr: '05/05', 
     admissionDate: '01/01/2020',
     tenure: '5 ANOS'
+  },
+  {
+    id: 'hiring-generic',
+    name: 'Generic Hiring',
+    role: '',
+    department: '',
+    photoUrl: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop',
+    photoScale: 1,
+    photoPosition: { x: 0, y: 0 },
+    dateStr: '', 
+    admissionDate: '',
+    tenure: ''
   }
 ];
 
@@ -162,7 +172,7 @@ const INITIAL_SLIDES: Slide[] = [{
   ]
 }];
 
-type EditorTab = 'DATA' | 'TEMPLATES' | 'IMPORT';
+type EditorTab = 'DATA' | 'TEMPLATES' | 'IMPORT' | 'IMAGES';
 
 // --- CONFIG FOR SOCIAL NETWORKS ---
 const SOCIAL_NETWORKS = [
@@ -205,43 +215,6 @@ const calculateTenure = (dateStr: string): string => {
   return `${years} ${years === 1 ? 'ANO' : 'ANOS'}`;
 };
 
-const calculateAge = (birthDate: string): number | null => {
-  if (!birthDate) return null;
-  try {
-    let birth: Date;
-    if (birthDate.includes('/')) {
-      const parts = birthDate.split('/');
-      if (parts.length === 3) {
-        let [day, month, year] = parts.map(Number);
-        if (year < 100) {
-          const currentYear = new Date().getFullYear() % 100;
-          year += (year > currentYear + 1 ? 1900 : 2000);
-        }
-        birth = new Date(year, month - 1, day);
-      } else if (parts.length === 2) {
-        // Just DD/MM, can't calculate age
-        return null;
-      } else {
-        return null;
-      }
-    } else {
-      birth = new Date(birthDate);
-    }
-    
-    if (isNaN(birth.getTime())) return null;
-
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
-  } catch (e) {
-    return null;
-  }
-};
-
 // --- ANIMATED SWITCH COMPONENT ---
 const ThemeSwitch = React.memo(({ isDarkMode, toggle }: { isDarkMode: boolean, toggle: () => void }) => {
   return (
@@ -256,36 +229,108 @@ const ThemeSwitch = React.memo(({ isDarkMode, toggle }: { isDarkMode: boolean, t
         }
         .switch, .switch__input { display: block; -webkit-tap-highlight-color: transparent; }
         .switch { margin: auto; position: relative; -webkit-user-select: none; -moz-user-select: none; user-select: none; }
-        .switch__icon { color: hsla(var(--hue),10%,80%); pointer-events: none; position: absolute; top: 0.375em; left: 0.375em; width: 0.75em; height: 0.75em; transition: color var(--trans-dur), transform var(--trans-dur) var(--trans-timing); }
-        .switch__icon:nth-of-type(2) { right: 0.375em; left: auto; }
-        .switch__inner, .switch__inner-icons { border-radius: 0.5em; display: block; overflow: hidden; position: absolute; top: 0.25em; left: 0.25em; width: 2.25em; height: 1em; }
-        .switch__inner:before, .switch__inner-icons { transition: transform var(--trans-dur) var(--trans-timing); transform: translateX(-1.25em); }
+        .switch__inner { border-radius: 0.5em; display: block; overflow: hidden; position: absolute; top: 0.25em; left: 0.25em; width: 2.25em; height: 1em; }
+        .switch__inner:before { transition: transform var(--trans-dur) var(--trans-timing); transform: translateX(-1.25em); }
         .switch__inner:before { background-color: var(--primary); border-radius: inherit; content: ""; display: block; width: 100%; height: 100%; }
-        .switch__inner-icons { pointer-events: none; }
-        .switch__inner-icons .switch__icon { color: hsl(0,0%,100%); top: 0.125em; left: 0.125em; transform: translateX(1.25em); }
-        .switch__inner-icons .switch__icon:nth-child(2) { right: 0.125em; left: auto; }
         .switch__input { background-color: hsl(0,0%,100%); border-radius: 0.75em; box-shadow: 0 0 0 0.0625em hsla(var(--hue),90%,50%,0), 0 0.125em 0.5em hsla(var(--hue),10%,10%,0.1); outline: transparent; width: 2.75em; height: 1.5em; -webkit-appearance: none; appearance: none; transition: background-color var(--trans-dur), box-shadow var(--trans-dur); cursor: pointer; }
-        .switch__input:checked { background-color: hsl(var(--hue),10%,10%); }
-        .switch__input:checked ~ .switch__icon { color: hsla(var(--hue),10%,40%); }
-        .switch__input:checked ~ .switch__inner:before, .switch__input:checked ~ .switch__inner-icons { transform: translateX(1.25em); }
-        .switch__input:not(:checked) ~ .switch__icon:first-of-type, .switch__input:checked ~ .switch__icon:nth-of-type(2) { transform: rotate(360deg); }
-        .switch__input:checked ~ .switch__inner-icons .switch__icon:first-of-type { transform: translateX(-1.25em) rotate(-360deg); }
-        .switch__input:checked ~ .switch__inner-icons .switch__icon:nth-of-type(2) { transform: translateX(-1.25em) rotate(360deg); }
+        .switch__input:checked { background-color: hsl(0,0%,100%); }
+        .switch__input:checked ~ .switch__inner:before { transform: translateX(1.25em); }
       `}</style>
       <label className="switch">
         <input className="switch__input" type="checkbox" role="switch" name="dark" checked={isDarkMode} onChange={toggle} />
-        <svg className="switch__icon" width="24px" height="24px" aria-hidden="true"><use href="#light" /></svg>
-        <svg className="switch__icon" width="24px" height="24px" aria-hidden="true"><use href="#dark" /></svg>
         <span className="switch__inner"></span>
-        <span className="switch__inner-icons">
-          <svg className="switch__icon" width="24px" height="24px" aria-hidden="true"><use href="#light" /></svg>
-          <svg className="switch__icon" width="24px" height="24px" aria-hidden="true"><use href="#dark" /></svg>
-        </span>
-        <span className="sr-only">Dark Mode</span>
+        <span className="sr-only">Toggle</span>
       </label>
     </div>
   );
 });
+
+const MorphingCanvas = ({ html, templateType, orientation, children }: { html: string, templateType: TemplateType, orientation: Orientation, children?: React.ReactNode }) => {
+  const [displayHtml, setDisplayHtml] = useState(html);
+  const [displayTemplate, setDisplayTemplate] = useState(templateType);
+  const [displayOrientation, setDisplayOrientation] = useState(orientation);
+  const [phase, setPhase] = useState<'idle' | 'fadeOut' | 'morph' | 'fadeIn'>('idle');
+  const [displayChildren, setDisplayChildren] = useState(children);
+
+  // Store the latest props in refs to access them inside timeouts without re-triggering
+  const latestHtml = useRef(html);
+  const latestTemplate = useRef(templateType);
+  const latestOrientation = useRef(orientation);
+  const latestChildren = useRef(children);
+
+  useEffect(() => {
+    latestHtml.current = html;
+    latestTemplate.current = templateType;
+    latestOrientation.current = orientation;
+    latestChildren.current = children;
+  }, [html, templateType, orientation, children]);
+
+  useEffect(() => {
+    if ((templateType !== displayTemplate || orientation !== displayOrientation) && phase === 'idle') {
+      setPhase('fadeOut');
+    } else if (templateType === displayTemplate && orientation === displayOrientation && phase === 'idle') {
+      setDisplayHtml(html);
+      setDisplayChildren(children);
+    }
+  }, [templateType, orientation, html, displayTemplate, displayOrientation, phase, children]);
+
+  useEffect(() => {
+    if (phase === 'fadeOut') {
+      const timer = setTimeout(() => {
+        setDisplayHtml(latestHtml.current);
+        setDisplayTemplate(latestTemplate.current);
+        setDisplayOrientation(latestOrientation.current);
+        setDisplayChildren(latestChildren.current);
+        setPhase('morph');
+      }, 120);
+      return () => clearTimeout(timer);
+    } else if (phase === 'morph') {
+      const timer = setTimeout(() => {
+        setPhase('fadeIn');
+      }, 300); // 300ms morph duration
+      return () => clearTimeout(timer);
+    } else if (phase === 'fadeIn') {
+      const timer = setTimeout(() => {
+        setPhase('idle');
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
+
+  return (
+    <motion.div
+      layout
+      transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+      style={{ 
+        background: 'white', 
+        overflow: 'hidden', 
+        width: 'fit-content',
+        height: 'fit-content',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        position: 'relative',
+        borderRadius: displayTemplate === TemplateType.NEWSLETTER ? 0 : 16
+      }}
+    >
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: phase === 'idle' ? 1 : (phase === 'fadeOut' ? 0 : (phase === 'fadeIn' ? 1 : 0)),
+          filter: phase === 'fadeOut' ? 'brightness(1.5)' : 'brightness(1)',
+          scale: phase === 'fadeIn' ? [1.03, 1] : 1,
+        }}
+        transition={{
+          opacity: { duration: phase === 'fadeOut' ? 0.12 : 0.2 },
+          filter: { duration: 0.12 },
+          scale: { duration: 0.2, ease: "easeOut" }
+        }}
+        style={{ width: 'fit-content', height: 'fit-content', transformOrigin: 'center' }}
+      >
+        <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+        {displayChildren}
+      </motion.div>
+    </motion.div>
+  );
+};
 
 export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -295,7 +340,18 @@ export default function App() {
   useEffect(() => {
     fetchEmployees().then(data => {
       if (data && data.length > 0) {
-        setEmployees(data);
+        const genericHiring = INITIAL_EMPLOYEES.find(e => e.id === 'hiring-generic');
+        if (genericHiring && !data.find(e => e.id === 'hiring-generic')) {
+          setEmployees([...data, genericHiring]);
+        } else {
+          setEmployees(data);
+        }
+      }
+    });
+
+    fetchHiringImages().then(images => {
+      if (images && images.length > 0) {
+        setCustomHiringImages(images);
       }
     });
   }, []);
@@ -343,10 +399,9 @@ export default function App() {
 
   const [config, setConfig] = useState<CanvasConfig>(INITIAL_CONFIG);
   // Removed isDarkMode state, enforcing dark mode by default
-  const [orientation, setOrientation] = useState<Orientation>('portrait');
+  const [orientation, setOrientation] = useState<Orientation>('landscape');
   const [providerFormat, setProviderFormat] = useState<ProviderFormat>('post-sq');
   const [language, setLanguage] = useState<Language>('en'); 
-  const [welcomeTextAlignment, setWelcomeTextAlignment] = useState<'left' | 'center' | 'right'>('center');
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(INITIAL_EMPLOYEES[0].id);
   const [sidebarDataView, setSidebarDataView] = useState<'LIST' | 'DETAIL'>('LIST');
@@ -368,8 +423,11 @@ export default function App() {
   });
 
   const [isMonthView, setIsMonthView] = useState<boolean>(false);
+  const [isGroupMode, setIsGroupMode] = useState<boolean>(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(new Date().getMonth());
   const [showImageControls, setShowImageControls] = useState<boolean>(false);
+  const [customHiringImages, setCustomHiringImages] = useState<string[]>([]);
   
   // SIGNATURE CONTROL STATE
   const [showSignatureControls, setShowSignatureControls] = useState<boolean>(false); // Changed to false to hide on load
@@ -408,10 +466,9 @@ export default function App() {
   const [hostedImageUrl, setHostedImageUrl] = useState('');
   const [hideIconsForExport, setHideIconsForExport] = useState(true); 
   const [includeInfoInHtml, setIncludeInfoInHtml] = useState(true); // NEW Toggle for text info
+  const [includeTextInExport, setIncludeTextInExport] = useState(false); // NEW Toggle for text in image
   const [hasCopied, setHasCopied] = useState<string | null>(null); 
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [isDepartmentSignature, setIsDepartmentSignature] = useState(false);
-  const [departmentName, setDepartmentName] = useState('');
 
   // --- SLIDE PRESENTATION STATE ---
   const [slides, setSlides] = useState<Slide[]>(INITIAL_SLIDES);
@@ -560,6 +617,15 @@ export default function App() {
         } as Employee;
     }
 
+    if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
+        // Always return an array in group mode to trigger the group template
+        if (selectedEmployeeIds.length === 0) {
+            const current = employees.find(e => e.id === selectedEmployeeId) || employees[0];
+            return [current];
+        }
+        return employees.filter(e => selectedEmployeeIds.includes(e.id));
+    }
+
     if (isMonthView && selectedTemplate === TemplateType.BIRTHDAY) {
        const targetMonth = String(selectedMonthIndex + 1).padStart(2, '0');
        return employees.filter(e => {
@@ -573,14 +639,16 @@ export default function App() {
     }
     const emp = employees.find(e => e.id === selectedEmployeeId);
     return emp || employees[0];
-  }, [employees, isMonthView, selectedTemplate, selectedMonthIndex, selectedEmployeeId, providerData, getCurrentProviderConfig]);
+  }, [employees, isMonthView, isGroupMode, selectedEmployeeIds, selectedTemplate, selectedMonthIndex, selectedEmployeeId, providerData, getCurrentProviderConfig]);
 
   const currentCanvasData = getCanvasData();
   const [previewHtml, setPreviewHtml] = useState<string>('');
   
   const filteredEmployees = useMemo(() => employees.filter(emp => 
-     emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     emp.role.toLowerCase().includes(searchQuery.toLowerCase())
+     emp.id !== 'hiring-generic' && (
+       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       emp.role.toLowerCase().includes(searchQuery.toLowerCase())
+     )
   ), [employees, searchQuery]);
 
   useEffect(() => {
@@ -594,17 +662,19 @@ export default function App() {
     });
 
     if (currentCanvasData && !isBulkMode && selectedTemplate !== TemplateType.PRESENTATION) {
-      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, welcomeTextAlignment, isDepartmentSignature, departmentName));
+      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat));
     }
-  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, welcomeTextAlignment, isDepartmentSignature, departmentName]);
+  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat]);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const positionRef = useRef({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false); 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const isSignature = selectedTemplate === TemplateType.NEWSLETTER;
@@ -696,7 +766,9 @@ export default function App() {
 
       const centerX = ((clientWidth - scaledW) / 2) + sidebarOffset;
       const centerY = (clientHeight - scaledH) / 2;
-      setPosition({ x: centerX, y: Math.max(0, centerY) });
+      const newPos = { x: centerX, y: Math.max(0, centerY) };
+      setPosition(newPos);
+      positionRef.current = newPos;
     }
   }, [previewDimensions.width, previewDimensions.height, selectedTemplate, isMonthView]); // Re-center only on layout change
 
@@ -709,22 +781,25 @@ export default function App() {
                 const newTenure = calculateTenure(value);
                 if (newTenure) updated.tenure = newTenure;
             }
-            if (field === 'birthDate' && value) {
-                // Keep dateStr (DD/MM) in sync with birthDate (YYYY-MM-DD)
-                try {
-                    const date = new Date(value);
-                    const day = String(date.getDate() + 1).padStart(2, '0'); // Fix for local date offset
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    updated.dateStr = `${day}/${month}`;
-                } catch (err) {
-                    console.error("Error syncing dateStr:", err);
-                }
-            }
             return updated;
         }
         return e;
     }));
   }, []);
+
+  // Sync contenteditable changes back to state
+  useEffect(() => {
+    const handleBlur = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      const field = target.getAttribute('data-field');
+      if (field && target.hasAttribute('contenteditable')) {
+        const value = target.innerText;
+        updateEmployee(selectedEmployeeId, field as keyof Employee, value);
+      }
+    };
+    document.addEventListener('focusout', handleBlur);
+    return () => document.removeEventListener('focusout', handleBlur);
+  }, [selectedEmployeeId, updateEmployee]);
 
   const updatePhotoPosition = useCallback((axis: 'x' | 'y', value: number) => {
       setEmployees(prev => {
@@ -756,21 +831,17 @@ export default function App() {
   }, []);
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Prevent zoom if scrolling inside popups or sidebars
-    if ((e.target as HTMLElement).closest('.signature-controls') || 
-        (e.target as HTMLElement).closest('.custom-scrollbar')) {
-      return;
-    }
     const step = 0.1;
     const delta = e.deltaY < 0 ? step : -step;
     handleZoom(delta);
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.image-controls') || (e.target as HTMLElement).closest('.signature-controls') || (e.target as HTMLElement).closest('.slide-editor-ui')) return; 
+    const target = e.target as HTMLElement;
+    if (target.closest('.image-controls') || target.closest('.signature-controls') || target.closest('.slide-editor-ui') || target.closest('[contenteditable]') || target.hasAttribute('contenteditable') || target.closest('button, input, textarea, select')) return; 
     
-    // NEW LOGIC FOR PROVIDER GRID DRAG (Middle Click Only)
-    if (isNewProvider && e.button === 1) { 
+    // NEW LOGIC FOR PROVIDER GRID DRAG (Left Click Only)
+    if (isNewProvider && e.button === 0) { 
         e.preventDefault();
         e.stopPropagation();
         setIsDraggingProviderGrid(true);
@@ -783,13 +854,13 @@ export default function App() {
         return;
     }
 
-    // Standard Pan Logic (Left Click Only)
-    if (e.button === 0) {
+    // Standard Pan Logic (Left or Middle Click)
+    if (e.button === 0 || e.button === 1) {
         e.preventDefault();
         setIsDraggingCanvas(true);
         setDragOffset({
-          x: e.clientX - position.x,
-          y: e.clientY - position.y
+          x: e.clientX - positionRef.current.x,
+          y: e.clientY - positionRef.current.y
         });
     }
   };
@@ -823,15 +894,19 @@ export default function App() {
         return;
     }
 
-    if (isDraggingCanvas && containerRef.current) {
+    if (isDraggingCanvas && canvasWrapperRef.current) {
         e.preventDefault();
         const newX = e.clientX - dragOffset.x;
         const newY = e.clientY - dragOffset.y;
-        setPosition({ x: newX, y: newY });
+        positionRef.current = { x: newX, y: newY };
+        canvasWrapperRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${zoomLevel})`;
     }
   };
 
   const handleMouseUp = () => {
+    if (isDraggingCanvas) {
+        setPosition(positionRef.current);
+    }
     setIsDraggingProviderGrid(false);
     setIsDraggingCanvas(false);
   };
@@ -873,10 +948,28 @@ export default function App() {
 
   // ... (keeping rest of file structure, focusing on the Provider UI update) ...
   
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file || !uploadTarget) return;
       
+      if (selectedTemplate === TemplateType.HIRING && uploadTarget.field === 'photoUrl') {
+          try {
+              // Upload actual file to Supabase Storage
+              const publicUrl = await uploadHiringImageToStorage(file);
+              
+              // Update state and DB with the public URL
+              updateEmployee(uploadTarget.id, uploadTarget.field as keyof Employee, publicUrl);
+              setCustomHiringImages(prev => [...prev, publicUrl]);
+              await addHiringImage(publicUrl);
+          } catch (err) {
+              console.error('Failed to upload hiring image:', err);
+              alert('Failed to upload image. Please try again.');
+          }
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setUploadTarget(null);
+          return;
+      }
+
       const reader = new FileReader();
       reader.onload = (evt) => {
           const result = evt.target?.result as string;
@@ -919,7 +1012,7 @@ export default function App() {
         clone.style.transform = 'none'; // Reset scale for capture
         
         // REMOVE SIGNATURE TEXT ONLY FOR EXPORT
-        if (selectedTemplate === TemplateType.NEWSLETTER) {
+        if (selectedTemplate === TemplateType.NEWSLETTER && !includeTextInExport) {
              const textElements = clone.querySelectorAll('.signature-text-remove');
              textElements.forEach(el => {
                  (el as HTMLElement).style.opacity = '0';
@@ -1102,9 +1195,7 @@ export default function App() {
     hideIcons: boolean, 
     showInfo: boolean,
     linksMap: Record<string, string> = signatureLinks,
-    activeKeys: string[] = activeSocials,
-    isDept: boolean = isDepartmentSignature,
-    deptName: string = departmentName
+    activeKeys: string[] = activeSocials
   ) => {
     // Prepare Data
     const bannerUrl = url || 'https://salsa-tech.com/wp-content/uploads/2022/assinatura/email-signature_background.png';
@@ -1136,32 +1227,19 @@ export default function App() {
     let contentHtml = '';
     
     if (showInfo) {
-        let displayName = '';
-        let displayRole = '';
-
-        if (isDept) {
-            const nameParts = deptName.split(' ');
-            const firstName = nameParts[0];
-            const restName = nameParts.slice(1).join(' ');
-            displayName = restName ? `${firstName}<br/>${restName}` : firstName;
-            displayRole = ''; // Hide role for department signature
-        } else {
-            // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
-            const nameParts = targetEmployee.name.split(' ');
-            const firstName = nameParts[0];
-            const restName = nameParts.slice(1).join(' ');
-            displayName = restName ? `${firstName}<br/>${restName}` : firstName;
-            displayRole = targetEmployee.role;
-        }
+        // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
+        const nameParts = targetEmployee.name.split(' ');
+        const firstName = nameParts[0];
+        const restName = nameParts.slice(1).join(' ');
+        const displayName = restName ? `${firstName}<br/>${restName}` : firstName;
 
         contentHtml += `
             <p style="font-family: 'Arial Black', Arial, sans-serif; font-size: 24px; font-weight: 900; text-transform: uppercase; color: #ffffff; margin: 0; line-height: 1; mso-line-height-rule: exactly;">
                 ${displayName}
             </p>
-            ${displayRole ? `
             <p style="font-family: Arial, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #ffffff; margin: 5px 0 10px 0;">
-                ${displayRole}
-            </p>` : ''}
+                ${targetEmployee.role}
+            </p>
         `;
     }
 
@@ -1261,8 +1339,7 @@ export default function App() {
                       }
 
                       const role = row['Job Position'] || row['Role'] || row['Cargo'] || 'Employee';
-                      const admission = row['Start Date'] || row['Admission'] || row['Admissão'] || row['Admission Date'] || '';
-                      const birthday = row['Birthday'] || row['Aniversário'] || row['Birth Date'] || '01/01';
+                      const admission = row['Start Date'] || row['Admission'] || row['Admissão'] || '';
 
                       return {
                           id: `imported-${Date.now()}-${idx}`,
@@ -1270,8 +1347,7 @@ export default function App() {
                           role: role,
                           previousRole: row['Previous Role'] || row['Cargo Anterior'] || '',
                           photoUrl: row['Photo'] || row['Foto'] || 'https://via.placeholder.com/150',
-                          dateStr: birthday,
-                          birthDate: (birthday.length > 5) ? birthday : '', // If it looks like a full date
+                          dateStr: row['Birthday'] || row['Aniversário'] || '01/01',
                           admissionDate: admission,
                           tenure: calculateTenure(admission),
                           photoScale: 1,
@@ -1371,34 +1447,134 @@ export default function App() {
        
        {/* 1. Header Tabs */}
        <div className="p-4 shrink-0">
-          <div className="flex bg-white/10 rounded-full p-1 h-14">
-             <button 
-                onClick={() => { setActiveTab('DATA'); setSidebarDataView('LIST'); }} 
-                className={`flex-1 flex items-center justify-center rounded-full transition-all duration-300 ${activeTab === 'DATA' ? 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                title="Employee Data"
-             >
-                {selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : <Users size={22} />}
-             </button>
+          <div className="flex bg-white/10 rounded-full p-1 h-14 relative">
+             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.NEW_PROVIDER && (
+                 <button 
+                    onClick={() => { 
+                        setActiveTab('DATA'); 
+                        if (selectedTemplate === TemplateType.HIRING) {
+                            setSidebarDataView('DETAIL');
+                        } else {
+                            setSidebarDataView('LIST'); 
+                        }
+                    }} 
+                    className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'DATA' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+                    title="Employee Data"
+                 >
+                    {activeTab === 'DATA' && (
+                      <motion.div
+                        layoutId="activeTabIndicator"
+                        className="absolute inset-0"
+                        transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+                      >
+                         <motion.div 
+                            key="indicator-DATA"
+                            className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
+                            animate={{ scaleX: [1, 1.1, 1] }}
+                            transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
+                         />
+                      </motion.div>
+                    )}
+                    <span className="relative z-10">
+                      {selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : <Users size={22} />}
+                    </span>
+                 </button>
+             )}
              <button 
                 onClick={() => setActiveTab('TEMPLATES')} 
-                className={`flex-1 flex items-center justify-center rounded-full transition-all duration-300 ${activeTab === 'TEMPLATES' ? 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'TEMPLATES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
                 title="Templates"
              >
-                <Palette size={22} />
+                {activeTab === 'TEMPLATES' && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    className="absolute inset-0"
+                    transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+                  >
+                     <motion.div 
+                        key="indicator-TEMPLATES"
+                        className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
+                        animate={{ scaleX: [1, 1.1, 1] }}
+                        transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
+                     />
+                  </motion.div>
+                )}
+                <span className="relative z-10">
+                  <Palette size={22} />
+                </span>
              </button>
-             <button 
-                onClick={() => setActiveTab('IMPORT')} 
-                className={`flex-1 flex items-center justify-center rounded-full transition-all duration-300 ${activeTab === 'IMPORT' ? 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                title="Import Excel"
-             >
-                <FileSpreadsheet size={22} />
-             </button>
+             {selectedTemplate === TemplateType.HIRING && (
+               <button 
+                  onClick={() => setActiveTab('IMAGES')} 
+                  className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'IMAGES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+                  title="Hiring Images"
+               >
+                  {activeTab === 'IMAGES' && (
+                    <motion.div
+                      layoutId="activeTabIndicator"
+                      className="absolute inset-0"
+                      transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+                    >
+                       <motion.div 
+                          key="indicator-IMAGES"
+                          className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
+                          animate={{ scaleX: [1, 1.1, 1] }}
+                          transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
+                       />
+                    </motion.div>
+                  )}
+                  <span className="relative z-10">
+                    <ImageIcon size={22} />
+                  </span>
+               </button>
+             )}
           </div>
        </div>
 
        {/* 2. Middle Content (Scrollable) */}
        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar">
-          {activeTab === 'DATA' && (
+          {activeTab === 'IMAGES' && selectedTemplate === TemplateType.HIRING && (
+             <div className="animate-in slide-in-from-right-4 duration-300 pt-2">
+                <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Image Library</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {customHiringImages.map((img, i) => (
+                        <div key={`custom-${i}`} className="relative group">
+                            <button 
+                                onClick={() => updateEmployee(selectedEmployee.id, 'photoUrl', img)}
+                                className={`w-full relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${selectedEmployee.photoUrl === img ? 'border-cyan-500 scale-[0.98]' : 'border-transparent hover:border-white/20'}`}
+                            >
+                                <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </button>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCustomHiringImages(prev => {
+                                        const newImages = prev.filter((_, idx) => idx !== i);
+                                        if (selectedEmployee.photoUrl === img) {
+                                            updateEmployee(selectedEmployee.id, 'photoUrl', newImages[0] || '');
+                                        }
+                                        return newImages;
+                                    });
+                                    deleteHiringImage(img).catch(console.error);
+                                }}
+                                className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                title="Remove Image"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    ))}
+                    <button 
+                        onClick={() => handleImageUploadTrigger(selectedEmployee.id, 'photoUrl')}
+                        className="aspect-square rounded-2xl border-2 border-dashed border-white/10 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-cyan-400 transition-all bg-white/5"
+                    >
+                        <Upload size={24} />
+                        <span className="text-[10px] font-bold uppercase">Upload Custom</span>
+                    </button>
+                </div>
+             </div>
+           )}
+           {activeTab === 'DATA' && (
             <div className="space-y-4 animate-in slide-in-from-left-4 duration-300 pt-2">
                {/* Data Sidebar Content */}
                {isNewProvider ? (
@@ -1632,7 +1808,7 @@ export default function App() {
                    </div>
                ) : (
                    /* Standard Employee List/Detail Logic */
-                   sidebarDataView === 'LIST' ? (
+                   (sidebarDataView === 'LIST' && selectedTemplate !== TemplateType.HIRING) ? (
                      <>
                         {/* UPDATED SEARCH BAR - Fully Rounded & Larger */}
                         <div className={`relative flex items-center px-6 py-4 rounded-full border transition-all bg-white/5 border-white/10 focus-within:bg-white/10 shadow-inner`}>
@@ -1644,8 +1820,23 @@ export default function App() {
                             {filteredEmployees.map((emp, index) => (
                                 <div 
                                     key={emp.id} 
-                                    onClick={() => { setSelectedEmployeeId(emp.id); setSidebarDataView('DETAIL'); }} 
-                                    className={`aspect-square relative overflow-hidden cursor-pointer rounded-2xl border ${selectedEmployeeId === emp.id ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 opacity-70 hover:opacity-100'}`}
+                                    onClick={() => {
+                                        if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
+                                            setSelectedEmployeeIds(prev => 
+                                                prev.includes(emp.id) 
+                                                    ? prev.filter(id => id !== emp.id)
+                                                    : [...prev, emp.id]
+                                            );
+                                        } else {
+                                            setSelectedEmployeeId(emp.id);
+                                            setSidebarDataView('DETAIL');
+                                        }
+                                    }}
+                                    className={`aspect-square relative overflow-hidden cursor-pointer rounded-2xl border ${
+                                        (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE)
+                                            ? (selectedEmployeeIds.includes(emp.id) ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 opacity-70 hover:opacity-100')
+                                            : (selectedEmployeeId === emp.id ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 opacity-70 hover:opacity-100')
+                                    }`}
                                 >
                                     <img src={emp.photoUrl || 'https://via.placeholder.com/150'} className="absolute inset-0 w-full h-full object-cover" />
                                     
@@ -1687,28 +1878,14 @@ export default function App() {
                    ) : (
                       // Detail View 
                       <div>
-                          <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
+                          {selectedTemplate !== TemplateType.HIRING && (
+                              <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
+                          )}
                           
                           <div className="space-y-3">
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><User size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.name} onChange={(e) => updateEmployee(selectedEmployee.id, 'name', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Full Name" /></div>
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Briefcase size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.role} onChange={(e) => updateEmployee(selectedEmployee.id, 'role', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Role" /></div>
-                                
-                                  <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}>
-                                      <Calendar size={16} className="opacity-40 mr-3 text-white" />
-                                      <div className="flex-1 flex items-center justify-between">
-                                          <input 
-                                              value={selectedEmployee.dateStr} 
-                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} 
-                                              className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" 
-                                              placeholder="Birthday (DD/MM/YY)" 
-                                          />
-                                          {calculateAge(selectedEmployee.dateStr) !== null && (
-                                              <span className="text-[10px] font-bold text-white/40 whitespace-nowrap ml-2">
-                                                  {calculateAge(selectedEmployee.dateStr)} ANOS
-                                              </span>
-                                          )}
-                                      </div>
-                                  </div>
+                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
                                 
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
 
@@ -1717,7 +1894,11 @@ export default function App() {
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><ImageIcon size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.photoUrl} onChange={(e) => updateEmployee(selectedEmployee.id, 'photoUrl', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Photo URL" /></div>
                           </div>
                           
-                          <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-4">Remove Employee</button>
+                          <button onClick={() => setIsManagementMode(true)} className="w-full py-3 rounded-2xl border border-white/10 text-white hover:bg-white/10 text-xs font-bold transition-all mt-4 flex items-center justify-center gap-2">
+                              <Settings size={16} />
+                              Manage Employees
+                          </button>
+                          <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
                       </div>
                    )
                )}
@@ -1733,14 +1914,29 @@ export default function App() {
                   { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
                   { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
                   { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
-                  { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
+                  { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
                   { id: TemplateType.PRESENTATION, label: 'Slide Deck', desc: 'AI Powered Presentation', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0318a761a56ead72a.png' }, 
+                  { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
                 ].map((t, index) => {
                   return (
                     <button 
                        key={t.id} 
                        onClick={() => { 
                            setSelectedTemplate(t.id as TemplateType); 
+                           if (t.id === TemplateType.HIRING) {
+                               setSelectedEmployeeId('hiring-generic');
+                               updateEmployee('hiring-generic', 'photoUrl', customHiringImages[0] || '');
+                               setSidebarDataView('DETAIL');
+                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                           } else if (t.id === TemplateType.NEW_PROVIDER) {
+                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                           } else if (selectedEmployeeId === 'hiring-generic') {
+                               const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic');
+                               if (firstRealEmployee) {
+                                   setSelectedEmployeeId(firstRealEmployee.id);
+                               }
+                               setSidebarDataView('LIST');
+                           }
                            if (t.id !== TemplateType.BIRTHDAY) setIsMonthView(false); 
                            if (t.id === TemplateType.PRESENTATION) {
                               setOrientation('landscape'); 
@@ -1770,45 +1966,6 @@ export default function App() {
                 })}
             </div>
           )}
-
-          {activeTab === 'IMPORT' && (
-             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 pt-2">
-                 <h3 className="text-sm font-bold text-cyan-300 uppercase mb-2 flex items-center gap-2"><FileSpreadsheet size={16}/> Import Data</h3>
-                 
-                 <button 
-                     onClick={() => setIsManagementMode(true)}
-                     className="w-full mb-4 p-4 rounded-3xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg transition-all flex items-center justify-center gap-3 group"
-                  >
-                      <div className="p-2 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
-                          <Users size={20} />
-                      </div>
-                      <span>Gerenciamento</span>
-                  </button>
-
-                  <div className="p-4 rounded-3xl border border-white/10 bg-white/5 text-center">
-                      <FileSpreadsheet size={48} className="text-green-500 mx-auto mb-4" />
-                      <h2 className="text-lg font-bold text-white mb-2">Upload Excel</h2>
-                      <p className="text-xs text-slate-400 mb-6">Upload an .xlsx file to bulk generate cards.</p>
-                      
-                      <label className="block w-full cursor-pointer group">
-                          <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
-                          <div className="border-2 border-dashed border-white/20 rounded-2xl p-6 group-hover:border-cyan-500 group-hover:bg-cyan-500/10 transition-all">
-                              <span className="text-cyan-400 font-bold group-hover:underline text-sm">Click to upload</span>
-                          </div>
-                      </label>
-                 </div>
-                 
-                 <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                     <h4 className="text-xs font-bold text-white mb-2">Instructions</h4>
-                     <ul className="text-[10px] text-slate-400 list-disc pl-4 space-y-1">
-                         <li>File must be .xlsx format</li>
-                         <li>Columns: Name, Role, Birthday, Admission, Photo</li>
-                         <li>Dates should be formatted as text</li>
-                         <li>Photo should be a direct URL</li>
-                     </ul>
-                 </div>
-             </div>
-          )}
        </div>
 
        {/* 3. Bottom Actions */}
@@ -1822,16 +1979,21 @@ export default function App() {
            </button>
            
            <button 
-              onClick={() => setActiveTab('IMPORT')}
-              className={`w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 transition-all ${activeTab === 'IMPORT' ? 'bg-cyan-600 border-cyan-500' : 'bg-white/10 hover:bg-white/20'}`}
-              title="Import Data"
+              onClick={() => setIsManagementMode(true)}
+              className="w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 bg-white/10 hover:bg-white/20 transition-all"
+              title="Employee Management"
            >
-              <Upload size={20} />
+              <Settings size={20} />
            </button>
        </div>
 
     </div>
   ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, isPresentation, handleDownload]);
+
+  // --- HIRING EDITOR OVERLAY ---
+  const renderHiringOverlay = () => {
+    return null;
+  };
 
   return (
     <div className={`w-full h-screen flex flex-col overflow-hidden ${theme.bg} dark text-slate-900 dark:text-white transition-colors duration-300`}>
@@ -1864,7 +2026,7 @@ export default function App() {
                 />
             ) : (
                 <div 
-                    className="flex-1 relative overflow-hidden cursor-move bg-slate-200/50 dark:bg-black/50"
+                    className={`flex-1 relative overflow-hidden bg-slate-200/50 dark:bg-black/50 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
                     onMouseDown={handleCanvasMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -1879,18 +2041,21 @@ export default function App() {
                     ></div>
 
                     <div ref={containerRef} className="w-full h-full relative">
-                       <div 
+                       <div
+                            ref={canvasWrapperRef}
                             style={{
                                 transform: `translate(${position.x}px, ${position.y}px) scale(${zoomLevel})`,
                                 transformOrigin: 'top left',
                                 transition: isDraggingCanvas ? 'none' : 'transform 0.1s ease-out',
                                 width: 'fit-content',
                                 height: 'fit-content',
-                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                                // REMOVED pointerEvents restriction here to allow clicks to propagate for dragging
+                                position: 'relative'
                             }}
-                            dangerouslySetInnerHTML={{ __html: previewHtml }}
-                       />
+                       >
+                           <MorphingCanvas html={previewHtml} templateType={selectedTemplate} orientation={orientation}>
+                               {renderHiringOverlay()}
+                           </MorphingCanvas>
+                       </div>
                     </div>
 
                     <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
@@ -1987,37 +2152,12 @@ export default function App() {
                                                 </p>
 
                                                 <label className="flex items-center justify-between cursor-pointer">
-                                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Department Signature</span>
-                                                    <ThemeSwitch 
-                                                        isDarkMode={isDepartmentSignature} 
-                                                        toggle={() => {
-                                                            const newValue = !isDepartmentSignature;
-                                                            setIsDepartmentSignature(newValue);
-                                                            if (newValue) {
-                                                                // Auto-fill company links
-                                                                setSignatureLinks({
-                                                                    ...signatureLinks,
-                                                                    linkedin: 'https://www.linkedin.com/company/salsa-technology/',
-                                                                    website: 'https://salsatechnology.com',
-                                                                    instagram: 'https://www.instagram.com/salsatechnology/'
-                                                                });
-                                                                setActiveSocials(['linkedin', 'website', 'instagram']);
-                                                            }
-                                                        }} 
-                                                    />
+                                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Include Text in Image</span>
+                                                    <ThemeSwitch isDarkMode={includeTextInExport} toggle={() => setIncludeTextInExport(!includeTextInExport)} />
                                                 </label>
-                                                {isDepartmentSignature && (
-                                                    <div className="mt-2 animate-in slide-in-from-top-2 duration-200">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Department Name</label>
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="e.g. MARKETING"
-                                                            value={departmentName}
-                                                            onChange={(e) => setDepartmentName(e.target.value.toUpperCase())}
-                                                            className="w-full bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-cyan-500/50 text-slate-700 dark:text-white transition-colors"
-                                                        />
-                                                    </div>
-                                                )}
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                    Toggle ON if you want the downloaded image to include the name and role text.
+                                                </p>
                                             </div>
 
                                             <div className="mt-4 p-3">
@@ -2071,53 +2211,70 @@ export default function App() {
 
                     {(!isPresentation && !isSignature && !isNewProvider) && (
                         <div className="absolute top-6 right-8 z-30 flex gap-2">
-                            {/* WELCOME TEXT ALIGNMENT (Landscape Only) */}
-                            {selectedTemplate === TemplateType.WELCOME && orientation === 'landscape' && (
+                            {/* MODO MENSAL TOGGLE (Only for Birthday) */}
+                            {selectedTemplate === TemplateType.BIRTHDAY && (
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Mensal</span>
+                                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Ver todos do mês</span>
+                                    </div>
+                                    <ThemeSwitch isDarkMode={isMonthView} toggle={() => setIsMonthView(!isMonthView)} />
+                                </div>
+                            )}
+
+                            {/* MODO GRUPO TOGGLE (Only for Job Change) */}
+                            {selectedTemplate === TemplateType.JOB_CHANGE && (
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Grupo</span>
+                                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Adicionar pessoas</span>
+                                    </div>
+                                    <ThemeSwitch isDarkMode={isGroupMode} toggle={() => {
+                                        const next = !isGroupMode;
+                                        setIsGroupMode(next);
+                                        if (next) {
+                                            setSidebarDataView('LIST');
+                                            if (selectedEmployeeIds.length === 0) {
+                                                setSelectedEmployeeIds([selectedEmployeeId]);
+                                            }
+                                        }
+                                    }} />
+                                </div>
+                            )}
+
+                            {/* LANGUAGE SWITCHER */}
+                            {selectedTemplate !== TemplateType.HIRING && (
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center">
-                                    {(['left', 'center', 'right'] as const).map((align) => (
+                                    {(['en', 'pt', 'es'] as Language[]).map((lang) => (
                                         <button
-                                            key={align}
-                                            onClick={() => setWelcomeTextAlignment(align)}
-                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${welcomeTextAlignment === align ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                                            title={`Align ${align}`}
+                                            key={lang}
+                                            onClick={() => setLanguage(lang)}
+                                            className={`w-8 h-8 rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         >
-                                            {align === 'left' && <AlignLeft size={14} />}
-                                            {align === 'center' && <AlignCenter size={14} />}
-                                            {align === 'right' && <AlignRight size={14} />}
+                                            {lang}
                                         </button>
                                     ))}
                                 </div>
                             )}
 
-                            {/* LANGUAGE SWITCHER */}
-                            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center">
-                                {(['en', 'pt', 'es'] as Language[]).map((lang) => (
-                                    <button
-                                        key={lang}
-                                        onClick={() => setLanguage(lang)}
-                                        className={`w-8 h-8 rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                            {selectedTemplate !== TemplateType.HIRING && (
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex">
+                                    <button 
+                                        onClick={() => handleOrientationChange('portrait')} 
+                                        className={`p-2 rounded-full transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                        title="Portrait"
                                     >
-                                        {lang}
+                                        <RectangleVertical size={20} />
                                     </button>
-                                ))}
-                            </div>
-
-                            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex">
-                                <button 
-                                    onClick={() => handleOrientationChange('portrait')} 
-                                    className={`p-2 rounded-full transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                                    title="Portrait"
-                                >
-                                    <RectangleVertical size={20} />
-                                </button>
-                                <button 
-                                    onClick={() => handleOrientationChange('landscape')} 
-                                    className={`p-2 rounded-full transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                                    title="Landscape"
-                                >
-                                    <RectangleHorizontal size={20} />
-                                </button>
-                            </div>
+                                    <button 
+                                        onClick={() => handleOrientationChange('landscape')} 
+                                        className={`p-2 rounded-full transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                        title="Landscape"
+                                    >
+                                        <RectangleHorizontal size={20} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -2126,7 +2283,7 @@ export default function App() {
             </div>
         </div>
         
-        {viewMode === ViewMode.EDITOR && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && (
+        {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && (
             <div 
                 className="fixed bottom-8 left-[380px] z-50 group"
                 onMouseDown={handleJoystickStart}
@@ -2155,6 +2312,14 @@ export default function App() {
             </div>
         )}
         
+        {/* Hidden File Input for Custom Image Uploads */}
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImageFileChange} 
+            accept="image/*" 
+            className="hidden" 
+        />
       </div>
   );
 }

@@ -31,6 +31,17 @@ export interface Employee {
   providerLogoScale?: number;
   gameThumbnails?: string[]; 
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
+  
+  // Custom Hiring Fields
+  hiringTitle1?: string;
+  hiringTitle2?: string;
+  hiringLayout?: {
+    logo?: { x: number, y: number, scale: number };
+    hiringTitle1?: { x: number, y: number, scale: number };
+    hiringTitle2?: { x: number, y: number, scale: number };
+    role?: { x: number, y: number, scale: number };
+    department?: { x: number, y: number, scale: number };
+  };
 }
 
 export interface ChecklistItem {
@@ -66,7 +77,8 @@ export enum TemplateType {
   JOB_CHANGE = 'Job Change',
   NEWSLETTER = 'Email Signature',
   PRESENTATION = 'Presentation Slide',
-  NEW_PROVIDER = 'New Provider' // New Template
+  NEW_PROVIDER = 'New Provider', // New Template
+  HIRING = 'Hiring'
 }
 
 export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-story' | 'banner-small' | 'banner-large';

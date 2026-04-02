@@ -307,9 +307,29 @@ const getWhatsappIcon = (fill: string) => `<svg xmlns="http://www.w3.org/2000/sv
 
 
 // Shared Sphere Elements
-const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' = 'portrait') => {
+const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' | 'hiring' = 'portrait') => {
   const noise = getNoiseOverlay();
   
+  if (variant === 'hiring') {
+    return `
+      <!-- Single Large Sphere Top Right (Hiring) -->
+      <div style="
+        position: absolute;
+        top: -120px;
+        right: -100px;
+        width: 350px; 
+        height: 350px;
+        border-radius: 50%;
+        background: linear-gradient(225deg, #22d3ee 0%, #594C99 100%);
+        box-shadow: -10px 10px 30px rgba(0,0,0,0.15);
+        z-index: 1;
+        overflow: hidden;
+      ">
+         ${noise}
+      </div>
+    `;
+  }
+
   // NEW PROVIDER SPHERES (Green Gradient)
   if (variant === 'provider') {
      return `
@@ -1160,8 +1180,7 @@ const generateLandscapeTemplate = (
   showConfetti: boolean = true,
   purpleColor: string = '#9333ea', 
   nameBottomOffset: string | null = null, 
-  customBackground: string | null = null,
-  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center'
+  customBackground: string | null = null 
 ) => {
   const cardBg = '#f1f1f1';
   const fadeColor = '#ffffff';
@@ -1220,42 +1239,15 @@ const generateLandscapeTemplate = (
   const leftPanelJustify = 'center'; 
   const leftPanelPadding = '0 20px';
 
-  const isWelcome = sphereVariant === 'welcome';
-  
-  // Dynamic font size logic for description
-  const desc = employee.description || 'Bem-vindo ao time! Estamos felizes em ter você conosco.';
-  const charCount = desc.length;
-  let descFontSize = 13;
-  if (charCount > 260) {
-    // Decrease font size proportionally after 260 chars
-    const excess = charCount - 260;
-    descFontSize = Math.max(8, 13 - Math.floor(excess / 40)); 
-  }
-
-  const welcomeContent = isWelcome ? `
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; margin-top: 10px;">
-      <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-        ${titleHtml}
-      </h1>
-      <div style="background: rgba(255, 255, 255, 0.5); padding: 12px 20px; border-radius: 8px; width: 85%; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 10; border: 1px solid rgba(255,255,255,1); box-sizing: border-box;">
-        <p class="mont-font" style="margin: 0; font-size: ${descFontSize}px; color: #1f2937; line-height: 1.5; text-align: ${welcomeTextAlignment}; font-weight: 500; word-break: break-word; overflow-wrap: break-word;">
-          ${desc}
-        </p>
-      </div>
-    </div>
-  ` : `
-    <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      ${titleHtml}
-    </h1>
-  `;
-
   return `
     <div id="capture-target" style="width: 740px; height: 360px; background: ${cardBg}; position: relative; display: flex; flex-direction: row; overflow: hidden; box-sizing: border-box;">
        <div style="width: 55%; height: 100%; background: ${leftPanelGradient}; position: relative; display: flex; align-items: center; justify-content: ${leftPanelJustify}; padding: ${leftPanelPadding}; box-sizing: border-box; overflow: hidden; z-index: 20;">
           ${noise}
           ${spheres}
           ${logo}
-          ${welcomeContent}
+          <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: normal; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            ${titleHtml}
+          </h1>
        </div>
        <div style="width: 45%; height: 100%; background: ${cardBg}; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
           <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
@@ -1382,41 +1374,21 @@ const generatePortraitTemplate = (
 };
 
 // --- SIGNATURE RENDERER ---
-const generateSignatureTemplate = (
-  employee: Employee, 
-  config: CanvasConfig, 
-  hideIcons: boolean = false, 
-  links?: { [key: string]: string },
-  isDept: boolean = false,
-  deptName: string = ''
-) => {
+const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hideIcons: boolean = false, links?: { [key: string]: string }) => {
   const noise = getNoiseOverlay();
   
   // Banner Version Only (Dimensions 600x150)
-  let displayNameHtml = '';
-  let displayRoleHtml = '';
-
-  if (isDept) {
-    const nameParts = deptName.split(' ');
-    const firstName = nameParts[0];
-    const restName = nameParts.slice(1).join(' ');
-    displayNameHtml = restName ? `${firstName.toUpperCase()}<br/>${restName.toUpperCase()}` : firstName.toUpperCase();
-    displayRoleHtml = ''; // Hide role for department signature
-  } else {
-    const firstName = employee.name.split(' ')[0];
-    const lastName = employee.name.split(' ').slice(1).join(' ');
-    displayNameHtml = `${firstName.toUpperCase()}<br/>${lastName.toUpperCase()}`;
-    displayRoleHtml = employee.role.toUpperCase();
-  }
+  const firstName = employee.name.split(' ')[0];
+  const lastName = employee.name.split(' ').slice(1).join(' ');
+  const fullName = firstName + ' ' + lastName;
 
   let titleSize = '34px';
-  const nameLen = isDept ? deptName.length : employee.name.length;
-  if (nameLen > 15) titleSize = '28px';
-  if (nameLen > 20) titleSize = '24px';
-  if (nameLen > 25) titleSize = '20px';
+  if (fullName.length > 15) titleSize = '28px';
+  if (fullName.length > 20) titleSize = '24px';
+  if (fullName.length > 25) titleSize = '20px';
 
   // Dynamic Role Size Logic to avoid Logo Overlap
-  const roleLen = isDept ? 0 : employee.role.length;
+  const roleLen = employee.role.length;
   let roleFontSize = '16px';
   if (roleLen > 25) roleFontSize = '14px';
   if (roleLen > 35) roleFontSize = '12px';
@@ -1477,33 +1449,223 @@ const generateSignatureTemplate = (
        <!-- TEXT OVERLAY (Always visible, icons conditional) -->
        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding-right: 40px; box-sizing: border-box; z-index: 10;">
           <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-             ${displayNameHtml}
+             ${firstName.toUpperCase()}<br/>
+             ${lastName.toUpperCase()}
            </h1>
-           ${displayRoleHtml ? `
            <p class="mont-light signature-text-remove" style="font-size: ${roleFontSize}; color: #ffffff; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; opacity: 1; line-height: 1.1; text-align: right;">
-             ${displayRoleHtml}
-           </p>` : ''}
+             ${employee.role}
+           </p>
            ${iconsHtml}
        </div>
     </div>
   `;
 };
 
+// --- JOB CHANGE GROUP RENDERER ---
+const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasConfig, language: Language, orientation: Orientation = 'portrait') => {
+  const isLandscape = orientation === 'landscape';
+  const cardWidth = isLandscape ? 740 : 360;
+  const cardBg = '#f1f1f1';
+  const fadeColor = '#ffffff';
+  const noise = getNoiseOverlay();
+  const spheres = getSpheresHtml('job_change'); 
+  const logo = getPepperLogoHtml(`position: absolute; top: 15px; right: ${isLandscape ? '25px' : '15px'}; width: 20px; height: 28px; z-index: 60;`);
+
+  const title = TEXTS.NEW_ROLE[language];
+  
+  // Dynamic Header Font Size based on Title Length
+  let headerFontSize = isLandscape ? '56px' : '48px';
+  if (title.length > 8) headerFontSize = isLandscape ? '48px' : '42px'; 
+  if (title.length > 10) headerFontSize = isLandscape ? '42px' : '36px'; 
+
+  const count = employees.length;
+  
+  // Grid Logic
+  let columns = isLandscape ? 4 : 2;
+  if (isLandscape) {
+      if (count <= 3) columns = 3;
+      if (count > 8) columns = 5;
+  } else {
+      if (count > 4) columns = 3;
+  }
+  
+  const isCompact = (isLandscape && count > 8) || (!isLandscape && count > 4);
+  
+  const gap = 12;
+  const paddingX = isLandscape ? 40 : 30;
+  const itemWidth = `calc(${100/columns}% - ${(gap * (columns - 1)) / columns}px)`;
+  
+  const frameGradient = `linear-gradient(to bottom, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(135deg, #22d3ee 0%, #9333ea 100%)`;
+
+  const rows = Math.ceil(count / columns);
+  const headerHeight = isLandscape ? 140 : 160;
+  const bodyPaddingY = 40;
+  
+  // Estimate item height (square aspect ratio)
+  const availableWidth = cardWidth - (paddingX * 2);
+  const approxItemSize = (availableWidth - ((columns - 1) * gap)) / columns;
+  
+  let containerHeight = headerHeight + bodyPaddingY + (rows * approxItemSize) + ((rows - 1) * gap);
+  if (!isLandscape && containerHeight < 540) containerHeight = 540;
+  if (isLandscape && containerHeight < 400) containerHeight = 400;
+
+  let gridItems = '';
+
+  const ARROW_UP_SVG = `<svg width="12" height="12" viewBox="0 0 270 270" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(41, 41) rotate(45 94.1 94.2)"><polygon points="165.23 0 165.23 50.7 87.09 50.7 188.21 152.7 152.4 188.48 50.7 87.09 50.7 165.23 0 165.23 0 0 165.23 0" fill="#ffffff"/></g></svg>`;
+  const ARROW_DOWN_SVG = `<svg width="10" height="10" viewBox="0 0 270 270" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(41, 41) rotate(225 94.1 94.2)"><polygon points="165.23 0 165.23 50.7 87.09 50.7 188.21 152.7 152.4 188.48 50.7 87.09 50.7 165.23 0 165.23 0 0 165.23 0" fill="#ffffff"/></g></svg>`;
+
+  employees.forEach(emp => {
+      const nameParts = emp.name.split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ');
+      const fullName = `${firstName} ${lastName}`;
+      const fullNameLength = fullName.length;
+      
+      let nameSizeNum = isCompact ? 10 : 13;
+      if (fullNameLength > 15) nameSizeNum -= 1;
+      if (fullNameLength > 22) nameSizeNum -= 1;
+      const finalNameSize = `${nameSizeNum}px`;
+
+      const newRole = emp.role.toUpperCase();
+      const prevRole = emp.previousRole ? emp.previousRole.toUpperCase() : TEXTS.PREVIOUS_ROLE_LABEL[language];
+
+      let roleSizeNum = isCompact ? 9 : 11;
+      if (newRole.length > 15) roleSizeNum -= 1;
+      if (newRole.length > 25) roleSizeNum -= 1;
+      const finalRoleSize = `${roleSizeNum}px`;
+
+      gridItems += `
+        <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
+            <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+            
+            <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;">
+                <!-- Name Overlay with Gradient Fade -->
+                <div style="padding: 12px 8px 4px; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);">
+                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1.1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${firstName} ${lastName}
+                    </p>
+                </div>
+
+                <!-- New Role -->
+                <div style="height: ${isCompact ? '24px' : '32px'}; background: linear-gradient(90deg, #22c55e 0%, #15803d 100%); display: flex; align-items: center; justify-content: space-between; padding: 0 8px;">
+                    <span class="mont-font" style="color: white; font-size: ${finalRoleSize}; font-weight: bold; letter-spacing: 0.5px; line-height: 1; flex: 1; min-width: 0; margin-right: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${newRole}</span>
+                    <div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${ARROW_UP_SVG}</div>
+                </div>
+
+                <!-- Previous Role -->
+                <div style="height: ${isCompact ? '18px' : '22px'}; background: linear-gradient(90deg, #450a0a 0%, #7f1d1d 100%); display: flex; align-items: center; justify-content: space-between; padding: 0 8px;">
+                     <div style="display: flex; align-items: center; gap: 4px; opacity: 0.9; flex: 1; min-width: 0;">
+                        <span class="mont-font" style="color: white; font-size: ${isCompact ? '7px' : '9px'}; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${prevRole}</span>
+                     </div>
+                     <div style="opacity: 0.8; transform: scale(0.9); flex-shrink: 0;">${ARROW_DOWN_SVG}</div>
+                </div>
+            </div>
+        </div>
+      `;
+  });
+
+  return `
+    <div id="capture-target" style="width: ${cardWidth}px; height: ${containerHeight}px; background: ${cardBg}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+       <div style="height: ${headerHeight}px; width: 100%; background: linear-gradient(to top, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; z-index: 20; flex-shrink: 0;">
+          ${noise}
+          ${spheres}
+          ${logo}
+          <h1 class="akira-font" style="font-size: ${headerFontSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: center; letter-spacing: 2px; position: relative; z-index: 10; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            ${title}
+          </h1>
+       </div>
+       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 20px;">
+          <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: ${gap}px; width: 100%; padding: 0 ${paddingX}px; z-index: 10; position: relative; box-sizing: border-box;">
+             ${gridItems}
+          </div>
+       </div>
+    </div>
+  `;
+};
+
+export const generateHiringTemplate = (employee: Employee, config: CanvasConfig): string => {
+  const scale = employee.photoScale || 1;
+  const posX = employee.photoPosition?.x || 0;
+  const posY = employee.photoPosition?.y || 0;
+  const logoFill = '#1a1a1a';
+
+  return `
+    <div id="capture-target" style="width: 540px; height: 540px; background: white; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'Orkney', sans-serif;">
+      <!-- Full Background Image -->
+      <img src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1;" onload="
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 100;
+          canvas.height = 100;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(this, 0, 0, 100, 100);
+          const data = ctx.getImageData(0, 0, 100, 30).data;
+          let r=0, g=0, b=0;
+          for(let i=0; i<data.length; i+=4) {
+            r += data[i]; g += data[i+1]; b += data[i+2];
+          }
+          const pixels = data.length / 4;
+          const brightness = ((r/pixels) * 299 + (g/pixels) * 587 + (b/pixels) * 114) / 1000;
+          const logo = this.parentElement.querySelector('svg');
+          if(logo) logo.style.fill = brightness > 140 ? '#1a1a1a' : '#ffffff';
+        } catch(e) { console.error('Could not detect brightness', e); }
+      " />
+      
+      <!-- Logo -->
+      <div style="position: absolute; top: 20px; left: 30px; width: 110px; height: auto; z-index: 60; pointer-events: none;">
+        <svg id="hiring-logo-svg" viewBox="0 -30 1000 450" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" xmlns:xlink="http://www.w3.org/1999/xlink" style="fill: ${logoFill}; transition: fill 0.3s ease;">
+          ${LOGO_CONTENT}
+        </svg>
+      </div>
+
+      <!-- Glassmorphism Box -->
+      <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 200px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 24px; z-index: 50; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow: hidden;">
+        
+        <!-- Blur Background Workaround for html-to-image -->
+        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1;">
+          <img src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: -320px; left: -20px; width: 540px; height: 540px; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); filter: blur(12px);" />
+          <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.15);"></div>
+        </div>
+
+        <!-- WE ARE HIRING Text -->
+        <div style="width: 100%; text-align: center; margin-top: 10px; position: relative; z-index: 1;">
+          <h1 style="font-family: 'Orkney', sans-serif; font-weight: 700; font-size: 60px; color: white; margin: 0; line-height: 1; letter-spacing: -1px; text-shadow: 0 2px 10px rgba(0,0,0,0.1); white-space: nowrap;">
+            WE ARE HIRING
+          </h1>
+        </div>
+
+        <!-- Hibrid Badge -->
+        <div style="position: absolute; right: 26px; bottom: 84px; z-index: 1;">
+          <div contenteditable="true" data-field="department" style="border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 4px 10px 2px 10px; font-family: 'Orkney Light', sans-serif; font-weight: 400; font-size: 10px; line-height: 1; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; background: rgba(255, 255, 255, 0.1);">
+            ${employee.department || 'Remote'}
+          </div>
+        </div>
+
+        <!-- Dark Pill Box -->
+        <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 60px; background: #222222; border-radius: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 24px; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1;">
+          
+          <!-- Job Title -->
+          <div contenteditable="true" data-field="role" style="font-family: 'Orkney Light', sans-serif; font-weight: 400; font-size: 24px; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; flex-grow: 1; overflow: hidden; text-overflow: ellipsis;">
+            ${employee.role || 'Account Manager'}
+          </div>
+
+          <!-- Arrow Button -->
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+};
+
 // --- MAIN GENERATOR ---
 
-export const generateCardCanvas = (
-  data: Employee | Employee[], 
-  config: CanvasConfig, 
-  type: TemplateType, 
-  orientation: Orientation = 'portrait', 
-  language: Language = 'en', 
-  isExportMode: boolean = false, 
-  links?: { [key: string]: string }, 
-  providerFormat: ProviderFormat = 'post-sq',
-  welcomeTextAlignment: 'left' | 'center' | 'right' = 'center',
-  isDept: boolean = false,
-  deptName: string = ''
-): string => {
+export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq'): string => {
   let cardHtml = '';
   
   if (Array.isArray(data)) {
@@ -1513,8 +1675,10 @@ export const generateCardCanvas = (
          } else {
              cardHtml = generateMonthGroupTemplate(data, config, language);
          }
+      } else if (type === TemplateType.JOB_CHANGE) {
+         cardHtml = generateJobChangeGroupTemplate(data, config, language, orientation);
       } else {
-         return generateCardCanvas(data[0], config, type, orientation, language, isExportMode, links, providerFormat, welcomeTextAlignment, isDept, deptName);
+         return generateCardCanvas(data[0], config, type, orientation, language);
       }
   } else {
       const employee = data;
@@ -1579,10 +1743,7 @@ export const generateCardCanvas = (
             'welcome', 
             employee.role.toUpperCase(), 
             false, 
-            '#594C99',
-            null,
-            null,
-            welcomeTextAlignment
+            '#594C99' 
           );
           break;
 
@@ -1653,11 +1814,15 @@ export const generateCardCanvas = (
         case TemplateType.NEWSLETTER:
           // Signature doesn't use the translation logic for titles usually, or name/role are dynamic
           // isExportMode in this context is now 'hideIcons'
-          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links, isDept, deptName);
+          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links);
           break;
         
         case TemplateType.NEW_PROVIDER:
           cardHtml = generateNewProviderTemplate(employee, providerFormat);
+          break;
+
+        case TemplateType.HIRING:
+          cardHtml = generateHiringTemplate(employee, config);
           break;
 
         default:
