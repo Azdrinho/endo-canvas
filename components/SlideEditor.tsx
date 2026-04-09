@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { BarChart, Bar, LineChart, Line, PieChart as RechartsPieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { 
   Type, Move, Layers, Trash2, Undo, Redo, 
   Sparkles, Plus, Image as ImageIcon, Box,
@@ -10,7 +11,7 @@ import {
   BringToFront, SendToBack,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-  Triangle, Star, Minus, ArrowRight as ArrowIcon, Columns, PieChart
+  Triangle, Star, Minus, ArrowRight as ArrowIcon, Columns, PieChart, BarChart2
 } from 'lucide-react';
 import { Slide, SlideElement, SlideElementType } from '../types';
 import { generateSlideContent } from '../services/geminiService';
@@ -161,6 +162,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
 
   const [prompt, setPrompt] = useState('');
+  const [promptImages, setPromptImages] = useState<{ base64: string; mimeType: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSidePanel, setActiveSidePanel] = useState<'layers' | 'properties'>('layers');
 
@@ -233,17 +235,77 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     }
   };
 
+  const handlePromptImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+
+      const newImages: { base64: string; mimeType: string }[] = [];
+      let processedCount = 0;
+
+      files.forEach((file: File) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              if (event.target?.result) {
+                  const img = new Image();
+                  img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      let width = img.width;
+                      let height = img.height;
+                      
+                      // Max dimensions
+                      const MAX_WIDTH = 1024;
+                      const MAX_HEIGHT = 1024;
+                      
+                      if (width > height) {
+                          if (width > MAX_WIDTH) {
+                              height *= MAX_WIDTH / width;
+                              width = MAX_WIDTH;
+                          }
+                      } else {
+                          if (height > MAX_HEIGHT) {
+                              width *= MAX_HEIGHT / height;
+                              height = MAX_HEIGHT;
+                          }
+                      }
+                      
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      ctx?.drawImage(img, 0, 0, width, height);
+                      
+                      // Compress to JPEG to save space
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                      
+                      newImages.push({
+                          base64: dataUrl,
+                          mimeType: 'image/jpeg'
+                      });
+
+                      processedCount++;
+                      if (processedCount === files.length) {
+                          setPromptImages(prev => [...prev, ...newImages]);
+                      }
+                  };
+                  img.src = event.target.result as string;
+              }
+          };
+          reader.readAsDataURL(file);
+      });
+  };
+
   const handleAIGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() && promptImages.length === 0) return;
     setIsGenerating(true);
     try {
-      const generatedSlide = await generateSlideContent(prompt, currentSlide.id);
+      const generatedSlide = await generateSlideContent(prompt, currentSlide.id, promptImages);
       const newSlides = [...slides];
       newSlides[currentSlideIndex] = generatedSlide;
       pushHistory(newSlides);
+      setPrompt('');
+      setPromptImages([]);
     } catch (e) {
       console.error(e);
-      alert("Failed to generate content");
+      // alert("Failed to generate content");
     } finally {
       setIsGenerating(false);
     }
@@ -576,7 +638,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       zIndex: currentSlide.elements.length + 1,
       children: type === 'group' ? [] : undefined,
       style: {
-        fontFamily: 'Mont Regular',
+        fontFamily: 'Orkney',
         fontSize: 24,
         color: '#000000',
         lineHeight: 1.2,
@@ -729,9 +791,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 value={el.style.fontFamily}
                 onChange={(e) => updateElement(el.id, { style: { fontFamily: e.target.value as any } })}
             >
-                <option value="AkiraExpanded-SuperBold">Akira</option>
-                <option value="Mont Regular">Mont Reg</option>
-                <option value="Mont SemiBold">Mont Bold</option>
+                <option value="Orkney">Orkney</option>
             </select>
             <div className="w-px h-6 bg-white/10"></div>
             <div className="flex items-center gap-1 bg-slate-900 rounded border border-white/10 p-0.5">
@@ -873,9 +933,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             value={primarySelectedElement.style.fontFamily}
                             onChange={(e) => updateElement(primarySelectedElement.id, { style: { fontFamily: e.target.value as any } })}
                         >
-                            <option value="AkiraExpanded-SuperBold">Akira SuperBold</option>
-                            <option value="Mont Regular">Mont Regular</option>
-                            <option value="Mont SemiBold">Mont SemiBold</option>
+                            <option value="Orkney">Orkney</option>
                         </select>
                         <div className="flex gap-2">
                             <input 
@@ -975,6 +1033,87 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     </button>
                 </div>
              </div>
+
+             {primarySelectedElement.type === 'chart' && primarySelectedElement.chartData && (
+                <div className="mt-6 border-t border-white/10 pt-4">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2"><BarChart2 size={14}/> Chart Data</h3>
+                    
+                    <div className="mb-4 space-y-2">
+                        <span className="text-xs text-slate-500">Series Colors</span>
+                        {primarySelectedElement.chartData.config.series.map((s, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <input type="color" value={s.color} onChange={(e) => {
+                                    const newSeries = [...primarySelectedElement.chartData!.config.series];
+                                    newSeries[i].color = e.target.value;
+                                    updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, config: { ...primarySelectedElement.chartData!.config, series: newSeries } } });
+                                }} className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0" />
+                                <input type="text" value={s.name || s.key} onChange={(e) => {
+                                    const newSeries = [...primarySelectedElement.chartData!.config.series];
+                                    newSeries[i].name = e.target.value;
+                                    updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, config: { ...primarySelectedElement.chartData!.config, series: newSeries } } });
+                                }} className="flex-1 bg-slate-900 border border-white/10 rounded text-xs text-white p-1" />
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead>
+                                <tr>
+                                    <th className="p-1 font-medium text-slate-400">{primarySelectedElement.chartData.config.xAxisKey || 'name'}</th>
+                                    {primarySelectedElement.chartData.config.series.map(s => (
+                                        <th key={s.key} className="p-1 font-medium text-slate-400">{s.key}</th>
+                                    ))}
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {primarySelectedElement.chartData.data.map((row, rowIndex) => (
+                                    <tr key={rowIndex}>
+                                        <td className="p-1">
+                                            <input type="text" value={row[primarySelectedElement.chartData!.config.xAxisKey || 'name'] || ''}
+                                                onChange={(e) => {
+                                                    const newData = [...primarySelectedElement.chartData!.data];
+                                                    newData[rowIndex] = { ...newData[rowIndex], [primarySelectedElement.chartData!.config.xAxisKey || 'name']: e.target.value };
+                                                    updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, data: newData } });
+                                                }}
+                                                className="w-full bg-slate-900 border border-white/10 rounded text-xs text-white p-1"
+                                            />
+                                        </td>
+                                        {primarySelectedElement.chartData.config.series.map(s => (
+                                            <td key={s.key} className="p-1">
+                                                <input type="number" value={row[s.key] || 0}
+                                                    onChange={(e) => {
+                                                        const newData = [...primarySelectedElement.chartData!.data];
+                                                        newData[rowIndex] = { ...newData[rowIndex], [s.key]: Number(e.target.value) };
+                                                        updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, data: newData } });
+                                                    }}
+                                                    className="w-full bg-slate-900 border border-white/10 rounded text-xs text-white p-1"
+                                                />
+                                            </td>
+                                        ))}
+                                        <td className="p-1">
+                                            <button onClick={() => {
+                                                const newData = primarySelectedElement.chartData!.data.filter((_, i) => i !== rowIndex);
+                                                updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, data: newData } });
+                                            }} className="text-red-400 hover:text-red-300"><Trash2 size={12}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button onClick={() => {
+                        const newData = [...primarySelectedElement.chartData!.data];
+                        const newRow: any = { [primarySelectedElement.chartData!.config.xAxisKey || 'name']: `Item ${newData.length + 1}` };
+                        primarySelectedElement.chartData!.config.series.forEach(s => newRow[s.key] = 0);
+                        newData.push(newRow);
+                        updateElement(primarySelectedElement.id, { chartData: { ...primarySelectedElement.chartData!, data: newData } });
+                    }} className="mt-2 w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 border border-white/10 p-1 rounded text-xs text-slate-300">
+                        <Plus size={12}/> Add Row
+                    </button>
+                </div>
+             )}
         </div>
     );
   };
@@ -1094,6 +1233,59 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                         ))}
                                     </div>
                                 )}
+                                {el.type === 'chart' && el.chartData && (
+                                    <div className="w-full h-full" style={{...el.style}}>
+                                        {(() => {
+                                            const sanitizedData = el.chartData.data.map(item => {
+                                                const newItem = { ...item };
+                                                Object.keys(newItem).forEach(key => {
+                                                    if (key !== (el.chartData!.config.xAxisKey || 'name') && typeof newItem[key] === 'string') {
+                                                        const parsed = parseFloat(String(newItem[key]).replace(/[^0-9.-]+/g,""));
+                                                        if (!isNaN(parsed)) newItem[key] = parsed;
+                                                    }
+                                                });
+                                                return newItem;
+                                            });
+                                            return (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    {el.chartData.type === 'bar' ? (
+                                                        <BarChart data={sanitizedData}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" vertical={false} />
+                                                            <XAxis dataKey={el.chartData.config.xAxisKey || 'name'} stroke="#ffffff80" tick={{fill: '#ffffff80', fontSize: 12}} />
+                                                            <YAxis stroke="#ffffff80" tick={{fill: '#ffffff80', fontSize: 12}} />
+                                                            <Tooltip contentStyle={{backgroundColor: '#1e1e1e', borderColor: '#333', color: '#fff'}} />
+                                                            <Legend wrapperStyle={{color: '#fff'}} />
+                                                            {el.chartData.config.series.map((s, i) => (
+                                                                <Bar key={s.key} dataKey={s.key} fill={s.color} name={s.name || s.key} />
+                                                            ))}
+                                                        </BarChart>
+                                                    ) : el.chartData.type === 'line' ? (
+                                                        <LineChart data={sanitizedData}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" vertical={false} />
+                                                            <XAxis dataKey={el.chartData.config.xAxisKey || 'name'} stroke="#ffffff80" tick={{fill: '#ffffff80', fontSize: 12}} />
+                                                            <YAxis stroke="#ffffff80" tick={{fill: '#ffffff80', fontSize: 12}} />
+                                                            <Tooltip contentStyle={{backgroundColor: '#1e1e1e', borderColor: '#333', color: '#fff'}} />
+                                                            <Legend wrapperStyle={{color: '#fff'}} />
+                                                            {el.chartData.config.series.map((s, i) => (
+                                                                <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} name={s.name || s.key} strokeWidth={3} />
+                                                            ))}
+                                                        </LineChart>
+                                                    ) : (
+                                                        <RechartsPieChart>
+                                                            <Pie data={sanitizedData} dataKey={el.chartData.config.series[0]?.key || 'value'} nameKey={el.chartData.config.xAxisKey || 'name'} cx="50%" cy="50%" outerRadius="80%" innerRadius="50%">
+                                                                {sanitizedData.map((entry, index) => (
+                                                                    <Cell key={`cell-${index}`} fill={el.chartData!.config.series[index % el.chartData!.config.series.length]?.color || '#8884d8'} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip contentStyle={{backgroundColor: '#1e1e1e', borderColor: '#333', color: '#fff'}} />
+                                                            <Legend wrapperStyle={{color: '#fff'}} />
+                                                        </RechartsPieChart>
+                                                    )}
+                                                </ResponsiveContainer>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
 
                                 {isSelected && el.type === 'text' && interactionMode === 'idle' && renderTextToolbar(el)}
 
@@ -1142,9 +1334,27 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             placeholder="Describe your slide..."
                             className="flex-1 bg-transparent border-none outline-none text-white text-lg placeholder:text-slate-500 h-14 pl-4"
                         />
+                        <div className="relative ml-2">
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                multiple
+                                onChange={handlePromptImageUpload} 
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                title="Upload reference images"
+                            />
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors relative ${promptImages.length > 0 ? 'bg-cyan-500 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+                                <ImageIcon size={18} />
+                                {promptImages.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                        {promptImages.length}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                         <button
                             onClick={handleAIGenerate}
-                            disabled={isGenerating || !prompt.trim()}
+                            disabled={isGenerating || (!prompt.trim() && promptImages.length === 0)}
                             className="w-14 h-14 rounded-full bg-white hover:bg-slate-200 text-black flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ml-2"
                         >
                             <ArrowRight size={24} strokeWidth={3} />

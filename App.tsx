@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, Slide, ProviderFormat, ProviderGridConfig } from './types';
 import { generateCardCanvas } from './services/emailTemplate'; 
-import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage } from './services/supabase';
+import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage } from './services/supabase';
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { SlideEditor } from './components/SlideEditor';
@@ -119,6 +119,18 @@ const INITIAL_EMPLOYEES: Employee[] = [
     dateStr: '', 
     admissionDate: '',
     tenure: ''
+  },
+  {
+    id: 'baby-generic',
+    name: 'Generic Baby',
+    role: '',
+    department: '',
+    photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+    photoScale: 1,
+    photoPosition: { x: 0, y: 0 },
+    dateStr: '', 
+    admissionDate: '',
+    tenure: ''
   }
 ];
 
@@ -147,7 +159,8 @@ const INITIAL_SLIDES: Slide[] = [{
        content: 'PRESENTATION TITLE',
        zIndex: 1,
        style: {
-          fontFamily: 'AkiraExpanded-SuperBold',
+          fontFamily: 'Orkney',
+          fontWeight: '700',
           fontSize: 48,
           color: '#000000',
           textAlign: 'left'
@@ -163,7 +176,7 @@ const INITIAL_SLIDES: Slide[] = [{
        content: 'Subtitle goes here',
        zIndex: 1,
        style: {
-          fontFamily: 'Mont Regular',
+          fontFamily: 'Orkney',
           fontSize: 24,
           color: '#666666',
           textAlign: 'left'
@@ -308,7 +321,7 @@ const MorphingCanvas = ({ html, templateType, orientation, children }: { html: s
         height: 'fit-content',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
         position: 'relative',
-        borderRadius: displayTemplate === TemplateType.NEWSLETTER ? 0 : 16
+        borderRadius: 0
       }}
     >
       <motion.div
@@ -341,17 +354,28 @@ export default function App() {
     fetchEmployees().then(data => {
       if (data && data.length > 0) {
         const genericHiring = INITIAL_EMPLOYEES.find(e => e.id === 'hiring-generic');
+        const genericBaby = INITIAL_EMPLOYEES.find(e => e.id === 'baby-generic');
+        
+        let finalData = [...data];
         if (genericHiring && !data.find(e => e.id === 'hiring-generic')) {
-          setEmployees([...data, genericHiring]);
-        } else {
-          setEmployees(data);
+          finalData.push(genericHiring);
         }
+        if (genericBaby && !data.find(e => e.id === 'baby-generic')) {
+          finalData.push(genericBaby);
+        }
+        setEmployees(finalData);
       }
     });
 
     fetchHiringImages().then(images => {
       if (images && images.length > 0) {
         setCustomHiringImages(images);
+      }
+    });
+
+    fetchBabyImages().then(images => {
+      if (images && images.length > 0) {
+        setCustomBabyImages(images);
       }
     });
   }, []);
@@ -428,6 +452,7 @@ export default function App() {
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(new Date().getMonth());
   const [showImageControls, setShowImageControls] = useState<boolean>(false);
   const [customHiringImages, setCustomHiringImages] = useState<string[]>([]);
+  const [customBabyImages, setCustomBabyImages] = useState<string[]>([]);
   
   // SIGNATURE CONTROL STATE
   const [showSignatureControls, setShowSignatureControls] = useState<boolean>(false); // Changed to false to hide on load
@@ -458,6 +483,7 @@ export default function App() {
     website: '',
     whatsapp: ''
   });
+  const [signatureDepartment, setSignatureDepartment] = useState('');
   
   // Track which socials are active in the UI
   const [activeSocials, setActiveSocials] = useState<string[]>(['linkedin', 'instagram', 'website']);
@@ -645,7 +671,7 @@ export default function App() {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   
   const filteredEmployees = useMemo(() => employees.filter(emp => 
-     emp.id !== 'hiring-generic' && (
+     emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && (
        emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
        emp.role.toLowerCase().includes(searchQuery.toLowerCase())
      )
@@ -662,9 +688,9 @@ export default function App() {
     });
 
     if (currentCanvasData && !isBulkMode && selectedTemplate !== TemplateType.PRESENTATION) {
-      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat));
+      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, signatureDepartment));
     }
-  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat]);
+  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, signatureDepartment]);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -968,6 +994,22 @@ export default function App() {
           if (fileInputRef.current) fileInputRef.current.value = '';
           setUploadTarget(null);
           return;
+      } else if (selectedTemplate === TemplateType.BABY && uploadTarget.field === 'photoUrl') {
+          try {
+              // Upload actual file to Supabase Storage
+              const publicUrl = await uploadBabyImageToStorage(file);
+              
+              // Update state and DB with the public URL
+              updateEmployee(uploadTarget.id, uploadTarget.field as keyof Employee, publicUrl);
+              setCustomBabyImages(prev => [...prev, publicUrl]);
+              await addBabyImage(publicUrl);
+          } catch (err) {
+              console.error('Failed to upload baby image:', err);
+              alert('Failed to upload image. Please try again.');
+          }
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setUploadTarget(null);
+          return;
       }
 
       const reader = new FileReader();
@@ -1149,7 +1191,7 @@ export default function App() {
                         y: `${yPct}%`,
                         w: `${wPct}%`,
                         h: `${hPct}%`,
-                        fontFace: el.style.fontFamily?.includes('Akira') ? 'Arial Black' : 'Arial',
+                        fontFace: 'Orkney',
                         fontSize: (el.style.fontSize || 16) * 0.75,
                         color: el.style.color?.replace('#', '') || '000000',
                         align: el.style.textAlign || 'left',
@@ -1195,7 +1237,8 @@ export default function App() {
     hideIcons: boolean, 
     showInfo: boolean,
     linksMap: Record<string, string> = signatureLinks,
-    activeKeys: string[] = activeSocials
+    activeKeys: string[] = activeSocials,
+    department: string = signatureDepartment
   ) => {
     // Prepare Data
     const bannerUrl = url || 'https://salsa-tech.com/wp-content/uploads/2022/assinatura/email-signature_background.png';
@@ -1227,13 +1270,25 @@ export default function App() {
     let contentHtml = '';
     
     if (showInfo) {
-        // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
-        const nameParts = targetEmployee.name.split(' ');
-        const firstName = nameParts[0];
-        const restName = nameParts.slice(1).join(' ');
-        const displayName = restName ? `${firstName}<br/>${restName}` : firstName;
+        if (department) {
+            const depParts = department.split(' ');
+            const firstDep = depParts[0];
+            const restDep = depParts.slice(1).join(' ');
+            const displayDep = restDep ? `${firstDep}<br/>${restDep}` : firstDep;
 
-        contentHtml += `
+            contentHtml += `
+            <p style="font-family: 'Arial Black', Arial, sans-serif; font-size: 24px; font-weight: 900; text-transform: uppercase; color: #ffffff; margin: 0; line-height: 1; mso-line-height-rule: exactly; padding-bottom: 15px;">
+                ${displayDep}
+            </p>
+        `;
+        } else {
+            // Split name only at the first space to match the user's "Vitor<br>Gonzalez" style
+            const nameParts = targetEmployee.name.split(' ');
+            const firstName = nameParts[0];
+            const restName = nameParts.slice(1).join(' ');
+            const displayName = restName ? `${firstName}<br/>${restName}` : firstName;
+
+            contentHtml += `
             <p style="font-family: 'Arial Black', Arial, sans-serif; font-size: 24px; font-weight: 900; text-transform: uppercase; color: #ffffff; margin: 0; line-height: 1; mso-line-height-rule: exactly;">
                 ${displayName}
             </p>
@@ -1241,6 +1296,7 @@ export default function App() {
                 ${targetEmployee.role}
             </p>
         `;
+        }
     }
 
     if (iconsCellsHtml) {
@@ -1448,11 +1504,11 @@ export default function App() {
        {/* 1. Header Tabs */}
        <div className="p-4 shrink-0">
           <div className="flex bg-white/10 rounded-full p-1 h-14 relative">
-             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.NEW_PROVIDER && (
+             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && selectedTemplate !== TemplateType.NEW_PROVIDER && (
                  <button 
                     onClick={() => { 
                         setActiveTab('DATA'); 
-                        if (selectedTemplate === TemplateType.HIRING) {
+                        if (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) {
                             setSidebarDataView('DETAIL');
                         } else {
                             setSidebarDataView('LIST'); 
@@ -1503,11 +1559,11 @@ export default function App() {
                   <Palette size={22} />
                 </span>
              </button>
-             {selectedTemplate === TemplateType.HIRING && (
+             {(selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
                <button 
                   onClick={() => setActiveTab('IMAGES')} 
                   className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'IMAGES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Hiring Images"
+                  title="Images"
                >
                   {activeTab === 'IMAGES' && (
                     <motion.div
@@ -1533,11 +1589,11 @@ export default function App() {
 
        {/* 2. Middle Content (Scrollable) */}
        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar">
-          {activeTab === 'IMAGES' && selectedTemplate === TemplateType.HIRING && (
+          {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
              <div className="animate-in slide-in-from-right-4 duration-300 pt-2">
                 <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Image Library</h3>
                 <div className="grid grid-cols-2 gap-3">
-                    {customHiringImages.map((img, i) => (
+                    {(selectedTemplate === TemplateType.HIRING ? customHiringImages : customBabyImages).map((img, i) => (
                         <div key={`custom-${i}`} className="relative group">
                             <button 
                                 onClick={() => updateEmployee(selectedEmployee.id, 'photoUrl', img)}
@@ -1548,14 +1604,25 @@ export default function App() {
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setCustomHiringImages(prev => {
-                                        const newImages = prev.filter((_, idx) => idx !== i);
-                                        if (selectedEmployee.photoUrl === img) {
-                                            updateEmployee(selectedEmployee.id, 'photoUrl', newImages[0] || '');
-                                        }
-                                        return newImages;
-                                    });
-                                    deleteHiringImage(img).catch(console.error);
+                                    if (selectedTemplate === TemplateType.HIRING) {
+                                        setCustomHiringImages(prev => {
+                                            const newImages = prev.filter((_, idx) => idx !== i);
+                                            if (selectedEmployee.photoUrl === img) {
+                                                updateEmployee(selectedEmployee.id, 'photoUrl', newImages[0] || '');
+                                            }
+                                            return newImages;
+                                        });
+                                        deleteHiringImage(img).catch(console.error);
+                                    } else {
+                                        setCustomBabyImages(prev => {
+                                            const newImages = prev.filter((_, idx) => idx !== i);
+                                            if (selectedEmployee.photoUrl === img) {
+                                                updateEmployee(selectedEmployee.id, 'photoUrl', newImages[0] || '');
+                                            }
+                                            return newImages;
+                                        });
+                                        deleteBabyImage(img).catch(console.error);
+                                    }
                                 }}
                                 className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                                 title="Remove Image"
@@ -1808,7 +1875,7 @@ export default function App() {
                    </div>
                ) : (
                    /* Standard Employee List/Detail Logic */
-                   (sidebarDataView === 'LIST' && selectedTemplate !== TemplateType.HIRING) ? (
+                   (sidebarDataView === 'LIST' && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY) ? (
                      <>
                         {/* UPDATED SEARCH BAR - Fully Rounded & Larger */}
                         <div className={`relative flex items-center px-6 py-4 rounded-full border transition-all bg-white/5 border-white/10 focus-within:bg-white/10 shadow-inner`}>
@@ -1878,7 +1945,7 @@ export default function App() {
                    ) : (
                       // Detail View 
                       <div>
-                          {selectedTemplate !== TemplateType.HIRING && (
+                          {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                               <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
                           )}
                           
@@ -1913,8 +1980,9 @@ export default function App() {
                   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
                   { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
                   { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
-                  { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
                   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
+                  { id: TemplateType.BABY, label: 'Baby Birth', desc: 'Welcome Baby', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69d5122206cc717826a7543b.jpg' },
+                  { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
                   { id: TemplateType.PRESENTATION, label: 'Slide Deck', desc: 'AI Powered Presentation', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0318a761a56ead72a.png' }, 
                   { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
                 ].map((t, index) => {
@@ -1928,18 +1996,23 @@ export default function App() {
                                updateEmployee('hiring-generic', 'photoUrl', customHiringImages[0] || '');
                                setSidebarDataView('DETAIL');
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                           } else if (t.id === TemplateType.BABY) {
+                               setSelectedEmployeeId('baby-generic');
+                               updateEmployee('baby-generic', 'photoUrl', customBabyImages[0] || '');
+                               setSidebarDataView('DETAIL');
+                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
                            } else if (t.id === TemplateType.NEW_PROVIDER) {
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
-                           } else if (selectedEmployeeId === 'hiring-generic') {
-                               const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic');
+                           } else if (selectedEmployeeId === 'hiring-generic' || selectedEmployeeId === 'baby-generic') {
+                               const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic');
                                if (firstRealEmployee) {
                                    setSelectedEmployeeId(firstRealEmployee.id);
                                }
                                setSidebarDataView('LIST');
                            }
                            if (t.id !== TemplateType.BIRTHDAY) setIsMonthView(false); 
-                           if (t.id === TemplateType.PRESENTATION) {
-                              setOrientation('landscape'); 
+                           if (t.id === TemplateType.PRESENTATION || t.id === TemplateType.BABY) {
+                               setOrientation('landscape'); 
                            }
                            // Removed auto-navigation logic for NEW_PROVIDER here
                        }} 
@@ -2017,22 +2090,24 @@ export default function App() {
             
             {SidebarContent}
 
-            {selectedTemplate === TemplateType.PRESENTATION ? (
+            <div style={{ display: selectedTemplate === TemplateType.PRESENTATION ? 'flex' : 'none', flex: 1, width: '100%', height: '100%' }}>
                 <SlideEditor 
                     slides={slides}
                     currentSlideIndex={currentSlideIndex}
                     onUpdateSlides={setSlides}
                     onSelectSlide={setCurrentSlideIndex}
                 />
-            ) : (
-                <div 
-                    className={`flex-1 relative overflow-hidden bg-slate-200/50 dark:bg-black/50 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onWheel={handleWheel}
-                >
+            </div>
+            
+            <div 
+                style={{ display: selectedTemplate !== TemplateType.PRESENTATION ? 'flex' : 'none' }}
+                className={`flex-1 relative overflow-hidden bg-slate-200/50 dark:bg-black/50 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+            >
                     <div className="absolute inset-0 opacity-10 pointer-events-none" 
                          style={{ 
                              backgroundImage: `radial-gradient(#ffffff 1px, transparent 1px)`, 
@@ -2098,6 +2173,7 @@ export default function App() {
                                 {showSignatureControls && (
                                     <div 
                                         ref={popupRef}
+                                        onWheel={(e) => e.stopPropagation()}
                                         className="signature-controls absolute mt-4 w-[340px] bg-white dark:bg-[#121212] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                                         style={{ right: 0 }}
                                     >
@@ -2106,6 +2182,32 @@ export default function App() {
                                             <button onClick={() => setShowSignatureControls(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white"><X size={18}/></button>
                                         </div>
                                         <div className="p-2 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                                            <div className="mb-4 p-3 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Department (Optional)</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="e.g. Marketing"
+                                                    value={signatureDepartment}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setSignatureDepartment(val);
+                                                        if (val && !signatureLinks.linkedin) {
+                                                            setSignatureLinks({
+                                                                linkedin: 'https://www.linkedin.com/company/salsa-technology/',
+                                                                instagram: 'https://www.instagram.com/salsatechnology/',
+                                                                website: 'https://salsatechnology.com',
+                                                                whatsapp: ''
+                                                            });
+                                                            setActiveSocials(['linkedin', 'instagram', 'website']);
+                                                        }
+                                                    }}
+                                                    className="w-full bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-cyan-500/50 text-slate-700 dark:text-white transition-colors"
+                                                />
+                                                <p className="text-[10px] text-slate-400 mt-2">
+                                                    Adds department to signature and auto-fills Salsa links.
+                                                </p>
+                                            </div>
+
                                             {SOCIAL_NETWORKS.map((net) => {
                                                 const isActive = activeSocials.includes(net.id);
                                                 const Icon = net.icon;
@@ -2257,7 +2359,7 @@ export default function App() {
                                 </div>
                             )}
 
-                            {selectedTemplate !== TemplateType.HIRING && (
+                            {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex">
                                     <button 
                                         onClick={() => handleOrientationChange('portrait')} 
@@ -2279,11 +2381,10 @@ export default function App() {
                     )}
 
                 </div>
-            )}
             </div>
         </div>
         
-        {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && (
+        {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
             <div 
                 className="fixed bottom-8 left-[380px] z-50 group"
                 onMouseDown={handleJoystickStart}

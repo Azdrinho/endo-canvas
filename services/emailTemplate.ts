@@ -9,38 +9,21 @@ const getFontStyles = () => `
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
     
-    /* Import Mont Fonts */
-    @import url(https://db.onlinewebfonts.com/c/6cce6b8c74a8ac84c45963dbac1e025a?family=Mont+Regular);
-    @import url(https://db.onlinewebfonts.com/c/303ff8c2975f30a5d6de8572b6b3fd15?family=Mont+SemiBold);
-    @import url(https://db.onlinewebfonts.com/c/38d16ae93a514dfd43dfd4aa13f280fc?family=Mont+Heavy);
-    @import url(https://db.onlinewebfonts.com/c/41fc8c954e9cc6cb6a52e93c07d6e2c8?family=Mont+ExtraLight+DEMO);
-
-    /* Import Akira Expanded Super Bold from Web Font CDN */
-    @font-face {
-        font-family: "AkiraExpanded-SuperBold";
-        src: url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.eot");
-        src: url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.eot?#iefix")format("embedded-opentype"),
-        url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.woff2")format("woff2"),
-        url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.woff")format("woff"),
-        url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.ttf")format("truetype"),
-        url("https://db.onlinewebfonts.com/t/6a6c946c81961ceab1711da6da2b26af.svg#AkiraExpanded-SuperBold")format("svg");
-    }
-
     /* Import Orkney Font */
     @import url(https://db.onlinewebfonts.com/c/1aab5ed24c6a9f95b69de27350a83559?family=Orkney);
 
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent !important; }
     
-    /* Use Literal Akira Expanded Super Bold */
+    /* Use Orkney Font for all templates */
     .akira-font { 
-      font-family: 'AkiraExpanded-SuperBold', 'Archivo Black', sans-serif; 
-      font-weight: normal; 
+      font-family: 'Orkney', sans-serif; 
+      font-weight: 700; 
       text-transform: uppercase;
     }
     
-    .mont-font { font-family: 'Mont Regular', 'Mont', sans-serif; }
-    .mont-semibold { font-family: 'Mont SemiBold', 'Mont', sans-serif; }
-    .mont-light { font-family: 'Mont ExtraLight DEMO', 'Mont', sans-serif; }
+    .mont-font { font-family: 'Orkney', sans-serif; font-weight: 400; }
+    .mont-semibold { font-family: 'Orkney', sans-serif; font-weight: 700; }
+    .mont-light { font-family: 'Orkney', sans-serif; font-weight: 300; }
 
     /* Utility for Grid Layout */
     .grid-container {
@@ -608,6 +591,11 @@ const TEXTS = {
     en: 'PREVIOUS ROLE',
     pt: 'CARGO ANTERIOR',
     es: 'CARGO ANTERIOR'
+  },
+  BABY_TITLE: {
+    en: 'WELCOME',
+    pt: 'SEJA BEM-VINDO',
+    es: 'BIENVENIDO'
   }
 };
 
@@ -1374,7 +1362,7 @@ const generatePortraitTemplate = (
 };
 
 // --- SIGNATURE RENDERER ---
-const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hideIcons: boolean = false, links?: { [key: string]: string }) => {
+const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hideIcons: boolean = false, links?: { [key: string]: string }, department?: string) => {
   const noise = getNoiseOverlay();
   
   // Banner Version Only (Dimensions 600x150)
@@ -1448,13 +1436,20 @@ const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hid
        
        <!-- TEXT OVERLAY (Always visible, icons conditional) -->
        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding-right: 40px; box-sizing: border-box; z-index: 10;">
-          <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-             ${firstName.toUpperCase()}<br/>
-             ${lastName.toUpperCase()}
-           </h1>
-           <p class="mont-light signature-text-remove" style="font-size: ${roleFontSize}; color: #ffffff; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; opacity: 1; line-height: 1.1; text-align: right;">
-             ${employee.role}
-           </p>
+           ${department ? `
+              <h1 class="akira-font signature-text-remove" style="font-size: ${department.length > 20 ? '24px' : '34px'}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1); padding-bottom: 15px;">
+                  ${department.split(' ')[0].toUpperCase()}<br/>
+                  ${department.split(' ').slice(1).join(' ').toUpperCase()}
+              </h1>
+           ` : `
+              <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                 ${firstName.toUpperCase()}<br/>
+                 ${lastName.toUpperCase()}
+               </h1>
+               <p class="mont-light signature-text-remove" style="font-size: ${roleFontSize}; color: #ffffff; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; opacity: 1; line-height: 1.1; text-align: right;">
+                 ${employee.role}
+               </p>
+           `}
            ${iconsHtml}
        </div>
     </div>
@@ -1583,6 +1578,80 @@ const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasCon
   `;
 };
 
+export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, language: Language): string => {
+  const cardWidth = 740;
+  const cardHeight = 360;
+  const noise = getNoiseOverlay();
+  const spheres = `
+    <svg viewBox="0 0 488 488" style="position: absolute; top: -140px; left: -140px; width: 280px; height: 280px; z-index: 1;">
+      <defs>
+        <linearGradient id="babySphereGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38B3ED" />
+          <stop offset="100%" stop-color="#594494" />
+        </linearGradient>
+      </defs>
+      <g xmlns="http://www.w3.org/2000/svg" id="Camada_1-2" data-name="Camada 1">
+        <circle fill="url(#babySphereGrad1)" cx="243.56" cy="243.56" r="243.56"/>
+      </g>
+    </svg>
+    <svg viewBox="0 0 488 488" style="position: absolute; bottom: -190px; right: -190px; width: 380px; height: 380px; z-index: 1;">
+      <defs>
+        <linearGradient id="babySphereGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38B3ED" />
+          <stop offset="100%" stop-color="#594494" />
+        </linearGradient>
+      </defs>
+      <g xmlns="http://www.w3.org/2000/svg" id="Camada_1-2" data-name="Camada 1">
+        <circle fill="url(#babySphereGrad2)" cx="243.56" cy="243.56" r="243.56"/>
+      </g>
+    </svg>
+  `;
+  const logo = getPepperLogoHtml('position: absolute; top: 15px; left: 15px; width: 20px; height: 28px; z-index: 60;');
+
+  const welcomeText = employee.role || TEXTS.BABY_TITLE[language] || 'SEJA BEM-VINDO';
+  const babyName = employee.name ? employee.name.split(' ')[0].toUpperCase() : 'NOME';
+  
+  const defaultDesc = language === 'pt' 
+    ? 'Hoje é dia de celebrar a vida de quem acabou de chegar ao mundo! Filho da nossa Nome e do papai Nome.<br/><br/>Que esse novo capítulo seja repleto de amor, risos e memórias preciosas.<br/><br/><b>Parabéns!</b>'
+    : language === 'es'
+    ? '¡Hoy es día de celebrar la vida de quien acaba de llegar al mundo! Hijo de nuestra Nombre y del papá Nombre.<br/><br/>Que este nuevo capítulo esté lleno de amor, risas y recuerdos preciosos.<br/><br/><b>¡Felicidades!</b>'
+    : 'Today is the day to celebrate the life of the one who just arrived in the world! Child of our Name and dad Name.<br/><br/>May this new chapter be filled with love, laughter, and precious memories.<br/><br/><b>Congratulations!</b>';
+
+  const description = employee.description || defaultDesc;
+
+  const scale = employee.photoScale || 1;
+  const posX = employee.photoPosition?.x || 0;
+  const posY = employee.photoPosition?.y || 0;
+  
+  const nameFontSize = babyName.length > 7 ? '42px' : '64px';
+
+  return `
+    <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: #ffffff; position: relative; display: flex; overflow: hidden; box-sizing: border-box; font-family: 'Orkney', sans-serif;">
+       
+       <!-- Left Side (Gradient) -->
+       <div style="width: 55%; height: 100%; background: linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); position: relative; z-index: 10; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
+          ${noise}
+          ${spheres}
+          ${logo}
+          
+          <div style="position: absolute; top: 45px; left: 40px; right: 40px; z-index: 20; text-align: center;">
+             <div contenteditable="true" data-field="role" style="font-family: 'Orkney', sans-serif; font-weight: 300; font-size: 28px; color: white; margin: 0; line-height: 1.2; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word;">${welcomeText}</div>
+             <div contenteditable="true" data-field="name" oninput="this.style.fontSize = this.innerText.length > 7 ? '42px' : '64px';" style="font-family: 'Orkney', sans-serif; font-weight: 700; font-size: ${nameFontSize}; color: white; margin: 0; line-height: 1; outline: none; user-select: text; cursor: text; pointer-events: auto; text-shadow: 0 4px 12px rgba(0,0,0,0.1); white-space: nowrap; overflow: hidden;">${babyName}</div>
+          </div>
+
+          <div style="position: absolute; bottom: 45px; left: 40px; right: 40px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 16px; padding: 15px; z-index: 30; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+             <div contenteditable="true" data-field="description" oninput="let fs=13; this.style.fontSize=fs+'px'; while(this.scrollHeight > 136 && fs > 8){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: 13px; color: white; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: 136px; overflow: hidden;">${description}</div>
+          </div>
+       </div>
+
+       <!-- Right Side (Image) -->
+       <div style="width: 45%; height: 100%; position: relative; z-index: 5; background: #f1f1f1; overflow: hidden;">
+          <img src="${employee.photoUrl || 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />
+       </div>
+    </div>
+  `;
+};
+
 export const generateHiringTemplate = (employee: Employee, config: CanvasConfig): string => {
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
@@ -1636,7 +1705,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
 
         <!-- Hibrid Badge -->
         <div style="position: absolute; right: 26px; bottom: 84px; z-index: 1;">
-          <div contenteditable="true" data-field="department" style="border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 4px 10px 2px 10px; font-family: 'Orkney Light', sans-serif; font-weight: 400; font-size: 10px; line-height: 1; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; background: rgba(255, 255, 255, 0.1);">
+          <div contenteditable="true" data-field="department" style="border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 4px 10px 2px 10px; font-family: 'Orkney', sans-serif; font-weight: 300; font-size: 10px; line-height: 1; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; background: rgba(255, 255, 255, 0.1);">
             ${employee.department || 'Remote'}
           </div>
         </div>
@@ -1645,7 +1714,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
         <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 60px; background: #222222; border-radius: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 24px; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1;">
           
           <!-- Job Title -->
-          <div contenteditable="true" data-field="role" style="font-family: 'Orkney Light', sans-serif; font-weight: 400; font-size: 24px; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; flex-grow: 1; overflow: hidden; text-overflow: ellipsis;">
+          <div contenteditable="true" data-field="role" style="font-family: 'Orkney', sans-serif; font-weight: 300; font-size: 24px; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; flex-grow: 1; overflow: hidden; text-overflow: ellipsis;">
             ${employee.role || 'Account Manager'}
           </div>
 
@@ -1665,7 +1734,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
 
 // --- MAIN GENERATOR ---
 
-export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq'): string => {
+export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq', department?: string): string => {
   let cardHtml = '';
   
   if (Array.isArray(data)) {
@@ -1678,7 +1747,7 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
       } else if (type === TemplateType.JOB_CHANGE) {
          cardHtml = generateJobChangeGroupTemplate(data, config, language, orientation);
       } else {
-         return generateCardCanvas(data[0], config, type, orientation, language);
+         return generateCardCanvas(data[0], config, type, orientation, language, isExportMode, links, providerFormat, department);
       }
   } else {
       const employee = data;
@@ -1814,7 +1883,7 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
         case TemplateType.NEWSLETTER:
           // Signature doesn't use the translation logic for titles usually, or name/role are dynamic
           // isExportMode in this context is now 'hideIcons'
-          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links);
+          cardHtml = generateSignatureTemplate(employee, config, isExportMode, links, department);
           break;
         
         case TemplateType.NEW_PROVIDER:
@@ -1823,6 +1892,10 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
 
         case TemplateType.HIRING:
           cardHtml = generateHiringTemplate(employee, config);
+          break;
+
+        case TemplateType.BABY:
+          cardHtml = generateBabyTemplate(employee, config, language);
           break;
 
         default:

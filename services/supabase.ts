@@ -113,7 +113,21 @@ export const fetchHiringImages = async (): Promise<string[]> => {
     return [];
   }
 
-  return data.map((row: any) => row.url);
+  return data.map((row: any) => row.url).filter((url: string) => !url.includes('baby_images/'));
+};
+
+export const fetchBabyImages = async (): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('hiring_images')
+    .select('url')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching baby images:', error);
+    return [];
+  }
+
+  return data.map((row: any) => row.url).filter((url: string) => url.includes('baby_images/'));
 };
 
 export const addHiringImage = async (url: string) => {
@@ -123,6 +137,17 @@ export const addHiringImage = async (url: string) => {
 
   if (error) {
     console.error('Error adding hiring image:', error);
+    throw error;
+  }
+};
+
+export const addBabyImage = async (url: string) => {
+  const { error } = await supabase
+    .from('hiring_images')
+    .insert([{ url }]);
+
+  if (error) {
+    console.error('Error adding baby image:', error);
     throw error;
   }
 };
@@ -138,6 +163,39 @@ export const deleteHiringImage = async (url: string) => {
 
   if (error) {
     console.error('Error deleting hiring image from DB:', error);
+    throw error;
+  }
+
+  // 2. Try to delete the actual file from storage to free up space
+  try {
+    const urlParts = url.split('/EndoCanvas/');
+    if (urlParts.length === 2) {
+      const filePath = urlParts[1];
+      console.log('Deleting from storage:', filePath);
+      const { error: storageError } = await supabase.storage
+        .from('EndoCanvas')
+        .remove([filePath]);
+        
+      if (storageError) {
+        console.error('Error deleting from storage:', storageError);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to parse and delete storage file', err);
+  }
+};
+
+export const deleteBabyImage = async (url: string) => {
+  console.log('Attempting to delete baby image:', url);
+  
+  // 1. Delete from the database
+  const { error } = await supabase
+    .from('hiring_images')
+    .delete()
+    .eq('url', url);
+
+  if (error) {
+    console.error('Error deleting baby image from DB:', error);
     throw error;
   }
 
@@ -178,6 +236,34 @@ export const uploadHiringImageToStorage = async (file: File): Promise<string> =>
 
   if (uploadError) {
     console.error('Error uploading hiring image:', uploadError);
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from('EndoCanvas')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+};
+
+export const uploadBabyImageToStorage = async (file: File): Promise<string> => {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('File size must be less than 5MB');
+  }
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `baby-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `baby_images/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('EndoCanvas')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+
+  if (uploadError) {
+    console.error('Error uploading baby image:', uploadError);
     throw uploadError;
   }
 

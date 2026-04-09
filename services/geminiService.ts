@@ -1,21 +1,21 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Slide, SlideElement } from "../types";
+import { jsonrepair } from 'jsonrepair';
 
 const CANVAS_WIDTH = 960;
 const CANVAS_HEIGHT = 540;
 
-// --- COLOR PALETTE (Updated for Definitive Identity) ---
+// --- COLOR PALETTE (Salsa Technology Identity) ---
 const PALETTE = {
-  ACID_GREEN: '#C6FF00', // Kept for legacy compatibility
-  DEEP_BLACK: '#0B0B0F', // New Brand Black
+  DEEP_GREEN: '#1E4D42', // Salsa Dark Green
+  SALSA_CYAN: '#56BFD2', // Gradient Start
+  SALSA_PURPLE: '#594494', // Gradient End
+  DEEP_BLACK: '#0B0B0F',
   PURE_WHITE: '#FFFFFF',
   DARK_GRAY: '#121212',
   LIGHT_GRAY: '#F5F5F7',
-  NEON_BLUE: '#00E5FF',  // New Brand Cyan
-  NEON_PURPLE: '#7A3CFF', // New Brand Purple
-  GLASS_BLUE: 'rgba(0, 229, 255, 0.1)',
-  CHART_BAR: '#00E5FF', 
+  CHART_BAR: '#56BFD2', 
   SEMANTIC_POSITIVE: '#00C853',
   SEMANTIC_NEGATIVE: '#FF3B3B'
 };
@@ -34,7 +34,7 @@ const ASSETS: Record<string, string> = {
 };
 
 const SYSTEM_PROMPT = `
-You are the **Boltz Infinite Design Engine**, a world-class presentation designer fluent in **English and Brazilian Portuguese**.
+You are the **Salsa Technology Design Engine**, a world-class presentation designer fluent in **English and Brazilian Portuguese**.
 Your goal is to generate premium, high-impact slides suitable for Apple Keynotes, Stripe investor decks, or Linear product reveals.
 
 ### 0. LANGUAGE PROTOCOL (BRAZILIAN PORTUGUESE SUPPORT)
@@ -46,19 +46,20 @@ You must detect the language of the prompt.
 - **If the prompt is in English**:
   - Generate content in English.
 
-### 1. DEFINITIVE VISUAL IDENTITY & BRAND DNA
+### 1. DEFINITIVE VISUAL IDENTITY & BRAND DNA (Salsa Technology)
 {
   "brand_identity": {
     "primary_colors": {
-      "cyan": "#00E5FF",
-      "purple": "#7A3CFF",
+      "green": "#1E4D42",
+      "cyan": "#56BFD2",
+      "purple": "#594494",
       "black": "#0B0B0F",
       "white": "#FFFFFF"
     },
     "gradient_primary": {
       "type": "linear",
       "direction": "left_to_right",
-      "colors": ["#00E5FF", "#7A3CFF"]
+      "colors": ["#56BFD2", "#594494"]
     },
     "semantic_colors": {
       "positive": "#00C853",
@@ -68,6 +69,7 @@ You must detect the language of the prompt.
     }
   },
   "color_usage_rules": {
+    "green": "primary brand color, solid backgrounds, strong emphasis",
     "cyan": "innovation, data, technology, neutral emphasis",
     "purple": "strategy, vision, premium positioning",
     "gradient": "hero areas, backgrounds, highlights",
@@ -89,7 +91,8 @@ You must intelligently select the background based on the slide's intent.
     "allowed_backgrounds": [
       "pure_white (#FFFFFF)",
       "pure_black (#0B0B0F)",
-      "cyan_to_purple_gradient (linear-gradient(90deg, #00E5FF 0%, #7A3CFF 100%))",
+      "salsa_green (#1E4D42)",
+      "cyan_to_purple_gradient (linear-gradient(90deg, #56BFD2 0%, #594494 100%))",
       "subtle_dark_gradient (linear-gradient(135deg, #1a1a1a 0%, #0B0B0F 100%))",
       "very_light_gray (#F5F5F7)"
     ],
@@ -113,9 +116,9 @@ Prevents text collision and ensures professional layout.
     "respect_line_height": "1.2 to 1.4"
   },
   "typography_system": {
-    "title": { "max_lines": 2, "tracking": "-1% to 0%", "line_height": 1.05, "size": "72px-96px", "font": "AkiraExpanded-SuperBold" },
-    "subtitle": { "opacity": 0.8, "max_width": "60% of layout", "size": "24px-32px", "font": "Mont SemiBold" },
-    "body": { "size": "18px-24px", "font": "Mont Regular" },
+    "title": { "max_lines": 2, "tracking": "-1% to 0%", "line_height": 1.05, "size": "72px-96px", "font": "Orkney" },
+    "subtitle": { "opacity": 0.8, "max_width": "60% of layout", "size": "24px-32px", "font": "Orkney" },
+    "body": { "size": "18px-24px", "font": "Orkney" },
     "kpi_number": { "oversized": true, "no_outline_effects": true }
   }
 }
@@ -138,9 +141,11 @@ This module enforces strict mathematical accuracy for all visuals.
       "center_mask": "Add a smaller circle in the center with background color to create donut effect."
     },
     "bar_chart": {
+      "use_variant": "box",
       "height_formula": "height = (value / max_value) * max_chart_height",
       "baseline_alignment": true,
-      "zero_reference_required": true
+      "zero_reference_required": true,
+      "exhaustive_generation": "You MUST generate a separate 'shape' element (variant: 'box') for EVERY single bar in the chart. Do not group them or skip any."
     },
     "validation_rules": [
       "visual_proportion_must_match_calculated_proportion",
@@ -155,20 +160,20 @@ Select the composition mode that best fits the prompt.
 {
   "composition_modes": {
     "hero_slide": {
-      "background": "cyan_to_purple_gradient",
+      "background": "salsa_green",
       "text_color": "#FFFFFF",
       "minimal_supporting_elements": true,
-      "description": "Bold statement, center aligned, gradient background"
+      "description": "Bold statement, center aligned, green background"
     },
     "data_slide_dark": {
       "background": "#0B0B0F",
-      "primary_accent": "#00E5FF",
+      "primary_accent": "#56BFD2",
       "highlight_metric_in_gradient": true,
       "description": "Dark mode, high contrast data visualization"
     },
     "data_slide_light": {
       "background": "#FFFFFF",
-      "primary_accent": "#7A3CFF",
+      "primary_accent": "#1E4D42",
       "bars_or_graphs_use_gradient": true,
       "description": "Light mode, clean, editorial style"
     }
@@ -317,7 +322,7 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
             const upperKey = String(content).toUpperCase();
             if (ASSETS[upperKey]) {
                 content = ASSETS[upperKey];
-            } else if (!content.startsWith('http')) {
+            } else if (!content.startsWith('http') && !content.startsWith('data:image')) {
                 // Heuristic matching
                 const lowerContent = String(content).toLowerCase();
                 const lowerPrompt = prompt.toLowerCase();
@@ -338,18 +343,21 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
             if (!isIcon) {
                 // Heuristic for Title vs Body based on size or context
                 if ((refinedStyle.fontSize && refinedStyle.fontSize >= 40) || (safeH > 60 && index === 0)) {
-                   refinedStyle.fontFamily = 'AkiraExpanded-SuperBold';
+                   refinedStyle.fontFamily = 'Orkney';
+                   refinedStyle.fontWeight = '700';
                    refinedStyle.textTransform = 'uppercase';
                    refinedStyle.lineHeight = 0.9;
                    if (!refinedStyle.fontSize) refinedStyle.fontSize = 60;
                    if (!refinedStyle.color) refinedStyle.color = isBgDark ? '#FFFFFF' : PALETTE.DEEP_BLACK;
                 } else if (refinedStyle.fontSize && refinedStyle.fontSize >= 24) {
                    // Subtitles / Big Metrics
-                   refinedStyle.fontFamily = 'Mont SemiBold';
-                   if (!refinedStyle.color) refinedStyle.color = isBgDark ? PALETTE.NEON_BLUE : '#333333';
+                   refinedStyle.fontFamily = 'Orkney';
+                   refinedStyle.fontWeight = '700';
+                   if (!refinedStyle.color) refinedStyle.color = isBgDark ? PALETTE.SALSA_CYAN : '#333333';
                 } else {
                    // Body
-                   refinedStyle.fontFamily = 'Mont Regular';
+                   refinedStyle.fontFamily = 'Orkney';
+                   refinedStyle.fontWeight = '400';
                    if (!refinedStyle.fontSize) refinedStyle.fontSize = 16;
                    if (!refinedStyle.color) refinedStyle.color = isBgDark ? '#E5E5E5' : '#444444';
                 }
@@ -357,7 +365,7 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
                  // Icon Fallback
                  if (!refinedStyle.fontSize) refinedStyle.fontSize = 48;
                  refinedStyle.fontFamily = 'inherit'; 
-                 if (!refinedStyle.color) refinedStyle.color = PALETTE.NEON_PURPLE;
+                 if (!refinedStyle.color) refinedStyle.color = PALETTE.SALSA_PURPLE;
             }
         }
 
@@ -367,9 +375,9 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
                  const lowerContent = String(el.content || "").toLowerCase();
                  // Auto-color based on context/prompt if missing
                  if (lowerContent.includes('bar') || lowerContent.includes('data') || lowerContent.includes('dados')) {
-                     refinedStyle.backgroundColor = PALETTE.NEON_BLUE;
+                     refinedStyle.backgroundColor = PALETTE.SALSA_CYAN;
                  } else if (lowerContent.includes('accent') || lowerContent.includes('destaque')) {
-                     refinedStyle.backgroundColor = PALETTE.NEON_PURPLE;
+                     refinedStyle.backgroundColor = PALETTE.SALSA_PURPLE;
                  } else {
                      refinedStyle.backgroundColor = isBgDark ? '#333333' : '#E5E5E5';
                  }
@@ -385,7 +393,8 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
             height: safeH,
             content: content,
             zIndex: refinedStyle.zIndex,
-            style: refinedStyle
+            style: refinedStyle,
+            chartData: el.chartData
         };
 
         // RECURSION
@@ -404,34 +413,51 @@ const processElementsRecursive = (elements: any[], parentX: number, parentY: num
 };
 
 const repairJSON = (jsonStr: string): string => {
-    jsonStr = jsonStr.trim();
-    // Basic repair for common truncation
-    if (!jsonStr.endsWith('}') && !jsonStr.endsWith(']')) {
-        // Try to close open brackets/braces blindly
-        const openBraces = (jsonStr.match(/\{/g) || []).length;
-        const closeBraces = (jsonStr.match(/\}/g) || []).length;
-        const openBrackets = (jsonStr.match(/\[/g) || []).length;
-        const closeBrackets = (jsonStr.match(/\]/g) || []).length;
-        
-        if (jsonStr.lastIndexOf('"') > jsonStr.lastIndexOf(':') && (jsonStr.match(/"/g) || []).length % 2 !== 0) {
-             jsonStr += '"'; 
+    try {
+        return jsonrepair(jsonStr);
+    } catch (e) {
+        console.error("jsonrepair failed", e);
+        // Fallback to basic repair
+        jsonStr = jsonStr.trim();
+        if (!jsonStr.endsWith('}') && !jsonStr.endsWith(']')) {
+            const openBraces = (jsonStr.match(/\{/g) || []).length;
+            const closeBraces = (jsonStr.match(/\}/g) || []).length;
+            const openBrackets = (jsonStr.match(/\[/g) || []).length;
+            const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+            
+            if (jsonStr.lastIndexOf('"') > jsonStr.lastIndexOf(':') && (jsonStr.match(/"/g) || []).length % 2 !== 0) {
+                 jsonStr += '"'; 
+            }
+            
+            for(let i=0; i < (openBrackets - closeBrackets); i++) jsonStr += ']';
+            for(let i=0; i < (openBraces - closeBraces); i++) jsonStr += '}';
         }
-        
-        for(let i=0; i < (openBrackets - closeBrackets); i++) jsonStr += ']';
-        for(let i=0; i < (openBraces - closeBraces); i++) jsonStr += '}';
+        return jsonStr;
     }
-    return jsonStr;
 };
 
-export const generateSlideContent = async (prompt: string, currentSlideId: string): Promise<Slide> => {
+export const generateSlideContent = async (prompt: string, currentSlideId: string, images?: { base64: string, mimeType: string }[]): Promise<Slide> => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("API Key is missing");
 
     const ai = new GoogleGenAI({ apiKey });
 
-    // ENHANCE PROMPT LOGIC - Force the AI to classify and build visual structures
-    const finalPrompt = `
+    const finalPrompt = images && images.length > 0 ? `
+      User Request: "${prompt}"
+      
+      **IMAGE REPLICATION PROTOCOL (CRITICAL)**:
+      1. You have been provided with an image. Your SOLE purpose is to replicate this image as a slide layout as accurately as possible.
+      2. **BYPASS ALL PREVIOUS LAYOUT RULES**: Ignore the 'Layout Intelligence Engine', 'Anti-Overlap', and 'Self-Correction' rules. The image IS the layout. Do not try to fix or adjust the layout.
+      3. **EXHAUSTIVE EXTRACTION**: Extract EVERY SINGLE piece of text, number, and label. Place them at the exact (x, y) coordinates to match their relative position in the image.
+      4. **CHART REPLICATION (NEW)**: If the image contains a chart (bar, line, pie), DO NOT try to draw it with shapes. Instead, create ONE element with type 'chart'. 
+         - **CRITICAL**: DO NOT TRY TO EXTRACT REAL NUMBERS FROM THE IMAGE. Vision models fail at this. You MUST use SAFE, MOCK DATA (e.g., 10, 20, 30). The user will edit the real data later in the UI.
+         - chartData.type: 'bar', 'line', or 'pie'
+         - chartData.data: Array of objects representing the MOCK data points (e.g. [{ name: 'Jan', value: 10 }, { name: 'Feb', value: 20 }]).
+         - chartData.config: Configuration for the chart, including xAxisKey and series (keys and colors).
+      5. **COLORS**: Adapt the colors to the Salsa Technology palette (Green, Cyan, Purple, Black, White) while maintaining the contrast and intent of the original image.
+      6. Generate strictly valid JSON. Do not stop until every element from the image has been translated into a JSON object.
+    ` : `
       User Request: "${prompt}"
       
       **EXECUTION PROTOCOL**:
@@ -439,7 +465,7 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
       2. Analyze request against 'Definitive Visual Identity' & 'Anti-Overlap & Layout Engine'.
       3. Select best 'Composition Mode'.
       4. **CALCULATE PROPORTIONS**: Apply 'Visual Math Engine' logic. 
-      5. **PIE CHARTS**: If the user asks for a pie chart (or "Gráfico de Pizza", "Torta"), you MUST use 'type': 'shape', 'style': { 'variant': 'pie', 'startAngle': number, 'endAngle': number }. Do NOT just make circles.
+      5. **CHARTS**: If the user asks for a chart, use type 'chart' and populate 'chartData' with the data. Do not draw charts manually with shapes.
       6. **ART DIRECTION**: Apply 'Layout Intelligence Engine'. Ensure 'Protagonist' rule is met.
       7. **VALIDATE**: Run 'Visual Math Validation' and 'Self-Correction'.
       8. Generate strictly valid JSON for the slide elements.
@@ -467,10 +493,41 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
         nullable: true
     };
 
+    const chartDataSchema = {
+        type: Type.OBJECT,
+        properties: {
+            type: { type: Type.STRING, enum: ['bar', 'line', 'pie'] },
+            data: {
+                type: Type.ARRAY,
+                items: { type: Type.OBJECT } // Allow any object for data points
+            },
+            config: {
+                type: Type.OBJECT,
+                properties: {
+                    xAxisKey: { type: Type.STRING },
+                    series: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                key: { type: Type.STRING },
+                                color: { type: Type.STRING },
+                                name: { type: Type.STRING }
+                            },
+                            required: ['key', 'color']
+                        }
+                    }
+                },
+                required: ['series']
+            }
+        },
+        required: ['type', 'data', 'config']
+    };
+
     const elementSchema = {
         type: Type.OBJECT,
         properties: {
-          type: { type: Type.STRING, enum: ["text", "image", "shape", "group"] },
+          type: { type: Type.STRING, enum: ["text", "image", "shape", "group", "chart"] },
           content: { type: Type.STRING },
           x: { type: Type.NUMBER },
           y: { type: Type.NUMBER },
@@ -478,6 +535,7 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
           height: { type: Type.NUMBER },
           zIndex: { type: Type.NUMBER },
           style: styleSchema,
+          chartData: chartDataSchema,
           elements: { 
              type: Type.ARRAY, 
              items: { 
@@ -500,8 +558,27 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
         required: ["type", "x", "y", "width", "height"]
     };
 
+    const parts: any[] = [];
+    
+    if (images && images.length > 0) {
+        for (const img of images) {
+            parts.push({
+                inlineData: {
+                    data: img.base64.split(',')[1] || img.base64,
+                    mimeType: img.mimeType
+                }
+            });
+        }
+    }
+    
+    parts.push({ text: finalPrompt });
+
+    const contents: any[] = [
+      { role: 'user', parts }
+    ];
+
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.5, 
@@ -519,13 +596,11 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
           required: ["elements", "background"]
         }
       },
-      contents: [
-        { role: 'user', parts: [{ text: finalPrompt }] }
-      ]
+      contents
     });
 
     let text = response.text || "";
-    text = text.replace(/```json/g, "").replace(/```/g, "");
+    text = text.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "");
     
     let json;
     try {
@@ -579,15 +654,16 @@ export const generateSlideContent = async (prompt: string, currentSlideId: strin
           id: 'err-1', type: 'text', x: 80, y: 200, width: 800, height: 100,
           content: 'ERRO NA GERAÇÃO',
           zIndex: 1,
-          style: { fontFamily: 'AkiraExpanded-SuperBold', fontSize: 50, color: '#333', textAlign: 'left' }
+          style: { fontFamily: 'Orkney', fontWeight: '700', fontSize: 50, color: '#333', textAlign: 'left' }
         },
         {
            id: 'err-2', type: 'text', x: 80, y: 280, width: 800, height: 60,
            content: 'Por favor, tente novamente com um prompt diferente.',
            zIndex: 2,
-           style: { fontFamily: 'Mont Regular', fontSize: 16, color: PALETTE.NEON_BLUE, textAlign: 'left' }
+           style: { fontFamily: 'Orkney', fontWeight: '400', fontSize: 16, color: PALETTE.SALSA_CYAN, textAlign: 'left' }
         }
       ]
     };
   }
 };
+

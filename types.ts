@@ -78,7 +78,8 @@ export enum TemplateType {
   NEWSLETTER = 'Email Signature',
   PRESENTATION = 'Presentation Slide',
   NEW_PROVIDER = 'New Provider', // New Template
-  HIRING = 'Hiring'
+  HIRING = 'Hiring',
+  BABY = 'Baby'
 }
 
 export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-story' | 'banner-small' | 'banner-large';
@@ -95,7 +96,20 @@ export interface CanvasConfig {
 
 // --- SLIDE EDITOR TYPES ---
 
-export type SlideElementType = 'text' | 'image' | 'shape' | 'group';
+export type SlideElementType = 'text' | 'image' | 'shape' | 'group' | 'chart';
+
+export interface ChartData {
+  type: 'bar' | 'line' | 'pie';
+  data: any[];
+  config: {
+    xAxisKey?: string;
+    series: {
+      key: string;
+      color: string;
+      name?: string;
+    }[];
+  };
+}
 
 export interface SlideElement {
   id: string;
@@ -106,8 +120,10 @@ export interface SlideElement {
   height: number;
   content: string; // Text content or Image URL
   children?: SlideElement[]; // For Grouping
+  chartData?: ChartData; // For Charts
   style: {
-    fontFamily?: 'AkiraExpanded-SuperBold' | 'Mont Regular' | 'Mont SemiBold';
+    fontFamily?: 'Orkney';
+    fontWeight?: '300' | '400' | '700' | '900' | 'normal' | 'bold';
     fontSize?: number;
     color?: string;
     backgroundColor?: string;
