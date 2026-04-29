@@ -123,7 +123,7 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   }
 
   return (
-    <div className={`fixed inset-0 z-40 flex flex-col pt-[72px] animate-in fade-in duration-500 ${isDarkMode ? 'bg-[#121212]' : 'bg-gray-100'}`}>
+    <div className={`absolute inset-0 z-40 flex flex-col ${isDarkMode ? 'bg-[#121212]' : 'bg-gray-100'}`}>
       {/* Header / Toolbar */}
       <div className={`px-8 py-6 flex justify-between items-center border-b shadow-sm shrink-0 ${isDarkMode ? 'bg-[#1e1e1e] border-white/10' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-4">

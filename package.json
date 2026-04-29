@@ -14,13 +14,17 @@
     "@supabase/supabase-js": "^2.97.0",
     "html-to-image": "1.11.11",
     "jsonrepair": "^3.13.3",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "motion": "^12.38.0",
     "pptxgenjs": "3.12.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.8.1",
-    "xlsx": "0.18.5"
+    "sonner": "^2.0.7",
+    "xlsx": "0.18.5",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

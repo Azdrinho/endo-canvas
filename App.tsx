@@ -1,7 +1,10 @@
 
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Toaster, toast } from 'sonner';
+import JSZip from 'jszip';
+import { jsPDF } from 'jspdf';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, Slide, ProviderFormat, ProviderGridConfig } from './types';
 import { generateCardCanvas } from './services/emailTemplate'; 
 import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage } from './services/supabase';
@@ -9,7 +12,7 @@ import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { SlideEditor } from './components/SlideEditor';
 import * as XLSX from 'xlsx';
-import { toPng } from 'html-to-image';
+import { toPng, toJpeg } from 'html-to-image';
 import PptxGenJS from 'pptxgenjs'; // Import PPTX Library
 import { 
   Layout, 
@@ -32,6 +35,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Undo2,
+  Redo2,
   X,
   TrendingUp,
   Move,
@@ -122,10 +127,10 @@ const INITIAL_EMPLOYEES: Employee[] = [
   },
   {
     id: 'baby-generic',
-    name: 'Generic Baby',
+    name: '',
     role: '',
     department: '',
-    photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+    photoUrl: '',
     photoScale: 1,
     photoPosition: { x: 0, y: 0 },
     dateStr: '', 
@@ -185,7 +190,7 @@ const INITIAL_SLIDES: Slide[] = [{
   ]
 }];
 
-type EditorTab = 'DATA' | 'TEMPLATES' | 'IMPORT' | 'IMAGES';
+type EditorTab = 'DATA' | 'TEMPLATES' | 'IMPORT' | 'IMAGES' | 'SETTINGS';
 
 // --- CONFIG FOR SOCIAL NETWORKS ---
 const SOCIAL_NETWORKS = [
@@ -314,36 +319,53 @@ const MorphingCanvas = ({ html, templateType, orientation, children }: { html: s
     <motion.div
       layout
       transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+      className="relative group active:scale-[1.02] transition-transform cursor-pointer"
       style={{ 
-        background: 'white', 
-        overflow: 'hidden', 
         width: 'fit-content',
-        height: 'fit-content',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        position: 'relative',
-        borderRadius: 0
+        height: 'fit-content'
       }}
     >
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: phase === 'idle' ? 1 : (phase === 'fadeOut' ? 0 : (phase === 'fadeIn' ? 1 : 0)),
-          filter: phase === 'fadeOut' ? 'brightness(1.5)' : 'brightness(1)',
-          scale: phase === 'fadeIn' ? [1.03, 1] : 1,
-        }}
-        transition={{
-          opacity: { duration: phase === 'fadeOut' ? 0.12 : 0.2 },
-          filter: { duration: 0.12 },
-          scale: { duration: 0.2, ease: "easeOut" }
-        }}
-        style={{ width: 'fit-content', height: 'fit-content', transformOrigin: 'center' }}
+      <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-lg opacity-0 group-hover:opacity-40 transition duration-500 blur-lg pointer-events-none"></div>
+      
+      <div className="relative border border-transparent group-hover:border-cyan-500/50 transition-all duration-500 overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] bg-white"
+           style={{ 
+             borderRadius: '0',
+           }}
       >
-        <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
-        {displayChildren}
-      </motion.div>
+        <motion.div
+          initial={false}
+          animate={{
+            opacity: phase === 'idle' ? 1 : (phase === 'fadeOut' ? 0 : (phase === 'fadeIn' ? 1 : 0)),
+            filter: phase === 'fadeOut' ? 'brightness(1.5)' : 'brightness(1)',
+            scale: phase === 'fadeIn' ? [1.03, 1] : 1,
+          }}
+          transition={{
+            opacity: { duration: phase === 'fadeOut' ? 0.12 : 0.2 },
+            filter: { duration: 0.12 },
+            scale: { duration: 0.2, ease: "easeOut" }
+          }}
+          style={{ width: 'fit-content', height: 'fit-content', transformOrigin: 'center' }}
+        >
+          <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+          {displayChildren}
+        </motion.div>
+      </div>
     </motion.div>
   );
 };
+
+const TEMPLATE_LIST = [
+  { id: TemplateType.BIRTHDAY, label: 'Happy Birthday', desc: 'Classic celebration card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1f03c89654a2a47ae.png' },
+  { id: TemplateType.ANNIVERSARY, label: 'Work Anniversary', desc: 'Celebrate tenure milestones', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0f03c89654a2a47ad.png' },
+  { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
+  { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
+  { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
+  { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
+  { id: TemplateType.BABY, label: 'Baby Birth', desc: 'Welcome Baby', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69d5122206cc717826a7543b.jpg' },
+  { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
+  { id: TemplateType.PRESENTATION, label: 'Slide Deck', desc: 'AI Powered Presentation', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0318a761a56ead72a.png' }, 
+  { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
+];
 
 export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -418,6 +440,16 @@ export default function App() {
   };
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.BIRTHDAY);
   const [activeTab, setActiveTab] = useState<EditorTab>('TEMPLATES');
+
+  // Preload template images when TEMPLATES tab is clicked
+  useEffect(() => {
+      if (activeTab === 'TEMPLATES') {
+          TEMPLATE_LIST.forEach(t => {
+              const img = new Image();
+              img.src = t.image;
+          });
+      }
+  }, [activeTab]);
   
   const viewMode = activeTab === 'IMPORT' ? ViewMode.IMPORT : ViewMode.EDITOR;
 
@@ -447,6 +479,7 @@ export default function App() {
   });
 
   const [isMonthView, setIsMonthView] = useState<boolean>(false);
+  const [isCompactMonthView, setIsCompactMonthView] = useState<boolean>(false);
   const [isGroupMode, setIsGroupMode] = useState<boolean>(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(new Date().getMonth());
@@ -456,6 +489,7 @@ export default function App() {
   
   // SIGNATURE CONTROL STATE
   const [showSignatureControls, setShowSignatureControls] = useState<boolean>(false); // Changed to false to hide on load
+  const [showExportDropdown, setShowExportDropdown] = useState<boolean>(false);
   const [signaturePopupLeft, setSignaturePopupLeft] = useState<number>(0);
   const signatureButtonRef = useRef<HTMLButtonElement>(null);
   
@@ -495,6 +529,56 @@ export default function App() {
   const [includeTextInExport, setIncludeTextInExport] = useState(false); // NEW Toggle for text in image
   const [hasCopied, setHasCopied] = useState<string | null>(null); 
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'pdf'>('png');
+
+  // --- UNDO/REDO STATE ---
+  const [history, setHistory] = useState<Employee[][]>([INITIAL_EMPLOYEES]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  const saveHistory = useCallback((newEmployees: Employee[]) => {
+      setHistory(prev => {
+          const newHistory = prev.slice(0, historyIndex + 1);
+          newHistory.push(newEmployees);
+          // Keep last 50 states
+          if (newHistory.length > 50) newHistory.shift();
+          return newHistory;
+      });
+      setHistoryIndex(prev => Math.min(prev + 1, 50));
+  }, [historyIndex]);
+
+  const undo = useCallback(() => {
+      if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setEmployees(history[newIndex]);
+          toast.info("Desfeito");
+      }
+  }, [history, historyIndex]);
+
+  const redo = useCallback(() => {
+      if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1;
+          setHistoryIndex(newIndex);
+          setEmployees(history[newIndex]);
+          toast.info("Refeito");
+      }
+  }, [history, historyIndex]);
+
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+              if (e.shiftKey) {
+                  redo();
+              } else {
+                  undo();
+              }
+          } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+              redo();
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // --- SLIDE PRESENTATION STATE ---
   const [slides, setSlides] = useState<Slide[]>(INITIAL_SLIDES);
@@ -668,7 +752,6 @@ export default function App() {
   }, [employees, isMonthView, isGroupMode, selectedEmployeeIds, selectedTemplate, selectedMonthIndex, selectedEmployeeId, providerData, getCurrentProviderConfig]);
 
   const currentCanvasData = getCanvasData();
-  const [previewHtml, setPreviewHtml] = useState<string>('');
   
   const filteredEmployees = useMemo(() => employees.filter(emp => 
      emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && (
@@ -677,9 +760,11 @@ export default function App() {
      )
   ), [employees, searchQuery]);
 
-  useEffect(() => {
-    // Only generate HTML for non-presentation templates
-    // Filter signatureLinks to only include active ones that have content or are active in UI
+  const previewHtml = useMemo(() => {
+    if (!currentCanvasData || isBulkMode || selectedTemplate === TemplateType.PRESENTATION) {
+        return '';
+    }
+    
     const activeLinksObj: Record<string, string> = {};
     activeSocials.forEach(key => {
         if (signatureLinks[key]) {
@@ -687,10 +772,8 @@ export default function App() {
         }
     });
 
-    if (currentCanvasData && !isBulkMode && selectedTemplate !== TemplateType.PRESENTATION) {
-      setPreviewHtml(generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, signatureDepartment));
-    }
-  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, isMonthView, selectedMonthIndex, signatureLinks, activeSocials, providerFormat, signatureDepartment]);
+    return generateCardCanvas(currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, activeLinksObj, providerFormat, signatureDepartment, { isMonthNamesOnly: isCompactMonthView });
+  }, [currentCanvasData, config, selectedTemplate, orientation, language, hideIconsForExport, isBulkMode, signatureLinks, activeSocials, providerFormat, signatureDepartment, isCompactMonthView]);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -799,19 +882,42 @@ export default function App() {
   }, [previewDimensions.width, previewDimensions.height, selectedTemplate, isMonthView]); // Re-center only on layout change
 
   // ... (keeping existing functions: updateEmployee, updatePhotoPosition, removeEmployee, handleZoom, handleWheel, handleCanvasMouseDown, handleMouseMove, handleMouseUp) ...
+  const setEmployeesWithHistory = useCallback((updater: (prev: Employee[]) => Employee[]) => {
+      setEmployees(prev => {
+          const next = updater(prev);
+          saveHistory(next);
+          return next;
+      });
+  }, [saveHistory]);
+
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const updateEmployee = useCallback((id: string, field: keyof Employee, value: any) => {
-    setEmployees(prev => prev.map(e => {
-        if (e.id === id) {
-            const updated = { ...e, [field]: value };
-            if (field === 'admissionDate') {
-                const newTenure = calculateTenure(value);
-                if (newTenure) updated.tenure = newTenure;
+    let updatedEmp: Employee | null = null;
+    let nextState: Employee[] = [];
+
+    setEmployees(prev => {
+        nextState = prev.map(e => {
+            if (e.id === id) {
+                const updated = { ...e, [field]: value };
+                if (field === 'admissionDate') {
+                    const newTenure = calculateTenure(value);
+                    if (newTenure) updated.tenure = newTenure;
+                }
+                updatedEmp = updated;
+                return updated;
             }
-            return updated;
-        }
-        return e;
-    }));
-  }, []);
+            return e;
+        });
+        return nextState;
+    });
+
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => {
+        if (nextState.length > 0) saveHistory(nextState);
+        if (updatedEmp) upsertEmployee(updatedEmp);
+    }, 500);
+  }, [saveHistory]);
 
   // Sync contenteditable changes back to state
   useEffect(() => {
@@ -828,18 +934,18 @@ export default function App() {
   }, [selectedEmployeeId, updateEmployee]);
 
   const updatePhotoPosition = useCallback((axis: 'x' | 'y', value: number) => {
-      setEmployees(prev => {
+      setEmployeesWithHistory(prev => {
           const emp = prev.find(e => e.id === selectedEmployeeId);
           if (!emp) return prev;
           const current = emp.photoPosition || { x: 0, y: 0 };
           const newPos = { ...current, [axis]: value };
           return prev.map(e => e.id === selectedEmployeeId ? { ...e, photoPosition: newPos } : e);
       });
-  }, [selectedEmployeeId]);
+  }, [selectedEmployeeId, setEmployeesWithHistory]);
 
   const removeEmployee = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEmployees(prev => {
+    setEmployeesWithHistory(prev => {
         const newList = prev.filter(emp => emp.id !== id);
         if (newList.length > 0 && selectedEmployeeId === id) {
              setSelectedEmployeeId(newList[0].id);
@@ -847,7 +953,7 @@ export default function App() {
         }
         return newList;
     });
-  }, [selectedEmployeeId]);
+  }, [selectedEmployeeId, setEmployeesWithHistory]);
 
   const handleZoom = useCallback((delta: number) => {
     setZoomLevel(prev => {
@@ -1053,6 +1159,13 @@ export default function App() {
         const clone = node.cloneNode(true) as HTMLElement;
         clone.style.transform = 'none'; // Reset scale for capture
         
+        // Remove rounded corners for export
+        const innerCard = clone.querySelector('div[style*="border-radius"]');
+        if (innerCard) {
+            (innerCard as HTMLElement).style.borderRadius = '0';
+        }
+        clone.style.borderRadius = '0';
+        
         // REMOVE SIGNATURE TEXT ONLY FOR EXPORT
         if (selectedTemplate === TemplateType.NEWSLETTER && !includeTextInExport) {
              const textElements = clone.querySelectorAll('.signature-text-remove');
@@ -1133,29 +1246,126 @@ export default function App() {
         // Wait a tick for DOM updates
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const dataUrl = await toPng(clone, {
+        const options = {
              quality: 1.0,
              pixelRatio: 2,
              cacheBust: false,
              skipAutoScale: true
-        });
+        };
 
-        const link = document.createElement('a');
-        const filename = isMonthView 
-            ? `endo-month-${MONTHS[selectedMonthIndex].toLowerCase()}-${Date.now()}.png`
-            : `endo-canvas-${selectedTemplate.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.png`;
-            
-        link.download = filename;
-        link.href = dataUrl;
-        link.click();
+        let dataUrl = '';
+        if (exportFormat === 'jpeg') {
+            dataUrl = await toJpeg(clone, options);
+        } else {
+            dataUrl = await toPng(clone, options);
+        }
+
+        const baseFilename = isMonthView 
+            ? `endo-month-${MONTHS[selectedMonthIndex].toLowerCase()}-${Date.now()}`
+            : `endo-canvas-${selectedTemplate.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+
+        if (exportFormat === 'pdf') {
+            const pdf = new jsPDF({
+                orientation: clone.offsetWidth > clone.offsetHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [clone.offsetWidth, clone.offsetHeight]
+            });
+            pdf.addImage(dataUrl, 'PNG', 0, 0, clone.offsetWidth, clone.offsetHeight);
+            pdf.save(`${baseFilename}.pdf`);
+        } else {
+            const link = document.createElement('a');
+            link.download = `${baseFilename}.${exportFormat === 'jpeg' ? 'jpg' : 'png'}`;
+            link.href = dataUrl;
+            link.click();
+        }
 
         document.body.removeChild(container);
+        toast.success(`Exportado com sucesso (${exportFormat.toUpperCase()})!`);
     } catch (err) {
       console.error("Download failed:", err);
-      // More helpful error message
-      alert("Não foi possível gerar a imagem. Se estiver usando imagens externas (como Unsplash ou Pikaso), tente salvá-las e fazer upload manualmente se o erro persistir.");
+      toast.error("Não foi possível gerar a imagem. Verifique se as imagens externas permitem CORS.");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleBatchExport = async () => {
+    if (!isMonthView || filteredEmployees.length === 0) return;
+    
+    setIsDownloading(true);
+    toast.info(`Iniciando exportação em lote de ${filteredEmployees.length} cartões...`);
+    
+    try {
+        const zip = new JSZip();
+        const folder = zip.folder(`Aniversariantes_${MONTHS[selectedMonthIndex]}`);
+        
+        // We need to render each employee temporarily to capture them
+        // This is a simplified approach: we generate the HTML for each and use a hidden container
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.zIndex = '-1';
+        document.body.appendChild(container);
+
+        for (let i = 0; i < filteredEmployees.length; i++) {
+            const emp = filteredEmployees[i];
+            const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
+            
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            const node = wrapper.firstElementChild as HTMLElement;
+            if (!node) continue;
+            
+            // Remove rounded corners for export
+            const innerCard = node.querySelector('div[style*="border-radius"]');
+            if (innerCard) {
+                (innerCard as HTMLElement).style.borderRadius = '0';
+            }
+            node.style.borderRadius = '0';
+            
+            container.innerHTML = '';
+            container.appendChild(node);
+            
+            // Wait for images to load
+            const imgElements = Array.from(node.querySelectorAll('img'));
+            await Promise.all(imgElements.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                });
+            }));
+            
+            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for rendering
+
+            const dataUrl = await toPng(node, {
+                quality: 1.0,
+                pixelRatio: 2,
+                cacheBust: false,
+                skipAutoScale: true
+            });
+            
+            const base64Data = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, "");
+            folder?.file(`${emp.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${MONTHS[selectedMonthIndex]}.png`, base64Data, {base64: true});
+            
+            toast.info(`Gerando ${i + 1}/${filteredEmployees.length}...`);
+        }
+        
+        document.body.removeChild(container);
+        
+        const content = await zip.generateAsync({type: "blob"});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = `Aniversariantes_${MONTHS[selectedMonthIndex]}.zip`;
+        link.click();
+        
+        toast.success("Exportação em lote concluída!");
+    } catch (err) {
+        console.error("Batch export failed:", err);
+        toast.error("Falha na exportação em lote.");
+    } finally {
+        setIsDownloading(false);
     }
   };
 
@@ -1469,7 +1679,8 @@ export default function App() {
   
   const HeaderContent = useMemo(() => (
       // ... (Same as before) ...
-      <header className="px-6 h-[72px] flex justify-between items-center z-50 shrink-0 sticky top-0 header-gradient">
+      <header className="px-6 h-[72px] flex justify-start items-center z-50 shrink-0 sticky top-0 header-gradient">
+        <Toaster position="top-center" theme="dark" />
         <div className="flex items-center h-full gap-6">
            <div className="">
               <SalsaLogo variant="light" className="h-11 w-32" />
@@ -1489,10 +1700,6 @@ export default function App() {
                 </g>
              </svg>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-           {/* Light Mode Switch Removed */}
         </div>
       </header>
   ), [isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, employees.length]);
@@ -1559,6 +1766,29 @@ export default function App() {
                   <Palette size={22} />
                 </span>
              </button>
+             <button 
+                onClick={() => setActiveTab('SETTINGS')} 
+                className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'SETTINGS' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Visual Identity"
+             >
+                {activeTab === 'SETTINGS' && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    className="absolute inset-0"
+                    transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+                  >
+                     <motion.div 
+                        key="indicator-SETTINGS"
+                        className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
+                        animate={{ scaleX: [1, 1.1, 1] }}
+                        transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
+                     />
+                  </motion.div>
+                )}
+                <span className="relative z-10">
+                  <Settings size={22} />
+                </span>
+             </button>
              {(selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
                <button 
                   onClick={() => setActiveTab('IMAGES')} 
@@ -1588,8 +1818,17 @@ export default function App() {
        </div>
 
        {/* 2. Middle Content (Scrollable) */}
-       <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar">
-          {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
+       <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar overflow-x-hidden">
+          <AnimatePresence mode="wait">
+             <motion.div 
+                 key={activeTab}
+                 initial={{ opacity: 0, x: 20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 exit={{ opacity: 0, x: -20 }}
+                 transition={{ duration: 0.2 }}
+                 className="h-full"
+             >
+                {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
              <div className="animate-in slide-in-from-right-4 duration-300 pt-2">
                 <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Image Library</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1885,7 +2124,12 @@ export default function App() {
                         {/* UPDATED GRID with animated gradient backgrounds */}
                         <div className="grid grid-cols-2 gap-2 pb-2">
                             {filteredEmployees.map((emp, index) => (
-                                <div 
+                                <motion.div 
+                                    layout
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    transition={{ duration: 0.2 }}
                                     key={emp.id} 
                                     onClick={() => {
                                         if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
@@ -1938,7 +2182,7 @@ export default function App() {
                                     <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                                         <div className="text-white text-xs font-bold truncate">{emp.name}</div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
                      </>
@@ -1948,44 +2192,102 @@ export default function App() {
                           {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                               <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
                           )}
-                          
-                          <div className="space-y-3">
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><User size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.name} onChange={(e) => updateEmployee(selectedEmployee.id, 'name', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Full Name" /></div>
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Briefcase size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.role} onChange={(e) => updateEmployee(selectedEmployee.id, 'role', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Role" /></div>
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
-                                
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
+                                               <div className="space-y-3">
+                                {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
+                                    <>
+                                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><User size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.name} onChange={(e) => updateEmployee(selectedEmployee.id, 'name', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Full Name" /></div>
+                                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Briefcase size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.role} onChange={(e) => updateEmployee(selectedEmployee.id, 'role', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Role" /></div>
+                                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
+                                        
+                                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
 
-                                <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><TrendingUp size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.previousRole || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'previousRole', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Previous Role (Job Change)" /></div>
+                                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><TrendingUp size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.previousRole || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'previousRole', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Previous Role (Job Change)" /></div>
+                                    </>
+                                )}
 
                                 <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}><ImageIcon size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.photoUrl} onChange={(e) => updateEmployee(selectedEmployee.id, 'photoUrl', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Photo URL" /></div>
                           </div>
                           
-                          <button onClick={() => setIsManagementMode(true)} className="w-full py-3 rounded-2xl border border-white/10 text-white hover:bg-white/10 text-xs font-bold transition-all mt-4 flex items-center justify-center gap-2">
-                              <Settings size={16} />
-                              Manage Employees
-                          </button>
-                          <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
+                          {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
+                              <>
+                                  <button onClick={() => setIsManagementMode(true)} className="w-full py-3 rounded-2xl border border-white/10 text-white hover:bg-white/10 text-xs font-bold transition-all mt-4 flex items-center justify-center gap-2">
+                                      <Settings size={16} />
+                                      Manage Employees
+                                  </button>
+                                  <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
+                              </>
+                          )}
                       </div>
                    )
                )}
             </div>
           )}
 
+          {activeTab === 'SETTINGS' && (
+            <div className="animate-in slide-in-from-right-4 duration-300 pt-2 space-y-6">
+                <div>
+                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><Palette size={16}/> Cores da Marca</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 block mb-2">Cor Primária</label>
+                            <div className="flex items-center gap-3">
+                                <input 
+                                    type="color" 
+                                    value={config.primaryColor} 
+                                    onChange={(e) => setConfig(prev => ({ ...prev, primaryColor: e.target.value }))}
+                                    className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0"
+                                />
+                                <input 
+                                    type="text" 
+                                    value={config.primaryColor}
+                                    onChange={(e) => setConfig(prev => ({ ...prev, primaryColor: e.target.value }))}
+                                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-cyan-500"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 block mb-2">Cor Secundária</label>
+                            <div className="flex items-center gap-3">
+                                <input 
+                                    type="color" 
+                                    value={config.secondaryColor} 
+                                    onChange={(e) => setConfig(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                                    className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0"
+                                />
+                                <input 
+                                    type="text" 
+                                    value={config.secondaryColor}
+                                    onChange={(e) => setConfig(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-cyan-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Logo da Empresa</h3>
+                    <div className="space-y-3">
+                        <input 
+                            type="text" 
+                            value={config.companyLogo}
+                            onChange={(e) => setConfig(prev => ({ ...prev, companyLogo: e.target.value }))}
+                            placeholder="URL do Logo (PNG/SVG)"
+                            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white w-full outline-none focus:border-cyan-500"
+                        />
+                        {config.companyLogo && (
+                            <div className="p-4 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center">
+                                <img src={config.companyLogo} alt="Logo Preview" className="max-h-16 object-contain" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+          )}
+
           {activeTab === 'TEMPLATES' && (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-3 pt-2">
-                {[
-                  { id: TemplateType.BIRTHDAY, label: 'Happy Birthday', desc: 'Classic celebration card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1f03c89654a2a47ae.png' },
-                  { id: TemplateType.ANNIVERSARY, label: 'Work Anniversary', desc: 'Celebrate tenure milestones', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0f03c89654a2a47ad.png' },
-                  { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
-                  { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
-                  { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
-                  { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
-                  { id: TemplateType.BABY, label: 'Baby Birth', desc: 'Welcome Baby', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69d5122206cc717826a7543b.jpg' },
-                  { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
-                  { id: TemplateType.PRESENTATION, label: 'Slide Deck', desc: 'AI Powered Presentation', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0318a761a56ead72a.png' }, 
-                  { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
-                ].map((t, index) => {
+                {TEMPLATE_LIST.map((t, index) => {
                   return (
                     <button 
                        key={t.id} 
@@ -1998,7 +2300,6 @@ export default function App() {
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
                            } else if (t.id === TemplateType.BABY) {
                                setSelectedEmployeeId('baby-generic');
-                               updateEmployee('baby-generic', 'photoUrl', customBabyImages[0] || '');
                                setSidebarDataView('DETAIL');
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
                            } else if (t.id === TemplateType.NEW_PROVIDER) {
@@ -2017,7 +2318,7 @@ export default function App() {
                            // Removed auto-navigation logic for NEW_PROVIDER here
                        }} 
                        className={`relative h-[140px] rounded-2xl text-left transition-all duration-300 group overflow-hidden border
-                         ${selectedTemplate === t.id ? 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] scale-[1.02]' : 'border-white/10 opacity-80 hover:opacity-100 hover:border-white/30'}
+                         ${selectedTemplate === t.id ? 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] scale-[1.02]' : 'border-white/10 opacity-80 hover:opacity-100 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:scale-[1.02]'}
                        `}
                     >
                        {/* Background Image */}
@@ -2039,25 +2340,29 @@ export default function App() {
                 })}
             </div>
           )}
+          </motion.div>
+          </AnimatePresence>
        </div>
 
        {/* 3. Bottom Actions */}
-       <div className="p-4 pt-2 shrink-0 flex gap-2 border-t border-white/5 bg-[#121212]">
-           <button 
-              className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-full shadow-lg transition-all font-bold text-white text-base ${isDownloading ? 'bg-cyan-700 cursor-wait' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:shadow-purple-500/20'}`} 
-              onClick={handleDownload} 
-              disabled={isDownloading}
-           >
-               {isPresentation ? (isDownloading ? '...' : 'Download PPT') : (isDownloading ? 'Generating...' : 'Download image')}
-           </button>
-           
-           <button 
-              onClick={() => setIsManagementMode(true)}
-              className="w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 bg-white/10 hover:bg-white/20 transition-all"
-              title="Employee Management"
-           >
-              <Settings size={20} />
-           </button>
+       <div className="p-4 pt-2 shrink-0 flex flex-col gap-2 border-t border-white/5 bg-[#121212]">
+           <div className="flex gap-2">
+               <button 
+                  className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-full shadow-lg transition-all font-bold text-white text-base ${isDownloading ? 'bg-cyan-700 cursor-wait' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:shadow-purple-500/20'}`} 
+                  onClick={handleDownload} 
+                  disabled={isDownloading}
+               >
+                   {isPresentation ? (isDownloading ? '...' : 'Download PPT') : (isDownloading ? 'Generating...' : `Download ${exportFormat.toUpperCase()}`)}
+               </button>
+               
+               <button 
+                  onClick={() => setIsManagementMode(true)}
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 bg-white/10 hover:bg-white/20 transition-all shrink-0"
+                  title="Employee Management"
+               >
+                  <Settings size={20} />
+               </button>
+           </div>
        </div>
 
     </div>
@@ -2075,18 +2380,37 @@ export default function App() {
         {HeaderContent}
         
         <div className="flex-1 relative overflow-hidden">
-            {isManagementMode && (
-                <div className="absolute inset-0 z-30 bg-gray-100 animate-in fade-in duration-500">
-                    <EmployeeManager 
-                        employees={employees}
-                        onClose={() => setIsManagementMode(false)}
-                        onUpdateEmployee={handleUpdateEmployeeDB}
-                        onDeleteEmployee={handleDeleteEmployeeDB}
-                        onAddEmployee={handleAddEmployeeDB}
-                    />
-                </div>
-            )}
-            <div className={`absolute inset-0 flex transition-all duration-500 ease-in-out transform ${isManagementMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
+            <AnimatePresence>
+                {isManagementMode && (
+                    <motion.div 
+                        key="management"
+                        initial={{ opacity: 0, y: 40, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 40, scale: 0.98 }}
+                        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute inset-0 z-30"
+                    >
+                        <EmployeeManager 
+                            employees={employees}
+                            onClose={() => setIsManagementMode(false)}
+                            onUpdateEmployee={handleUpdateEmployeeDB}
+                            onDeleteEmployee={handleDeleteEmployeeDB}
+                            onAddEmployee={handleAddEmployeeDB}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
+            <motion.div 
+                className="absolute inset-0 flex"
+                animate={{ 
+                    opacity: isManagementMode ? 0 : 1,
+                    scale: isManagementMode ? 1.02 : 1,
+                    y: isManagementMode ? -20 : 0,
+                    pointerEvents: isManagementMode ? 'none' : 'auto'
+                }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            >
             
             {SidebarContent}
 
@@ -2121,7 +2445,7 @@ export default function App() {
                             style={{
                                 transform: `translate(${position.x}px, ${position.y}px) scale(${zoomLevel})`,
                                 transformOrigin: 'top left',
-                                transition: isDraggingCanvas ? 'none' : 'transform 0.1s ease-out',
+                                transition: isDraggingCanvas ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                                 width: 'fit-content',
                                 height: 'fit-content',
                                 position: 'relative'
@@ -2130,20 +2454,34 @@ export default function App() {
                            <MorphingCanvas html={previewHtml} templateType={selectedTemplate} orientation={orientation}>
                                {renderHiringOverlay()}
                            </MorphingCanvas>
+
+                           {isDownloading && (
+                               <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
+                                   <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+                                   <motion.div 
+                                       className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)]"
+                                       animate={{ top: ['0%', '100%', '0%'] }}
+                                       transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                   />
+                               </div>
+                           )}
                        </div>
                     </div>
 
                     <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
+                        <button onClick={undo} disabled={historyIndex === 0} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
+                        <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
+                        <div className="h-px w-8 bg-white/20 mx-auto my-1"></div>
                         <button onClick={() => handleZoom(0.1)} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"><ZoomIn size={20}/></button>
                         <button onClick={() => handleZoom(-0.1)} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"><ZoomOut size={20}/></button>
                         <button onClick={() => { setZoomLevel(1); }} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"><RotateCcw size={20}/></button>
                     </div>
                     
                     {isMonthView && selectedTemplate === TemplateType.BIRTHDAY && (
-                        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 flex items-center gap-4 z-20 shadow-xl">
-                            <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white/10 rounded-full text-white"><ChevronLeft size={20}/></button>
-                            <span className="text-white font-bold uppercase min-w-[100px] text-center">{MONTHS[selectedMonthIndex]}</span>
-                            <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white/10 rounded-full text-white"><ChevronRight size={20}/></button>
+                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 ml-[140px] bg-white/10 backdrop-blur-md border border-slate-300 dark:border-white/20 shadow-[0_8px_30px_rgba(0,0,0,0.12)] rounded-full px-6 py-3 flex items-center gap-6 z-20 transition-all dark:bg-black/20 bg-white">
+                            <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-700 dark:text-white transition-colors"><ChevronLeft size={20}/></button>
+                            <span className="text-slate-800 dark:text-white font-bold uppercase min-w-[120px] text-center tracking-wider">{MONTHS[selectedMonthIndex]}</span>
+                            <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-700 dark:text-white transition-colors"><ChevronRight size={20}/></button>
                         </div>
                     )}
                     
@@ -2315,12 +2653,33 @@ export default function App() {
                         <div className="absolute top-6 right-8 z-30 flex gap-2">
                             {/* MODO MENSAL TOGGLE (Only for Birthday) */}
                             {selectedTemplate === TemplateType.BIRTHDAY && (
-                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Mensal</span>
-                                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Ver todos do mês</span>
+                                <div className="flex gap-2">
+                                    {isMonthView && (
+                                        <>
+                                            <button 
+                                                onClick={handleBatchExport}
+                                                disabled={isDownloading || filteredEmployees.length === 0}
+                                                className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-1 rounded-full shadow-xl flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Download size={14} />
+                                                Exportar Lote (ZIP)
+                                            </button>
+                                            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[10px] font-bold text-white uppercase leading-none">Apenas Nomes</span>
+                                                    <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Sem fotos</span>
+                                                </div>
+                                                <ThemeSwitch isDarkMode={isCompactMonthView} toggle={() => setIsCompactMonthView(!isCompactMonthView)} />
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Mensal</span>
+                                            <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Ver todos do mês</span>
+                                        </div>
+                                        <ThemeSwitch isDarkMode={isMonthView} toggle={() => setIsMonthView(!isMonthView)} />
                                     </div>
-                                    <ThemeSwitch isDarkMode={isMonthView} toggle={() => setIsMonthView(!isMonthView)} />
                                 </div>
                             )}
 
@@ -2341,6 +2700,44 @@ export default function App() {
                                             }
                                         }
                                     }} />
+                                </div>
+                            )}
+
+                            {/* EXPORT FORMAT DROPDOWN */}
+                            {!isPresentation && (
+                                <div className="relative">
+                                    <button 
+                                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                        className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 h-10 shadow-xl flex items-center gap-2 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                                    >
+                                        {exportFormat.toUpperCase()}
+                                        <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    
+                                    <AnimatePresence>
+                                        {showExportDropdown && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                transition={{ duration: 0.15 }}
+                                                className="absolute top-full mt-2 right-0 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 w-24"
+                                            >
+                                                {(['png', 'jpeg', 'pdf'] as const).map(fmt => (
+                                                    <button
+                                                        key={fmt}
+                                                        onClick={() => {
+                                                            setExportFormat(fmt);
+                                                            setShowExportDropdown(false);
+                                                        }}
+                                                        className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors ${exportFormat === fmt ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                    >
+                                                        {fmt.toUpperCase()}
+                                                    </button>
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             )}
 
@@ -2381,7 +2778,7 @@ export default function App() {
                     )}
 
                 </div>
-            </div>
+            </motion.div>
         </div>
         
         {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (

@@ -956,7 +956,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
 };
 
 // --- MONTHLY GROUP RENDERER ---
-const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig, language: Language) => {
+const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig, language: Language, opts?: { isMonthNamesOnly?: boolean }) => {
   const cardBg = '#f1f1f1';
   const fadeColor = '#ffffff';
   const purpleColor = '#9333ea';
@@ -974,71 +974,98 @@ const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig,
   if (monthName.length > 8) headerFontSize = '36px'; 
   if (monthName.length > 10) headerFontSize = '32px'; 
 
-  const count = employees.length;
-  const isCompact = count > 4;
-  const itemWidth = isCompact ? '30%' : '46%'; 
-  const dateSize = isCompact ? '7px' : '9px';
-  const frameGradient = `linear-gradient(to bottom, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%)`;
-
-  const columns = isCompact ? 3 : 2;
-  const rows = Math.ceil(count / columns);
   let containerHeight = 540;
-  if (rows > 3) {
-      const extraRows = rows - 3;
-      containerHeight += (extraRows * 125);
-  }
+  let flexContent = '';
 
-  let gridItems = '';
+  if (opts?.isMonthNamesOnly) {
+     let namesHtml = '';
+     employees.forEach((emp: Employee) => {
+         const day = emp.dateStr.split('/')[0] || '';
+         const month = emp.dateStr.split('/')[1] || '';
+         const displayName = emp.name.length > 25 ? emp.name.substring(0, 25) + '...' : emp.name;
+         namesHtml += `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); padding: 8px 0; width: 100%;">
+                <span style="font-family: 'Orkney', sans-serif; font-size: 14px; font-weight: bold; color: #333;">${displayName}</span>
+                <span class="akira-font" style="font-size: 12px; color: ${purpleColor};">${day}/${month}</span>
+            </div>
+         `;
+     });
 
-  employees.forEach(emp => {
-      const day = emp.dateStr.split('/')[0] || '';
-      const month = emp.dateStr.split('/')[1] || '';
-      const nameParts = emp.name.split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ');
-      const fullName = `${firstName} ${lastName}`;
-      const fullNameLength = fullName.length;
-      let fontSizeNum = isCompact ? 8 : 10;
-      if (fullNameLength > 10) fontSizeNum -= 1;
-      if (fullNameLength > 15) fontSizeNum -= 1;
-      if (fullNameLength > 20) fontSizeNum -= 1;
-      if (isCompact && fontSizeNum < 5) fontSizeNum = 5;
-      if (isCompact && fontSizeNum < 5) fontSizeNum = 5;
-      if (!isCompact && fontSizeNum < 7) fontSizeNum = 7;
-      const finalNameSize = `${fontSizeNum}px`;
+     containerHeight = Math.max(540, 160 + (employees.length * 40) + 60);
+
+     flexContent = `
+         <div style="display: flex; flex-direction: column; width: 100%; padding: 0 40px; z-index: 10; position: relative; box-sizing: border-box; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-top: 20px; align-self: center;">
+            ${namesHtml}
+         </div>
+     `;
+  } else {
+      const count = employees.length;
+      const isCompact = count > 4;
+      const itemWidth = isCompact ? '30%' : '46%'; 
+      const dateSize = isCompact ? '7px' : '9px';
+      const frameGradient = `linear-gradient(to bottom, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%)`;
+
+      const columns = isCompact ? 3 : 2;
+      const rows = Math.ceil(count / columns);
+      containerHeight = 540;
+      if (rows > 3) {
+          const extraRows = rows - 3;
+          containerHeight += (extraRows * 125);
+      }
+
+      let gridItems = '';
+
+      employees.forEach((emp: Employee) => {
+          const day = emp.dateStr.split('/')[0] || '';
+          const month = emp.dateStr.split('/')[1] || '';
+          const nameParts = emp.name.split(' ');
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' ');
+          const fullName = `${firstName} ${lastName}`;
+          const fullNameLength = fullName.length;
+          let fontSizeNum = isCompact ? 8 : 10;
+          if (fullNameLength > 10) fontSizeNum -= 1;
+          if (fullNameLength > 15) fontSizeNum -= 1;
+          if (fullNameLength > 20) fontSizeNum -= 1;
+          if (isCompact && fontSizeNum < 5) fontSizeNum = 5;
+          if (!isCompact && fontSizeNum < 7) fontSizeNum = 7;
+          const finalNameSize = `${fontSizeNum}px`;
+          
+          const maxLineLen = Math.max(firstName.length, lastName.length);
+          const dateLen = 5; 
+          const collisionThreshold = isCompact ? 9 : 13;
+          const collisionScore = maxLineLen + dateLen;
+          const shouldStackDate = collisionScore > collisionThreshold || fullNameLength > 18;
+
+          const nameContainerStyle = shouldStackDate
+            ? `position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;`
+            : `position: absolute; bottom: 12px; left: 12px; z-index: 10; pointer-events: none; max-width: 65%;`;
+
+          const dateContainerStyle = shouldStackDate
+            ? `position: absolute; bottom: 8px; left: 12px; z-index: 10; pointer-events: none;`
+            : `position: absolute; bottom: 14px; right: 12px; z-index: 10; pointer-events: none;`;
+
+          const dateTextAlign = shouldStackDate ? 'left' : 'right';
+
+          gridItems += `
+            <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
+                <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <div style="${nameContainerStyle}">
+                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${firstName}<br/>${lastName}
+                    </p>
+                </div>
+                <div style="${dateContainerStyle}">
+                    <p class="akira-font" style="font-size: ${dateSize}; color: #ffffff; margin: 0; text-align: ${dateTextAlign}; opacity: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${day}/${month}
+                    </p>
+                </div>
+            </div>
+          `;
+      });
       
-      const maxLineLen = Math.max(firstName.length, lastName.length);
-      const dateLen = 5; 
-      const collisionThreshold = isCompact ? 9 : 13;
-      const collisionScore = maxLineLen + dateLen;
-      const shouldStackDate = collisionScore > collisionThreshold || fullNameLength > 18;
-
-      const nameContainerStyle = shouldStackDate
-        ? `position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;`
-        : `position: absolute; bottom: 12px; left: 12px; z-index: 10; pointer-events: none; max-width: 65%;`;
-
-      const dateContainerStyle = shouldStackDate
-        ? `position: absolute; bottom: 8px; left: 12px; z-index: 10; pointer-events: none;`
-        : `position: absolute; bottom: 14px; right: 12px; z-index: 10; pointer-events: none;`;
-
-      const dateTextAlign = shouldStackDate ? 'left' : 'right';
-
-      gridItems += `
-        <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-            <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
-            <div style="${nameContainerStyle}">
-                <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                    ${firstName}<br/>${lastName}
-                </p>
-            </div>
-            <div style="${dateContainerStyle}">
-                <p class="akira-font" style="font-size: ${dateSize}; color: #ffffff; margin: 0; text-align: ${dateTextAlign}; opacity: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                    ${day}/${month}
-                </p>
-            </div>
-        </div>
-      `;
-  });
+      flexContent = `<div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 12px; width: 100%; padding: 0 30px; z-index: 10; position: relative; box-sizing: border-box;">${gridItems}</div>`;
+  }
 
   return `
     <div id="capture-target" style="width: 360px; height: ${containerHeight}px; background: ${cardBg}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
@@ -1050,17 +1077,15 @@ const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig,
             ${monthName}
           </h1>
        </div>
-       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 20px;">
-          <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
-          <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 12px; width: 100%; padding: 0 30px; z-index: 10; position: relative; box-sizing: border-box;">
-             ${gridItems}
-          </div>
+       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; padding-top: 20px; padding-bottom: 20px;">
+          ${backgroundConfetti}
+          ${flexContent}
        </div>
     </div>
   `;
 };
 
-const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: CanvasConfig, language: Language) => {
+const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: CanvasConfig, language: Language, opts?: { isMonthNamesOnly?: boolean }) => {
   const cardBg = '#f1f1f1';
   const fadeColor = '#ffffff';
   const purpleColor = '#9333ea';
@@ -1073,65 +1098,95 @@ const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: Canv
   const monthName = employees.length > 0 ? getMonthName(employees[0].dateStr, language) : 'ANIVERSARIANTES';
   let headerFontSize = '42px';
   const count = employees.length;
-  let cols = 4; 
-  if (count <= 3) cols = 3; 
-  if (count > 8) cols = 5; 
-  
-  const gap = 15;
-  const paddingX = 30;
-  const itemWidthPct = `calc(${100/cols}% - ${ (gap * (cols - 1)) / cols }px)`;
-  const availableWidth = 740 - (paddingX * 2);
-  const approxItemSize = (availableWidth - ((cols - 1) * gap)) / cols;
-  const rows = Math.ceil(count / cols);
+
   const headerHeight = 120;
-  const bodyPaddingY = 40;
-  let containerHeight = headerHeight + bodyPaddingY + (rows * approxItemSize) + ((rows - 1) * gap);
-  if (containerHeight < 360) containerHeight = 360;
-  containerHeight = Math.ceil(containerHeight);
+  let containerHeight = 360;
+  let flexContent = '';
 
-  let gridItems = '';
-
-  employees.forEach(emp => {
-      const day = emp.dateStr.split('/')[0] || '';
-      const month = emp.dateStr.split('/')[1] || '';
-      const nameParts = emp.name.split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ');
-      const fullName = `${firstName} ${lastName}`;
-      const fullNameLength = fullName.length;
-      let fontSizeNum = 10;
-      if (cols >= 5) fontSizeNum = 8; 
-      if (fullNameLength > 12) fontSizeNum -= 1;
-      if (fullNameLength > 18) fontSizeNum -= 1;
-      if (fontSizeNum < 6) fontSizeNum = 6;
-      const finalNameSize = `${fontSizeNum}px`;
-      const dateSize = cols >= 5 ? '7px' : '9px';
-      const shouldStackDate = fullNameLength > 15 || cols >= 5; 
-      const nameContainerStyle = shouldStackDate
-        ? `position: absolute; bottom: 20px; left: 8px; z-index: 10; pointer-events: none; max-width: 90%;`
-        : `position: absolute; bottom: 10px; left: 10px; z-index: 10; pointer-events: none; max-width: 65%;`;
-      const dateContainerStyle = shouldStackDate
-        ? `position: absolute; bottom: 6px; left: 8px; z-index: 10; pointer-events: none;`
-        : `position: absolute; bottom: 12px; right: 10px; z-index: 10; pointer-events: none;`;
-      const dateTextAlign = shouldStackDate ? 'left' : 'right';
-      const frameGradient = `linear-gradient(to bottom, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%)`;
-
-      gridItems += `
-        <div style="width: ${itemWidthPct}; aspect-ratio: 1; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-            <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
-            <div style="${nameContainerStyle}">
-                <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                    ${firstName}<br/>${lastName}
-                </p>
+  if (opts?.isMonthNamesOnly) {
+     let namesHtml = '';
+     employees.forEach((emp: Employee) => {
+         const day = emp.dateStr.split('/')[0] || '';
+         const month = emp.dateStr.split('/')[1] || '';
+         const displayName = emp.name.length > 25 ? emp.name.substring(0, 25) + '...' : emp.name;
+         namesHtml += `
+            <div style="flex: 0 0 calc(50% - 20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); padding: 8px 0; box-sizing: border-box;">
+                <span style="font-family: 'Orkney', sans-serif; font-size: 14px; font-weight: bold; color: #333;">${displayName}</span>
+                <span class="akira-font" style="font-size: 12px; color: ${purpleColor};">${day}/${month}</span>
             </div>
-            <div style="${dateContainerStyle}">
-                <p class="akira-font" style="font-size: ${dateSize}; color: #ffffff; margin: 0; text-align: ${dateTextAlign}; opacity: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                    ${day}/${month}
-                </p>
+         `;
+     });
+
+     containerHeight = Math.max(360, headerHeight + (Math.ceil(employees.length / 2) * 45) + 60);
+
+     flexContent = `
+         <div style="display: flex; flex-direction: column; width: 100%; padding: 0 40px; z-index: 10; position: relative; box-sizing: border-box; background: transparent; align-self: center;">
+            <div style="background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 20px 30px; display: flex; flex-wrap: wrap; gap: 0 40px;">
+                ${namesHtml}
             </div>
-        </div>
-      `;
-  });
+         </div>
+     `;
+  } else {
+      let cols = 4; 
+      if (count <= 3) cols = 3; 
+      if (count > 8) cols = 5; 
+      
+      const gap = 15;
+      const paddingX = 30;
+      const itemWidthPct = `calc(${100/cols}% - ${ (gap * (cols - 1)) / cols }px)`;
+      const availableWidth = 740 - (paddingX * 2);
+      const approxItemSize = (availableWidth - ((cols - 1) * gap)) / cols;
+      const rows = Math.ceil(count / cols);
+      const bodyPaddingY = 40;
+      containerHeight = headerHeight + bodyPaddingY + (rows * approxItemSize) + ((rows - 1) * gap);
+      if (containerHeight < 360) containerHeight = 360;
+      containerHeight = Math.ceil(containerHeight);
+
+      let gridItems = '';
+
+      employees.forEach(emp => {
+          const day = emp.dateStr.split('/')[0] || '';
+          const month = emp.dateStr.split('/')[1] || '';
+          const nameParts = emp.name.split(' ');
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' ');
+          const fullName = `${firstName} ${lastName}`;
+          const fullNameLength = fullName.length;
+          let fontSizeNum = 10;
+          if (cols >= 5) fontSizeNum = 8; 
+          if (fullNameLength > 12) fontSizeNum -= 1;
+          if (fullNameLength > 18) fontSizeNum -= 1;
+          if (fontSizeNum < 6) fontSizeNum = 6;
+          const finalNameSize = `${fontSizeNum}px`;
+          const dateSize = cols >= 5 ? '7px' : '9px';
+          const shouldStackDate = fullNameLength > 15 || cols >= 5; 
+          const nameContainerStyle = shouldStackDate
+            ? `position: absolute; bottom: 20px; left: 8px; z-index: 10; pointer-events: none; max-width: 90%;`
+            : `position: absolute; bottom: 10px; left: 10px; z-index: 10; pointer-events: none; max-width: 65%;`;
+          const dateContainerStyle = shouldStackDate
+            ? `position: absolute; bottom: 6px; left: 8px; z-index: 10; pointer-events: none;`
+            : `position: absolute; bottom: 12px; right: 10px; z-index: 10; pointer-events: none;`;
+          const dateTextAlign = shouldStackDate ? 'left' : 'right';
+          const frameGradient = `linear-gradient(to bottom, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%)`;
+
+          gridItems += `
+            <div style="width: ${itemWidthPct}; aspect-ratio: 1; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
+                <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <div style="${nameContainerStyle}">
+                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${firstName}<br/>${lastName}
+                    </p>
+                </div>
+                <div style="${dateContainerStyle}">
+                    <p class="akira-font" style="font-size: ${dateSize}; color: #ffffff; margin: 0; text-align: ${dateTextAlign}; opacity: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${day}/${month}
+                    </p>
+                </div>
+            </div>
+          `;
+      });
+      flexContent = `<div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: ${gap}px; width: 100%; z-index: 10; position: relative; box-sizing: border-box;">${gridItems}</div>`;
+  }
 
   const headerGradient = `linear-gradient(to top, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%)`;
 
@@ -1145,11 +1200,9 @@ const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: Canv
             ${monthName}
           </h1>
        </div>
-       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 20px ${paddingX}px; box-sizing: border-box;">
-          <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
-          <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: ${gap}px; width: 100%; z-index: 10; position: relative; box-sizing: border-box;">
-             ${gridItems}
-          </div>
+       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; padding: 20px 30px; box-sizing: border-box;">
+          ${backgroundConfetti}
+          ${flexContent}
        </div>
     </div>
   `;
@@ -1238,7 +1291,7 @@ const generateLandscapeTemplate = (
           </h1>
        </div>
        <div style="width: 45%; height: 100%; background: ${cardBg}; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-          <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
+          ${backgroundConfetti}
           <div style="width: 260px; height: 260px; background: ${frameBackground}; position: relative; display: flex; justify-content: center; overflow: hidden; z-index: 10; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);">
             ${noise}
             <img src="${employee.photoUrl}" style="height: 135%; width: 135%; max-width: none; object-fit: cover; object-position: top center; z-index: 1; margin-left: -17.5%; margin-top: -35px; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
@@ -1341,7 +1394,7 @@ const generatePortraitTemplate = (
           </h1>
        </div>
        <div style="flex: 1; width: 100%; background: ${cardBg}; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-          <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">${backgroundConfetti}</div>
+          ${backgroundConfetti}
           <div style="width: 280px; height: 280px; background: ${frameBackground}; position: relative; display: flex; justify-content: center; overflow: hidden; z-index: 10; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);">
             ${noise}
             <img src="${employee.photoUrl}" style="height: 135%; width: 135%; max-width: none; object-fit: cover; object-position: top center; z-index: 1; margin-left: -17.5%; margin-top: -35px; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
@@ -1734,15 +1787,15 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
 
 // --- MAIN GENERATOR ---
 
-export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq', department?: string): string => {
+export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq', department?: string, opts?: { isMonthNamesOnly?: boolean }): string => {
   let cardHtml = '';
   
   if (Array.isArray(data)) {
       if (type === TemplateType.BIRTHDAY) {
          if (orientation === 'landscape') {
-             cardHtml = generateMonthGroupLandscapeTemplate(data, config, language);
+             cardHtml = generateMonthGroupLandscapeTemplate(data, config, language, opts);
          } else {
-             cardHtml = generateMonthGroupTemplate(data, config, language);
+             cardHtml = generateMonthGroupTemplate(data, config, language, opts);
          }
       } else if (type === TemplateType.JOB_CHANGE) {
          cardHtml = generateJobChangeGroupTemplate(data, config, language, orientation);
