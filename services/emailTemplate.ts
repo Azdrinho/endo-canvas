@@ -1855,10 +1855,10 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           break;
         
         case TemplateType.WELCOME:
-          const glassStyle = "margin-top: 15px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 15px 20px; text-align: left;";
+          const glassStyle = "margin-top: 15px; background: rgba(255, 255, 255, 0.45); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 15px 20px; text-align: left;";
           const descHtml = employee.description 
             ? `<div style="${glassStyle}">
-                 <div contenteditable="true" data-field="description" oninput="let fs=13; this.style.fontSize=fs+'px'; while(this.scrollHeight > 136 && fs > 8){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-size: 13px; font-weight: 400; color: white; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: 136px; overflow: hidden; text-shadow: none; text-transform: none;">${employee.description}</div>
+                 <div contenteditable="true" data-field="description" oninput="let fs=13; this.style.fontSize=fs+'px'; while(this.scrollHeight > 136 && fs > 8){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-size: 13px; font-weight: 400; color: #1A1A1A; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: 136px; overflow: hidden; text-shadow: none; text-transform: none;">${employee.description}</div>
                </div>`
             : '';
 

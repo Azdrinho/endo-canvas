@@ -386,6 +386,7 @@ export default function App() {
           finalData.push(genericBaby);
         }
         setEmployees(finalData);
+        setSelectedEmployeeId(data[0].id);
       }
     });
 
@@ -651,15 +652,16 @@ export default function App() {
               const speed = 4; // REDUCED SENSITIVITY
 
               // Only for employees now, New Provider logic removed
+              const targetId = selectedEmployee.id;
               setEmployees(prev => {
-                  const emp = prev.find(p => p.id === selectedEmployeeId);
+                  const emp = prev.find(p => p.id === targetId);
                   if (!emp) return prev;
                   
                   const currentPos = emp.photoPosition || { x: 0, y: 0 };
                   const newX = currentPos.x + (v.x * speed);
                   const newY = currentPos.y + (v.y * speed);
                   
-                  return prev.map(p => p.id === selectedEmployeeId ? { ...p, photoPosition: { x: newX, y: newY } } : p);
+                  return prev.map(p => p.id === targetId ? { ...p, photoPosition: { x: newX, y: newY } } : p);
               });
           }, 20); // 50fps
       }
@@ -2709,9 +2711,9 @@ export default function App() {
                                     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
                                         <button 
                                             onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                            className="px-3 h-full rounded-full flex items-center gap-2 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                                            className="px-3 w-[84px] justify-between h-full rounded-full flex items-center text-white text-[10px] tracking-wider font-bold hover:bg-white/20 transition-all"
                                         >
-                                            {exportFormat.toUpperCase()}
+                                            <span>{exportFormat.toUpperCase()}</span>
                                             <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
                                         </button>
                                     </div>
