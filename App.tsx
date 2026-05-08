@@ -614,19 +614,20 @@ export default function App() {
 
   const handleJoystickStart = (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       setIsJoystickDragging(true);
       const startX = e.clientX;
       const startY = e.clientY;
       const container = e.currentTarget.getBoundingClientRect();
       const centerX = container.left + container.width / 2;
       const centerY = container.top + container.height / 2;
-      // Container is w-32 (128px). Radius is 64px. Stick is w-14 (56px).
-      // Max travel = 64 - (56/2) = 64 - 28 = 36px.
-      const maxRadius = 36; 
+      // Container is w-20 (80px), stick is w-8 (32px).
+      // Max travel = 40 - 16 = 24px.
+      const maxRadius = 24; 
 
       const updatePosition = (clientX: number, clientY: number) => {
-          let dx = clientX - centerX;
-          let dy = clientY - centerY;
+          let dx = (clientX - centerX) / zoomLevel;
+          let dy = (clientY - centerY) / zoomLevel;
           const distance = Math.sqrt(dx*dx + dy*dy);
           
           if (distance > maxRadius) {
@@ -2457,6 +2458,44 @@ export default function App() {
                                {renderHiringOverlay()}
                            </MorphingCanvas>
 
+                           {/* NEW JOYSTICK & SLIDER */}
+                           {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
+                               <div 
+                                   className="absolute -right-[100px] top-4 z-50 flex flex-col items-center gap-4"
+                               >
+                                  {/* Joystick */}
+                                  <div 
+                                      className={`w-[80px] h-[80px] rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 shadow-xl flex items-center justify-center transition-opacity duration-300 ${isJoystickDragging ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-100'}`}
+                                      onMouseDown={handleJoystickStart}
+                                  >
+                                      <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+                                          <div className="w-full h-px bg-white"></div>
+                                          <div className="h-full w-px bg-white absolute"></div>
+                                      </div>
+                                      <div 
+                                          className="w-[32px] h-[32px] rounded-full bg-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.5)] relative z-10 cursor-grab active:cursor-grabbing flex items-center justify-center"
+                                          style={{ transform: `translate(${joystickUiPos.x}px, ${joystickUiPos.y}px)` }}
+                                      >
+                                          <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
+                                      </div>
+                                  </div>
+
+                                  {/* Scale Slider */}
+                                  <div 
+                                      className="h-[120px] w-[32px] bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center shadow-xl opacity-60 hover:opacity-100 transition-opacity"
+                                      onMouseDown={(e) => e.stopPropagation()} // Prevent canvas dragging when using slider
+                                  >
+                                      <input 
+                                          type="range" 
+                                          min="0.5" max="3" step="0.05" 
+                                          value={selectedEmployee.photoScale || 1}
+                                          onChange={(e) => updateEmployee(selectedEmployee.id, 'photoScale', parseFloat(e.target.value))}
+                                          className="w-[100px] h-[2px] appearance-none bg-white/20 rounded-full outline-none -rotate-90 cursor-ns-resize [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-md"
+                                      />
+                                  </div>
+                               </div>
+                           )}
+
                            {isDownloading && (
                                <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
                                    <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
@@ -2784,35 +2823,6 @@ export default function App() {
                 </div>
             </motion.div>
         </div>
-        
-        {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
-            <div 
-                className="fixed bottom-8 left-[380px] z-50 group"
-                onMouseDown={handleJoystickStart}
-            >
-              <div className={`w-32 h-32 rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center justify-center transition-opacity duration-300 ${isJoystickDragging ? 'opacity-100 scale-110' : 'opacity-40 hover:opacity-100'}`}>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
-                  <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                      <div className="w-full h-px bg-white"></div>
-                      <div className="h-full w-px bg-white absolute"></div>
-                  </div>
-                  
-                  <div 
-                      className="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg border-2 border-white/20 relative z-10 cursor-grab active:cursor-grabbing"
-                      style={{ transform: `translate(${joystickUiPos.x}px, ${joystickUiPos.y}px)` }}
-                  >
-                      <div className="absolute inset-0 rounded-full bg-white/20 blur-sm"></div>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                          <Move size={20} className="text-white opacity-80" />
-                      </div>
-                  </div>
-                  
-                  <div className="absolute -bottom-8 text-[10px] font-bold text-white/50 uppercase tracking-widest pointer-events-none">
-                      Pan Photo
-                  </div>
-              </div>
-            </div>
-        )}
         
         {/* Hidden File Input for Custom Image Uploads */}
         <input 
