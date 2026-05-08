@@ -1383,19 +1383,23 @@ const generatePortraitTemplate = (
   const defaultFrameBg = `linear-gradient(to bottom, ${fadeColor} 20%, rgba(255,255,255,0) 100%), linear-gradient(90deg, #22d3ee 0%, ${purpleColor} 100%)`;
   const frameBackground = customBackground || defaultFrameBg;
 
+  const topPanelHeight = sphereVariant === 'welcome' ? '215px' : '190px';
+  const frameSize = sphereVariant === 'welcome' ? '255px' : '280px';
+  const h1Width = sphereVariant === 'welcome' ? 'width: 100%; display: flex; flex-direction: column; align-items: center;' : '';
+
   return `
     <div id="capture-target" style="width: 360px; height: 540px; background: ${cardBg}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
-       <div style="height: 190px; width: 100%; background: linear-gradient(to top, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%); position: relative; display: flex; align-items: center; justify-content: ${justifyContent}; padding-left: ${paddingLeft}; box-sizing: border-box; overflow: hidden; z-index: 20;">
+       <div style="height: ${topPanelHeight}; width: 100%; background: linear-gradient(to top, ${fadeColor} 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, ${purpleColor} 0%, #22d3ee 100%); position: relative; display: flex; align-items: center; justify-content: ${justifyContent}; padding-left: ${paddingLeft}; box-sizing: border-box; overflow: hidden; z-index: 20;">
           ${noise}
           ${spheres}
           ${logo}
-          <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <h1 class="akira-font" style="font-size: ${titleSize}; line-height: 1; color: ${cardBg}; margin: 0; text-align: ${textAlign}; letter-spacing: ${letterSpacing}; position: relative; z-index: 10; white-space: ${sphereVariant === 'welcome' ? 'normal' : 'nowrap'}; word-wrap: break-word; text-shadow: 0 4px 12px rgba(0,0,0,0.1); ${h1Width}">
             ${titleHtml}
           </h1>
        </div>
        <div style="flex: 1; width: 100%; background: ${cardBg}; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
           ${backgroundConfetti}
-          <div style="width: 280px; height: 280px; background: ${frameBackground}; position: relative; display: flex; justify-content: center; overflow: hidden; z-index: 10; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);">
+          <div style="width: ${frameSize}; height: ${frameSize}; background: ${frameBackground}; position: relative; display: flex; justify-content: center; overflow: hidden; z-index: 10; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);">
             ${noise}
             <img src="${employee.photoUrl}" style="height: 135%; width: 135%; max-width: none; object-fit: cover; object-position: top center; z-index: 1; margin-left: -17.5%; margin-top: -35px; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${gradientHeight}; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 2; pointer-events: none;"></div>
@@ -1855,10 +1859,16 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           break;
         
         case TemplateType.WELCOME:
-          const glassStyle = "margin-top: 15px; background: rgba(255, 255, 255, 0.45); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 15px 20px; text-align: left;";
+          const welcomeTitleSize = isLandscape ? '42px' : '26px';
+          const glassPadding = isLandscape ? '15px 20px' : '8px 14px';
+          const glassMargin = isLandscape ? '15px' : '6px';
+          const descFontSize = isLandscape ? '13px' : '11px';
+          const glassStyle = `margin-top: ${glassMargin}; background: rgba(255, 255, 255, 0.35); backdrop-filter: blur(12px); border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: ${glassPadding}; text-align: left; box-sizing: border-box; width: 100%; max-width: 320px;`;
+          const maxDescHeight = isLandscape ? 136 : 110;
+          
           const descHtml = employee.description 
             ? `<div style="${glassStyle}">
-                 <div contenteditable="true" data-field="description" oninput="let fs=13; this.style.fontSize=fs+'px'; while(this.scrollHeight > 136 && fs > 8){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-size: 13px; font-weight: 400; color: #1A1A1A; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: 136px; overflow: hidden; text-shadow: none; text-transform: none;">${employee.description}</div>
+                 <div contenteditable="true" data-field="description" oninput="let fs=${descFontSize.replace('px','')}; this.style.fontSize=fs+'px'; while(this.scrollHeight > ${maxDescHeight} && fs > 7){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-size: ${descFontSize}; font-weight: 400; color: #1A1A1A; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: ${maxDescHeight}px; overflow: hidden; text-shadow: none; text-transform: none;">${employee.description}</div>
                </div>`
             : '';
 
@@ -1866,7 +1876,7 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
             employee, 
             config, 
             `${TEXTS.WELCOME[language]}${descHtml}`, 
-            '42px', 
+            welcomeTitleSize, 
             'center', 
             '1px', 
             'welcome', 
