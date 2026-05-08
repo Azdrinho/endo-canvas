@@ -2706,13 +2706,15 @@ export default function App() {
                             {/* EXPORT FORMAT DROPDOWN */}
                             {!isPresentation && (
                                 <div className="relative">
-                                    <button 
-                                        onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                        className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 h-10 shadow-xl flex items-center gap-2 text-white text-xs font-bold hover:bg-white/20 transition-all"
-                                    >
-                                        {exportFormat.toUpperCase()}
-                                        <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
+                                        <button 
+                                            onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                            className="px-3 h-full rounded-full flex items-center gap-2 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                                        >
+                                            {exportFormat.toUpperCase()}
+                                            <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
                                     
                                     <AnimatePresence>
                                         {showExportDropdown && (
@@ -2743,12 +2745,12 @@ export default function App() {
 
                             {/* LANGUAGE SWITCHER */}
                             {selectedTemplate !== TemplateType.HIRING && (
-                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center">
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
                                     {(['en', 'pt', 'es'] as Language[]).map((lang) => (
                                         <button
                                             key={lang}
                                             onClick={() => setLanguage(lang)}
-                                            className={`w-8 h-8 rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                            className={`w-9 h-full rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         >
                                             {lang}
                                         </button>
@@ -2757,20 +2759,20 @@ export default function App() {
                             )}
 
                             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
-                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex">
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
                                     <button 
                                         onClick={() => handleOrientationChange('portrait')} 
-                                        className={`p-2 rounded-full transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                        className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         title="Portrait"
                                     >
-                                        <RectangleVertical size={20} />
+                                        <RectangleVertical size={18} />
                                     </button>
                                     <button 
                                         onClick={() => handleOrientationChange('landscape')} 
-                                        className={`p-2 rounded-full transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                        className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         title="Landscape"
                                     >
-                                        <RectangleHorizontal size={20} />
+                                        <RectangleHorizontal size={18} />
                                     </button>
                                 </div>
                             )}

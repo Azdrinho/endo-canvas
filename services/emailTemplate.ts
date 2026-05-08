@@ -1051,7 +1051,7 @@ const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig,
             <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
                 <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="${nameContainerStyle}">
-                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         ${firstName}<br/>${lastName}
                     </p>
                 </div>
@@ -1173,7 +1173,7 @@ const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: Canv
             <div style="width: ${itemWidthPct}; aspect-ratio: 1; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
                 <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="${nameContainerStyle}">
-                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 0.9; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                    <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         ${firstName}<br/>${lastName}
                     </p>
                 </div>
@@ -1297,7 +1297,7 @@ const generateLandscapeTemplate = (
             <img src="${employee.photoUrl}" style="height: 135%; width: 135%; max-width: none; object-fit: cover; object-position: top center; z-index: 1; margin-left: -17.5%; margin-top: -35px; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${gradientHeight}; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 2; pointer-events: none;"></div>
             <div style="${nameContainerStyle}">
-              <p class="akira-font" style="font-size: ${nameFontSize}; color: #ffffff; margin: 0; line-height: 0.9; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">
+              <p class="akira-font" style="font-size: ${nameFontSize}; color: #ffffff; margin: 0; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">
                 ${employee.name.split(' ')[0]}<br/>
                 ${employee.name.split(' ').slice(1).join(' ')}
               </p>
@@ -1400,7 +1400,7 @@ const generatePortraitTemplate = (
             <img src="${employee.photoUrl}" style="height: 135%; width: 135%; max-width: none; object-fit: cover; object-position: top center; z-index: 1; margin-left: -17.5%; margin-top: -35px; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${gradientHeight}; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 2; pointer-events: none;"></div>
             <div style="${nameContainerStyle}">
-              <p class="akira-font" style="font-size: ${nameFontSize}; color: #ffffff; margin: 0; line-height: 0.9; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">
+              <p class="akira-font" style="font-size: ${nameFontSize}; color: #ffffff; margin: 0; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">
                 ${employee.name.split(' ')[0]}<br/>
                 ${employee.name.split(' ').slice(1).join(' ')}
               </p>
@@ -1490,12 +1490,12 @@ const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hid
        <!-- TEXT OVERLAY (Always visible, icons conditional) -->
        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding-right: 40px; box-sizing: border-box; z-index: 10;">
            ${department ? `
-              <h1 class="akira-font signature-text-remove" style="font-size: ${department.length > 20 ? '24px' : '34px'}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1); padding-bottom: 15px;">
+              <h1 class="akira-font signature-text-remove" style="font-size: ${department.length > 20 ? '24px' : '34px'}; line-height: 1; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1); padding-bottom: 15px;">
                   ${department.split(' ')[0].toUpperCase()}<br/>
                   ${department.split(' ').slice(1).join(' ').toUpperCase()}
               </h1>
            ` : `
-              <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 0.9; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+              <h1 class="akira-font signature-text-remove" style="font-size: ${titleSize}; line-height: 1; color: #ffffff; margin: 0; text-align: right; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                  ${firstName.toUpperCase()}<br/>
                  ${lastName.toUpperCase()}
                </h1>
@@ -1855,10 +1855,17 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           break;
         
         case TemplateType.WELCOME:
+          const glassStyle = "margin-top: 15px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 15px 20px; text-align: left;";
+          const descHtml = employee.description 
+            ? `<div style="${glassStyle}">
+                 <div contenteditable="true" data-field="description" oninput="let fs=13; this.style.fontSize=fs+'px'; while(this.scrollHeight > 136 && fs > 8){ fs-=0.5; this.style.fontSize=fs+'px'; }" style="font-family: 'Orkney', sans-serif; font-size: 13px; font-weight: 400; color: white; margin: 0; line-height: 1.3; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: pre-wrap; word-break: break-word; max-height: 136px; overflow: hidden; text-shadow: none; text-transform: none;">${employee.description}</div>
+               </div>`
+            : '';
+
           cardHtml = generatorFn(
             employee, 
             config, 
-            TEXTS.WELCOME[language], 
+            `${TEXTS.WELCOME[language]}${descHtml}`, 
             '42px', 
             'center', 
             '1px', 
