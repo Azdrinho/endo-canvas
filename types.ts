@@ -122,7 +122,7 @@ export interface SlideElement {
   children?: SlideElement[]; // For Grouping
   chartData?: ChartData; // For Charts
   style: {
-    fontFamily?: 'Orkney';
+    fontFamily?: string;
     fontWeight?: '300' | '400' | '700' | '900' | 'normal' | 'bold';
     fontSize?: number;
     color?: string;

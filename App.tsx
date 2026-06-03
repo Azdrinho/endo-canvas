@@ -7,7 +7,8 @@ import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, Slide, ProviderFormat, ProviderGridConfig } from './types';
 import { generateCardCanvas } from './services/emailTemplate'; 
-import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage } from './services/supabase';
+import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, uploadEmployeePhoto } from './services/supabase';
+import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from './services/imageConverter';
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { SlideEditor } from './components/SlideEditor';
@@ -370,6 +371,7 @@ const TEMPLATE_LIST = [
 export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [isManagementMode, setIsManagementMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Fetch from Supabase on mount
   useEffect(() => {
@@ -423,6 +425,247 @@ export default function App() {
       deleteEmployee(id); // Fire and forget
   };
 
+  const [isConvertingAll, setIsConvertingAll] = useState(false);
+
+  const convertExistingImagesToWebP = async () => {
+      setIsConvertingAll(true);
+      const toastId = toast.loading('Iniciando conversão em lote para WEBP...');
+      
+      try {
+          let convertCount = 0;
+          const backgroundMap = new Map<string, string>();
+
+          // 1. Convert hiring backgrounds
+          if (customHiringImages.length > 0) {
+              const nextHiringImages = [...customHiringImages];
+              let hiringListChanged = false;
+              for (let i = 0; i < customHiringImages.length; i++) {
+                  const url = customHiringImages[i];
+                  if (url && url.startsWith('http') && !url.includes('.webp')) {
+                      try {
+                          toast.loading(`Otimizando fundo de contratação ${i + 1}/${customHiringImages.length}...`, { id: toastId });
+                          const webpBlob = await convertUrlToWebPBlob(url);
+                          const webpFile = new File([webpBlob], `hiring-${Date.now()}-${i}.webp`, { type: 'image/webp' });
+                          const newUrl = await uploadHiringImageToStorage(webpFile);
+                          await addHiringImage(newUrl);
+                          try {
+                              await deleteHiringImage(url);
+                          } catch (delErr) {
+                              console.warn("Could not delete old hiring image from storage:", delErr);
+                          }
+                          nextHiringImages[i] = newUrl;
+                          backgroundMap.set(url, newUrl);
+                          hiringListChanged = true;
+                          convertCount++;
+                      } catch (err) {
+                          console.error(`Failed to convert hiring background ${url} to WebP:`, err);
+                      }
+                  }
+              }
+              if (hiringListChanged) {
+                  setCustomHiringImages(nextHiringImages);
+              }
+          }
+
+          // 2. Convert baby backgrounds
+          if (customBabyImages.length > 0) {
+              const nextBabyImages = [...customBabyImages];
+              let babyListChanged = false;
+              for (let i = 0; i < customBabyImages.length; i++) {
+                  const url = customBabyImages[i];
+                  if (url && url.startsWith('http') && !url.includes('.webp')) {
+                      try {
+                          toast.loading(`Otimizando fundo infantil ${i + 1}/${customBabyImages.length}...`, { id: toastId });
+                          const webpBlob = await convertUrlToWebPBlob(url);
+                          const webpFile = new File([webpBlob], `baby-${Date.now()}-${i}.webp`, { type: 'image/webp' });
+                          const newUrl = await uploadBabyImageToStorage(webpFile);
+                          await addBabyImage(newUrl);
+                          try {
+                              await deleteBabyImage(url);
+                          } catch (delErr) {
+                              console.warn("Could not delete old baby image from storage:", delErr);
+                          }
+                          nextBabyImages[i] = newUrl;
+                          backgroundMap.set(url, newUrl);
+                          babyListChanged = true;
+                          convertCount++;
+                      } catch (err) {
+                          console.error(`Failed to convert baby background ${url} to WebP:`, err);
+                      }
+                  }
+              }
+              if (babyListChanged) {
+                  setCustomBabyImages(nextBabyImages);
+              }
+          }
+
+          // 3. Convert all employees' photoUrls and gameThumbnails
+          toast.loading('Convertendo fotos dos colaboradores para WEBP...', { id: toastId });
+          const updatedEmployees = await Promise.all(employees.map(async (emp) => {
+              let updatedEmp = { ...emp };
+              let changed = false;
+
+              // Check if mapped to a newly converted background URL
+              if (emp.photoUrl && backgroundMap.has(emp.photoUrl)) {
+                  updatedEmp.photoUrl = backgroundMap.get(emp.photoUrl)!;
+                  changed = true;
+              } 
+              // Base64 conversion
+              else if (emp.photoUrl && emp.photoUrl.startsWith('data:image/') && !emp.photoUrl.startsWith('data:image/webp;')) {
+                  try {
+                      const webpDataUrl = await convertDataUrlToWebP(emp.photoUrl);
+                      updatedEmp.photoUrl = webpDataUrl;
+                      convertCount++;
+                      changed = true;
+                  } catch (err) {
+                      console.error(`Failed to convert employee ${emp.name} photo to WebP:`, err);
+                  }
+              }
+              // External HTTP URL conversion (not Unsplash placeholders ideally, but convert any user-uploaded files on Supabase)
+              else if (emp.photoUrl && emp.photoUrl.startsWith('http') && !emp.photoUrl.includes('.webp') && !emp.photoUrl.includes('image/webp') && !emp.photoUrl.includes('unsplash.com')) {
+                  try {
+                      const webpBlob = await convertUrlToWebPBlob(emp.photoUrl);
+                      const webpFile = new File([webpBlob], `photo-${emp.id}-${Date.now()}.webp`, { type: 'image/webp' });
+                      const newUrl = await uploadEmployeePhoto(webpFile, emp.id);
+                      updatedEmp.photoUrl = newUrl;
+                      convertCount++;
+                      changed = true;
+                  } catch (err) {
+                      console.error(`Failed to convert external photo to WebP for ${emp.name}:`, err);
+                  }
+              }
+              
+              // Also convert any base64/HTTP thumb under gameThumbnails
+              if (emp.gameThumbnails && emp.gameThumbnails.length > 0) {
+                  let thumbnailsChanged = false;
+                  const newThumbs = await Promise.all(emp.gameThumbnails.map(async (thumb) => {
+                      if (!thumb) return thumb;
+                      
+                      if (thumb.startsWith('data:image/') && !thumb.startsWith('data:image/webp;')) {
+                          try {
+                              const webpThumb = await convertDataUrlToWebP(thumb);
+                              convertCount++;
+                              thumbnailsChanged = true;
+                              changed = true;
+                              return webpThumb;
+                          } catch (err) {
+                              console.error('Failed to convert game thumbnail base64 to WebP:', err);
+                              return thumb;
+                          }
+                      } else if (thumb.startsWith('http') && !thumb.includes('.webp') && !thumb.includes('image/webp')) {
+                          try {
+                              const webpBlob = await convertUrlToWebPBlob(thumb);
+                              const webpDataUrl = await new Promise<string>((resolveReader) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => resolveReader(reader.result as string);
+                                  reader.readAsDataURL(webpBlob);
+                              });
+                              convertCount++;
+                              thumbnailsChanged = true;
+                              changed = true;
+                              return webpDataUrl;
+                          } catch (err) {
+                              console.error('Failed to convert game thumbnail url to WebP:', err);
+                              return thumb;
+                          }
+                      }
+                      return thumb;
+                  }));
+                  if (thumbnailsChanged) {
+                      updatedEmp.gameThumbnails = newThumbs;
+                  }
+              }
+              
+              if (changed) {
+                  await upsertEmployee(updatedEmp);
+              }
+              return updatedEmp;
+          }));
+          
+          setEmployees(updatedEmployees);
+          
+          // 4. Convert provider logo
+          let newProviderLogo = providerData.logo;
+          let providerChanged = false;
+          if (providerData.logo) {
+              if (providerData.logo.startsWith('data:image/') && !providerData.logo.startsWith('data:image/webp;')) {
+                  try {
+                      newProviderLogo = await convertDataUrlToWebP(providerData.logo);
+                      convertCount++;
+                      providerChanged = true;
+                  } catch (err) {
+                      console.error('Failed to convert provider logo to WebP:', err);
+                  }
+              } else if (providerData.logo.startsWith('http') && !providerData.logo.includes('.webp') && !providerData.logo.includes('image/webp')) {
+                  try {
+                      const webpBlob = await convertUrlToWebPBlob(providerData.logo);
+                      const webpDataUrl = await new Promise<string>((resolveReader) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolveReader(reader.result as string);
+                          reader.readAsDataURL(webpBlob);
+                      });
+                      newProviderLogo = webpDataUrl;
+                      convertCount++;
+                      providerChanged = true;
+                  } catch (err) {
+                      console.error('Failed to convert external provider logo to WebP:', err);
+                  }
+              }
+          }
+          
+          // 5. Convert provider thumbnails
+          const newProviderThumbs = await Promise.all(providerData.thumbnails.map(async (thumb) => {
+              if (!thumb) return thumb;
+              if (thumb.startsWith('data:image/') && !thumb.startsWith('data:image/webp;')) {
+                  try {
+                      const webpThumb = await convertDataUrlToWebP(thumb);
+                      convertCount++;
+                      providerChanged = true;
+                      return webpThumb;
+                  } catch (err) {
+                      console.error('Failed to convert provider thumbnail base64 to WebP:', err);
+                      return thumb;
+                  }
+              } else if (thumb.startsWith('http') && !thumb.includes('.webp') && !thumb.includes('image/webp')) {
+                  try {
+                      const webpBlob = await convertUrlToWebPBlob(thumb);
+                      const webpDataUrl = await new Promise<string>((resolveReader) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolveReader(reader.result as string);
+                          reader.readAsDataURL(webpBlob);
+                      });
+                      convertCount++;
+                      providerChanged = true;
+                      return webpDataUrl;
+                  } catch (err) {
+                      console.error('Failed to convert external provider thumbnail to WebP:', err);
+                      return thumb;
+                  }
+              }
+              return thumb;
+          }));
+          
+          if (providerChanged) {
+              setProviderData(prev => ({
+                  ...prev,
+                  logo: newProviderLogo,
+                  thumbnails: newProviderThumbs
+              }));
+          }
+          
+          if (convertCount > 0) {
+              toast.success(`Conversão concluída! ${convertCount} fotos e planos de fundo otimizados para WEBP.`, { id: toastId });
+          } else {
+              toast.info('Todas as imagens já estão devidamente otimizadas em WEBP.', { id: toastId });
+          }
+      } catch (err) {
+          console.error('Batch WebP conversion error:', err);
+          toast.error('Erro na conversão em lote das imagens.', { id: toastId });
+      } finally {
+          setIsConvertingAll(false);
+      }
+  };
+
   const handleAddEmployeeDB = async () => {
       const newEmp: Employee = {
           id: `emp-${Date.now()}`,
@@ -441,6 +684,13 @@ export default function App() {
   };
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.BIRTHDAY);
   const [activeTab, setActiveTab] = useState<EditorTab>('TEMPLATES');
+
+  // Force sidebar to open when switching away from presentation (Slide Deck)
+  useEffect(() => {
+     if (selectedTemplate !== TemplateType.PRESENTATION) {
+         setIsSidebarOpen(true);
+     }
+  }, [selectedTemplate]);
 
   // Preload template images when TEMPLATES tab is clicked
   useEffect(() => {
@@ -1084,8 +1334,18 @@ export default function App() {
   // ... (keeping rest of file structure, focusing on the Provider UI update) ...
   
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      let file = e.target.files?.[0];
       if (!file || !uploadTarget) return;
+      
+      const conversionToastId = toast.loading('Processando e convertendo imagem para WEBP...');
+      try {
+          const convertedFile = await convertFileToWebP(file);
+          file = convertedFile;
+          toast.success('Imagem convertida para WEBP com sucesso!', { id: conversionToastId });
+      } catch (err) {
+          console.error('Falha na conversão para WEBP:', err);
+          toast.error('Erro ao converter para WEBP. Usando formato original.', { id: conversionToastId });
+      }
       
       if (selectedTemplate === TemplateType.HIRING && uploadTarget.field === 'photoUrl') {
           try {
@@ -1098,7 +1358,7 @@ export default function App() {
               await addHiringImage(publicUrl);
           } catch (err) {
               console.error('Failed to upload hiring image:', err);
-              alert('Failed to upload image. Please try again.');
+              toast.error('Falha ao enviar a imagem convertida para o servidor.');
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
           setUploadTarget(null);
@@ -1114,7 +1374,7 @@ export default function App() {
               await addBabyImage(publicUrl);
           } catch (err) {
               console.error('Failed to upload baby image:', err);
-              alert('Failed to upload image. Please try again.');
+              toast.error('Falha ao enviar a imagem convertida para o servidor.');
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
           setUploadTarget(null);
@@ -1709,7 +1969,15 @@ export default function App() {
 
   // Redesigned Floating Sidebar
   const SidebarContent = useMemo(() => (
-    <div className={`absolute top-24 left-6 w-[340px] bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-hidden`}>
+    <div 
+      style={{
+        transform: isSidebarOpen ? 'none' : 'translateX(calc(-100% - 30px))',
+        transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+      }}
+      className={`absolute top-24 left-6 w-[340px] bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible`}
+    >
+       {/* Inner wrapper to enclose content neatly inside the custom-shaped card */}
+       <div className="w-full h-full flex flex-col overflow-hidden rounded-[2.5rem] bg-[#121212]">
        
        {/* 1. Header Tabs */}
        <div className="p-4 shrink-0">
@@ -2285,6 +2553,31 @@ export default function App() {
                         )}
                     </div>
                 </div>
+
+                <div className="border-t border-white/10 pt-6">
+                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2">
+                        <ImageIcon size={16}/> Otimização de Imagens
+                    </h3>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                            Imagens enviadas recentemente são convertidas para <strong>WEBP</strong> no momento do carregamento. Use o botão abaixo para otimizar todas as fotos de colaboradores e logotipos salvos no banco de dados.
+                        </p>
+                        <button
+                            onClick={convertExistingImagesToWebP}
+                            disabled={isConvertingAll}
+                            className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            {isConvertingAll ? (
+                                <>
+                                    <span className="w-3 h-3 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                                    Convertendo Imagens Existentes...
+                                </>
+                            ) : (
+                                "Converter Imagens Existentes para WEBP"
+                            )}
+                        </button>
+                    </div>
+                </div>
             </div>
           )}
 
@@ -2300,11 +2593,11 @@ export default function App() {
                                setSelectedEmployeeId('hiring-generic');
                                updateEmployee('hiring-generic', 'photoUrl', customHiringImages[0] || '');
                                setSidebarDataView('DETAIL');
-                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                               setActiveTab('IMAGES');
                            } else if (t.id === TemplateType.BABY) {
                                setSelectedEmployeeId('baby-generic');
                                setSidebarDataView('DETAIL');
-                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                               setActiveTab('IMAGES');
                            } else if (t.id === TemplateType.NEW_PROVIDER) {
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
                            } else if (selectedEmployeeId === 'hiring-generic' || selectedEmployeeId === 'baby-generic') {
@@ -2363,13 +2656,26 @@ export default function App() {
                   className="w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 bg-white/10 hover:bg-white/20 transition-all shrink-0"
                   title="Employee Management"
                >
-                  <Settings size={20} />
+                  <Users size={20} />
                </button>
            </div>
        </div>
 
+       </div>
+
+        {/* Toggle tab - elegant rounded button fixed on the right edge */}
+        {isPresentation && (
+          <button
+            onClick={() => setIsSidebarOpen(prev => !prev)}
+            className="absolute left-full top-[160px] w-8 h-14 bg-[#121212]/95 backdrop-blur-md border-y border-r border-white/10 rounded-r-2xl flex items-center justify-center cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-[#161a23] shadow-[5px_0_15px_rgba(0,0,0,0.4)] z-50 transition-all duration-300 ease-in-out hover:scale-x-110 origin-left outline-none"
+            title={isSidebarOpen ? "Recolher Menu" : "Expandir Menu"}
+          >
+            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+          </button>
+        )}
+
     </div>
-  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, isPresentation, handleDownload]);
+  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, isPresentation, handleDownload, isSidebarOpen]);
 
   // --- HIRING EDITOR OVERLAY ---
   const renderHiringOverlay = () => {

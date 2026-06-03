@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Employee } from '../types';
 import { uploadEmployeePhoto } from '../services/supabase';
+import { convertFileToWebP } from '../services/imageConverter';
 import { 
   ChevronLeft, 
   Trash2, 
@@ -115,16 +116,22 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      let file = e.target.files?.[0];
       if (!file) return;
 
-      if (file.size > 5 * 1024 * 1024) {
-          alert("O arquivo deve ter no máximo 5MB.");
+      if (file.size > 10 * 1024 * 1024) {
+          alert("O arquivo deve ter no máximo 10MB.");
           return;
       }
 
       setIsUploadingPhoto(true);
       try {
+          try {
+              const webpFile = await convertFileToWebP(file);
+              file = webpFile;
+          } catch (convErr) {
+              console.error("Erro ao converter para WebP, enviando formato original:", convErr);
+          }
           const url = await uploadEmployeePhoto(file, employee.id);
           handleChange('photoUrl', url);
       } catch (error) {

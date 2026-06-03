@@ -302,7 +302,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         right: -100px;
         width: 350px; 
         height: 350px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(225deg, #22d3ee 0%, #594C99 100%);
         box-shadow: -10px 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -323,7 +323,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         left: -80px;
         width: 320px; 
         height: 320px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: radial-gradient(circle at 30% 30%, #17261d 0%, #191e1b 100%);
         box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
         z-index: 1;
@@ -338,7 +338,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         right: -50px;
         width: 250px; 
         height: 250px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: radial-gradient(circle at 70% 70%, #17261d 0%, #191e1b 100%);
         box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
         z-index: 1;
@@ -359,7 +359,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translate(-50%, -30%); /* Centered horizontally, shifted down to be below title */
         width: 240px; 
         height: 240px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #e9d5ff 0%, #a855f7 45%, #22d3ee 100%);
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -380,7 +380,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translate(-50%, -50%); /* Perfectly centered */
         width: 240px; 
         height: 240px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #e9d5ff 0%, #a855f7 45%, #22d3ee 100%);
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -402,7 +402,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translateY(-50%); /* Centered vertically */
         width: 380px; 
         height: 380px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #22d3ee 0%, #594C99 55%, #e9d5ff 100%);
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -423,7 +423,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translateY(-50%) rotate(45deg); 
         width: 360px; 
         height: 360px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #e9d5ff 0%, #594C99 45%, #22d3ee 100%);
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -438,7 +438,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         right: -30px;
         width: 100px; 
         height: 100px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #22d3ee 0%, #a855f7 100%);
         box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         z-index: 1;
@@ -458,7 +458,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         right: -100px;
         width: 350px; 
         height: 350px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(225deg, #22d3ee 0%, #594C99 55%, #e9d5ff 100%); /* Rotated gradient */
         box-shadow: -10px 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -479,7 +479,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translateY(-50%);
         width: 250px; 
         height: 250px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #22d3ee 0%, #594C99 55%, #e9d5ff 100%);
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         z-index: 1;
@@ -500,7 +500,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         transform: translateY(-50%);
         width: 240px; 
         height: 240px;
-        border-radius: 50%;
+        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
         background: linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); 
         box-shadow: -10px 0 40px rgba(0,0,0,0.2);
         z-index: 1;
@@ -524,7 +524,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
       right: -60px;
       width: 220px; 
       height: 220px;
-      border-radius: 50%;
+      border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
       background: linear-gradient(135deg, #e9d5ff 0%, #a855f7 45%, #22d3ee 100%);
       box-shadow: 0 10px 30px rgba(0,0,0,0.15);
       z-index: 1;
@@ -539,7 +539,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
       ${smallSpherePos}
       width: 130px; 
       height: 130px;
-      border-radius: 50%;
+      border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
       background: linear-gradient(135deg, #22d3ee 0%, #a855f7 55%, #e9d5ff 100%);
       box-shadow: 0 10px 30px rgba(0,0,0,0.15);
       z-index: 1;
@@ -1745,7 +1745,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
       </div>
 
       <!-- Glassmorphism Box -->
-      <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 200px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 24px; z-index: 50; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow: hidden;">
+      <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 200px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 24px; -webkit-clip-path: inset(0 round 24px); clip-path: inset(0 round 24px); z-index: 50; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow: hidden;">
         
         <!-- Blur Background Workaround for html-to-image -->
         <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1;">
@@ -1776,7 +1776,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
           </div>
 
           <!-- Arrow Button -->
-          <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%); background: linear-gradient(135deg, #22d3ee 0%, #9333ea 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
