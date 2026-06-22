@@ -10,7 +10,19 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Create a dummy client if URL is missing to prevent crash during dev/build
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const isValidUrl = (url: string) => {
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+const safeUrl = isValidUrl(SUPABASE_URL) ? SUPABASE_URL : 'https://placeholder-project.supabase.co';
+const safeKey = SUPABASE_ANON_KEY || 'placeholder-anon-key';
+
+export const supabase = createClient(safeUrl, safeKey);
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
   const { data, error } = await supabase

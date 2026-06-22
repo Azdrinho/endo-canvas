@@ -30,7 +30,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" crossorigin="anonymous">
     <link href="https://db.onlinewebfonts.com/c/6ac09869bcd949ed727771cfba1ea124?family=Orkney+Light" rel="stylesheet" crossorigin="anonymous">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css' crossorigin="anonymous">
     <style>
@@ -221,6 +221,43 @@
         transform: scale(1.2);
         cursor: grabbing;
         background: #ffffff;
+      }
+
+      /* Remover outline, ring e foco de todos os botões, inputs, divs e elementos interativos do layout */
+      * {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      *:focus, *:focus-visible, *:active, *:focus-within {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+
+      /* Remover outlines e bordas cinzas (contornos) de botões, dropdowns, inputs e painéis no layout externo, exceto as páginas */
+      .w-\[72px\] button, .w-\[72px\] div,
+      .w-64 button, .w-64 select, .w-64 input, .w-64 select *, .w-64 div,
+      .h-16 button, .h-16 select, .h-16 input, .h-16 div,
+      .h-\[96px\] button, .h-\[96px\] select, .h-\[96px\] div, .h-\[96px\] img,
+      [class*="top-\[80px\]"] button, [class*="top-\[80px\]"] div, [class*="top-\[80px\]"],
+      [class*="bottom-28"] button, [class*="bottom-28"] div, [class*="bottom-28"] {
+        border-color: transparent !important;
+        outline: none !important;
+      }
+
+      /* COM EXCEÇÃO DO VISUALIZADOR DE PÁGINAS E ELEMENTOS INTERNOS DA PÁGINA (PAGE SHEETS OU CAROUSEL) */
+      [id^="page-sheet-"], 
+      [id^="page-sheet-"] *, 
+      .ring-2, 
+      .ring-2 *, 
+      [class*="ring-2"], 
+      [class*="ring-cyan-500"], 
+      [class*="border-cyan-400"], 
+      [class*="border-slate-900"],
+      [id^="slide-"] {
+        outline: revert !important;
+        box-shadow: revert !important;
+        --tw-ring-width: 2px !important;
+        --tw-ring-color: #06b6d4 !important; /* cyan-500 */
       }
     </style>
   <script type="importmap">

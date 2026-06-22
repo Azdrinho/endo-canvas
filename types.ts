@@ -142,8 +142,10 @@ export interface SlideElement {
     startAngle?: number; // For Pie Charts
     endAngle?: number;   // For Pie Charts
     rotation?: number;   // For general rotation
+    crop?: { left: number; top: number; right: number; bottom: number };   // For image non-destructive crop
   };
   zIndex: number;
+  isLocked?: boolean;
 }
 
 export interface Slide {

@@ -19,11 +19,6 @@ import {
   Download,
   X
 } from 'lucide-react';
-import { 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from 'recharts';
 
 interface EmployeeEditorProps {
   employee: Employee;
@@ -35,21 +30,6 @@ interface EmployeeEditorProps {
 }
 
 const MOODS = ['😄', '😊', '😐', '😔', '😡', '❤️', '👍', '☕', '⚡', '⭐'];
-
-const DUMMY_DATA = [
-  { name: 'Jan', value: 4000 },
-  { name: 'Feb', value: 3000 },
-  { name: 'Mar', value: 5000 },
-  { name: 'Apr', value: 2780 },
-  { name: 'May', value: 1890 },
-  { name: 'Jun', value: 2390 },
-  { name: 'Jul', value: 3490 },
-  { name: 'Aug', value: 4000 },
-  { name: 'Sep', value: 3000 },
-  { name: 'Oct', value: 2000 },
-  { name: 'Nov', value: 2780 },
-  { name: 'Dec', value: 1890 },
-];
 
 type Tab = 'PROFILE' | 'ONBOARDING';
 
@@ -312,39 +292,6 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
                                   onChange={(e) => handleChange('birthDate', e.target.value)}
                                   className={`text-xs bg-transparent outline-none text-right w-28 cursor-pointer ${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
                               />
-                          </div>
-                      </div>
-
-                      {/* Performance Chart Block */}
-                      <div className={`md:col-span-3 p-8 shadow-sm text-white min-h-[260px] flex flex-col relative overflow-hidden rounded-2xl ${isDarkMode ? 'bg-gradient-to-br from-cyan-700 to-purple-900' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
-                          <div className="flex justify-between items-center mb-6 z-10">
-                              <span className="font-medium text-xl">Performance:</span>
-                              <div className="flex gap-8 text-xs font-bold opacity-60">
-                                  <span>DAY</span>
-                                  <span>WEEK</span>
-                                  <span>MONTH</span>
-                                  <span className="text-white opacity-100">YEAR</span>
-                              </div>
-                          </div>
-                          
-                          <div className="flex-1 w-full h-full absolute inset-0 pt-20">
-                              <ResponsiveContainer width="100%" height="100%">
-                                  <AreaChart data={DUMMY_DATA}>
-                                      <defs>
-                                          <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                                              <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
-                                              <stop offset="95%" stopColor="#ffffff" stopOpacity={0}/>
-                                          </linearGradient>
-                                      </defs>
-                                      <Area 
-                                          type="monotone" 
-                                          dataKey="value" 
-                                          stroke="#ffffff" 
-                                          strokeWidth={4}
-                                          fill="url(#colorVal)" 
-                                      />
-                                  </AreaChart>
-                              </ResponsiveContainer>
                           </div>
                       </div>
                   </div>

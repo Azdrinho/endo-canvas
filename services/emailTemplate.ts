@@ -1253,7 +1253,7 @@ const generateLandscapeTemplate = (
   const maxLineLen = Math.max(firstName.length, restName.length);
   const collisionScore = maxLineLen + (cleanLabel.length * 0.6);
   const isLongName = nameLen > 16 || collisionScore > 12;
-  const isLabelMultiline = cleanLabel.length > 20 || bottomTextHtml.includes('<br');
+  const isLabelMultiline = cleanLabel.length > 35 || bottomTextHtml.includes('<br');
   
   const stackedBottomPos = isLabelMultiline ? '52px' : '35px';
   const defaultBottomPos = isLongName ? stackedBottomPos : '15px';
@@ -1360,7 +1360,7 @@ const generatePortraitTemplate = (
   const maxLineLen = Math.max(firstName.length, restName.length);
   const collisionScore = maxLineLen + (cleanLabel.length * 0.6);
   const isLongName = nameLen > 16 || collisionScore > 12;
-  const isLabelMultiline = cleanLabel.length > 20 || bottomTextHtml.includes('<br');
+  const isLabelMultiline = cleanLabel.length > 35 || bottomTextHtml.includes('<br');
   const stackedBottomPos = isLabelMultiline ? '52px' : '35px';
   const defaultBottomPos = isLongName ? stackedBottomPos : '15px';
   const bottomPos = nameBottomOffset || defaultBottomPos;
@@ -1715,6 +1715,12 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
   const posY = employee.photoPosition?.y || 0;
   const logoFill = '#1a1a1a';
 
+  const roleText = (employee.role || 'Account Manager').trim();
+  let initialFontSize = 24;
+  if (roleText.length > 24) {
+    initialFontSize = Math.max(10, Math.min(24, Math.floor(550 / roleText.length)));
+  }
+
   return `
     <div id="capture-target" style="width: 540px; height: 540px; background: white; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'Orkney', sans-serif;">
       <!-- Full Background Image -->
@@ -1771,8 +1777,8 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
         <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; height: 60px; background: #222222; border-radius: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 24px; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1;">
           
           <!-- Job Title -->
-          <div contenteditable="true" data-field="role" style="font-family: 'Orkney', sans-serif; font-weight: 300; font-size: 24px; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; flex-grow: 1; overflow: hidden; text-overflow: ellipsis;">
-            ${employee.role || 'Account Manager'}
+          <div contenteditable="true" data-field="role" oninput="let fs = 24; this.style.fontSize = fs + 'px'; while (this.scrollWidth > this.clientWidth && fs > 9) { fs -= 0.5; this.style.fontSize = fs + 'px'; }" style="font-family: 'Orkney', sans-serif; font-weight: 300; font-size: ${initialFontSize}px; color: white; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">
+            ${roleText}
           </div>
 
           <!-- Arrow Button -->
@@ -1859,7 +1865,7 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           break;
         
         case TemplateType.WELCOME:
-          const welcomeTitleSize = isLandscape ? '42px' : '26px';
+          const welcomeTitleSize = isLandscape ? '42px' : '36px';
           const glassPadding = isLandscape ? '15px 20px' : '8px 14px';
           const glassMargin = isLandscape ? '15px' : '6px';
           const descFontSize = isLandscape ? '13px' : '11px';

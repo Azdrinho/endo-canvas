@@ -356,9 +356,9 @@ const MorphingCanvas = ({ html, templateType, orientation, children }: { html: s
 };
 
 const TEMPLATE_LIST = [
+  { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
   { id: TemplateType.BIRTHDAY, label: 'Happy Birthday', desc: 'Classic celebration card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1f03c89654a2a47ae.png' },
   { id: TemplateType.ANNIVERSARY, label: 'Work Anniversary', desc: 'Celebrate tenure milestones', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0f03c89654a2a47ad.png' },
-  { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
   { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
   { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
@@ -682,13 +682,15 @@ export default function App() {
       setEmployees(prev => [newEmp, ...prev]);
       upsertEmployee(newEmp);
   };
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.BIRTHDAY);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.WELCOME);
   const [activeTab, setActiveTab] = useState<EditorTab>('TEMPLATES');
 
   // Force sidebar to open when switching away from presentation (Slide Deck)
   useEffect(() => {
      if (selectedTemplate !== TemplateType.PRESENTATION) {
          setIsSidebarOpen(true);
+     } else {
+         setIsSidebarOpen(false);
      }
   }, [selectedTemplate]);
 
@@ -1943,7 +1945,30 @@ export default function App() {
   const HeaderContent = useMemo(() => (
       // ... (Same as before) ...
       <header className="px-6 h-[72px] flex justify-start items-center z-50 shrink-0 sticky top-0 header-gradient">
-        <Toaster position="top-center" theme="dark" />
+        <Toaster 
+          position="top-center" 
+          theme="dark" 
+          toastOptions={{
+              style: {
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '9999px',
+                  padding: '10px 20px',
+                  color: '#e2e8f0',
+                  fontFamily: '"Orkney", "Inter", sans-serif',
+                  boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.4)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: '500',
+                  width: 'max-content',
+                  minWidth: 'auto',
+              }
+          }}
+        />
         <div className="flex items-center h-full gap-6">
            <div className="">
               <SalsaLogo variant="light" className="h-11 w-32" />
@@ -2411,6 +2436,11 @@ export default function App() {
                                             );
                                         } else {
                                             setSelectedEmployeeId(emp.id);
+                                        }
+                                    }}
+                                    onDoubleClick={() => {
+                                        if (!(isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE)) {
+                                            setSelectedEmployeeId(emp.id);
                                             setSidebarDataView('DETAIL');
                                         }
                                     }}
@@ -2663,16 +2693,7 @@ export default function App() {
 
        </div>
 
-        {/* Toggle tab - elegant rounded button fixed on the right edge */}
-        {isPresentation && (
-          <button
-            onClick={() => setIsSidebarOpen(prev => !prev)}
-            className="absolute left-full top-[160px] w-8 h-14 bg-[#121212]/95 backdrop-blur-md border-y border-r border-white/10 rounded-r-2xl flex items-center justify-center cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-[#161a23] shadow-[5px_0_15px_rgba(0,0,0,0.4)] z-50 transition-all duration-300 ease-in-out hover:scale-x-110 origin-left outline-none"
-            title={isSidebarOpen ? "Recolher Menu" : "Expandir Menu"}
-          >
-            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-          </button>
-        )}
+
 
     </div>
   ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, isPresentation, handleDownload, isSidebarOpen]);
@@ -2729,6 +2750,10 @@ export default function App() {
                     currentSlideIndex={currentSlideIndex}
                     onUpdateSlides={setSlides}
                     onSelectSlide={setCurrentSlideIndex}
+                    onBack={() => {
+                        setSelectedTemplate(TemplateType.BIRTHDAY);
+                        setActiveTab('TEMPLATES');
+                    }}
                 />
             </div>
             
