@@ -1,5 +1,8 @@
 {
   "name": "Endo Canvas - Backup 20/02/26",
   "description": "The official canvas builder for Endomarketing assets.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

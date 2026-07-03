@@ -28,7 +28,7 @@ interface EmployeeManagerProps {
   onClose: () => void;
   onUpdateEmployee: (id: string, updates: Partial<Employee>) => void;
   onDeleteEmployee: (id: string) => void;
-  onAddEmployee: () => void;
+  onAddEmployee: () => Promise<Employee> | Employee;
 }
 
 export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
@@ -244,7 +244,12 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {/* Add New Card - Perfectly matched with other cards */}
             <button 
-              onClick={onAddEmployee}
+              onClick={async () => {
+                const newEmp = await onAddEmployee();
+                if (newEmp && newEmp.id) {
+                  setEditingId(newEmp.id);
+                }
+              }}
               className={`group rounded-2xl border border-dashed shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-center justify-center p-6 min-h-[290px] relative hover:scale-[1.02] ${isDarkMode ? 'bg-white/[0.02] border-white/20 hover:border-cyan-500' : 'bg-gray-50 border-gray-300 hover:border-cyan-400'}`}
             >
               <div className="p-4 rounded-full bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-black transition-all mb-4 shadow">

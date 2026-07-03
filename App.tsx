@@ -7,7 +7,8 @@ import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, Slide, ProviderFormat, ProviderGridConfig } from './types';
 import { generateCardCanvas } from './services/emailTemplate'; 
-import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, uploadEmployeePhoto } from './services/supabase';
+import { generateBackground } from './services/magnificService'; 
+import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, fetchActivationImages, addActivationImage, deleteActivationImage, uploadActivationImageToStorage, uploadEmployeePhoto } from './services/supabase';
 import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from './services/imageConverter';
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
@@ -49,6 +50,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
+  ArrowRight,
+  Loader2,
   Code,
   Link as LinkIcon,
   Copy,
@@ -72,7 +75,10 @@ import {
   Grid,
   Rotate3D,
   Type,
-  Settings // Added Settings Icon
+  Settings, // Added Settings Icon
+  Sparkles,
+  Scan,
+  Hash
 } from 'lucide-react';
 
 // --- DATA INITIALIZATION ---
@@ -128,10 +134,22 @@ const INITIAL_EMPLOYEES: Employee[] = [
   },
   {
     id: 'baby-generic',
-    name: '',
+    name: 'BABY',
     role: '',
     department: '',
-    photoUrl: '',
+    photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+    photoScale: 1,
+    photoPosition: { x: 0, y: 0 },
+    dateStr: '', 
+    admissionDate: '',
+    tenure: ''
+  },
+  {
+    id: 'gaming-generic',
+    name: 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?',
+    role: '1',
+    department: '',
+    photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
     photoScale: 1,
     photoPosition: { x: 0, y: 0 },
     dateStr: '', 
@@ -328,7 +346,7 @@ const MorphingCanvas = ({ html, templateType, orientation, children }: { html: s
     >
       <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-lg opacity-0 group-hover:opacity-40 transition duration-500 blur-lg pointer-events-none"></div>
       
-      <div className="relative border border-transparent group-hover:border-cyan-500/50 transition-all duration-500 overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] bg-white"
+      <div className="relative border border-transparent group-hover:border-cyan-500/50 transition-all duration-500 overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] bg-transparent"
            style={{ 
              borderRadius: '0',
            }}
@@ -356,15 +374,16 @@ const MorphingCanvas = ({ html, templateType, orientation, children }: { html: s
 };
 
 const TEMPLATE_LIST = [
+  { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
   { id: TemplateType.BIRTHDAY, label: 'Happy Birthday', desc: 'Classic celebration card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1f03c89654a2a47ae.png' },
   { id: TemplateType.ANNIVERSARY, label: 'Work Anniversary', desc: 'Celebrate tenure milestones', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0f03c89654a2a47ad.png' },
   { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
-  { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
-  { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.BABY, label: 'Baby Birth', desc: 'Welcome Baby', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69d5122206cc717826a7543b.jpg' },
   { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
+  { id: TemplateType.ACTIVATION, label: 'General Disclosure', desc: "General announcements and company\nupdates template", image: 'https://img.mailinblue.com/2600492/images/content_library/original/6a3d7e9f295b587ca6a4bd4c.png' },
   { id: TemplateType.PRESENTATION, label: 'Slide Deck', desc: 'AI Powered Presentation', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f0318a761a56ead72a.png' }, 
+  { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
   { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
 ];
 
@@ -373,37 +392,13 @@ export default function App() {
   const [isManagementMode, setIsManagementMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Fetch from Supabase on mount
+  // 3. Silent Auto Backup Synchronization to LocalStorage
   useEffect(() => {
-    fetchEmployees().then(data => {
-      if (data && data.length > 0) {
-        const genericHiring = INITIAL_EMPLOYEES.find(e => e.id === 'hiring-generic');
-        const genericBaby = INITIAL_EMPLOYEES.find(e => e.id === 'baby-generic');
-        
-        let finalData = [...data];
-        if (genericHiring && !data.find(e => e.id === 'hiring-generic')) {
-          finalData.push(genericHiring);
-        }
-        if (genericBaby && !data.find(e => e.id === 'baby-generic')) {
-          finalData.push(genericBaby);
-        }
-        setEmployees(finalData);
-        setSelectedEmployeeId(data[0].id);
-      }
-    });
+    if (employees && employees.length > 0 && employees !== INITIAL_EMPLOYEES) {
+      localStorage.setItem('end-employees', JSON.stringify(employees));
+    }
+  }, [employees]);
 
-    fetchHiringImages().then(images => {
-      if (images && images.length > 0) {
-        setCustomHiringImages(images);
-      }
-    });
-
-    fetchBabyImages().then(images => {
-      if (images && images.length > 0) {
-        setCustomBabyImages(images);
-      }
-    });
-  }, []);
 
   const handleUpdateEmployeeDB = async (id: string, updates: Partial<Employee>) => {
       setEmployees(prev => prev.map(e => {
@@ -426,6 +421,8 @@ export default function App() {
   };
 
   const [isConvertingAll, setIsConvertingAll] = useState(false);
+  const [backgroundTheme, setBackgroundTheme] = useState('');
+  const [isGeneratingBg, setIsGeneratingBg] = useState(false);
 
   const convertExistingImagesToWebP = async () => {
       setIsConvertingAll(true);
@@ -681,6 +678,7 @@ export default function App() {
       };
       setEmployees(prev => [newEmp, ...prev]);
       upsertEmployee(newEmp);
+      return newEmp;
   };
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.WELCOME);
   const [activeTab, setActiveTab] = useState<EditorTab>('TEMPLATES');
@@ -739,10 +737,12 @@ export default function App() {
   const [showImageControls, setShowImageControls] = useState<boolean>(false);
   const [customHiringImages, setCustomHiringImages] = useState<string[]>([]);
   const [customBabyImages, setCustomBabyImages] = useState<string[]>([]);
+  const [customActivationImages, setCustomActivationImages] = useState<string[]>([]);
   
   // SIGNATURE CONTROL STATE
   const [showSignatureControls, setShowSignatureControls] = useState<boolean>(false); // Changed to false to hide on load
   const [showExportDropdown, setShowExportDropdown] = useState<boolean>(false);
+  const [showLogoDropdown, setShowLogoDropdown] = useState<boolean>(false);
   const [signaturePopupLeft, setSignaturePopupLeft] = useState<number>(0);
   const signatureButtonRef = useRef<HTMLButtonElement>(null);
   
@@ -752,7 +752,42 @@ export default function App() {
   const popupRef = useRef<HTMLDivElement>(null);
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
+  const selectedEmployee = useMemo(() => {
+    if (selectedTemplate === TemplateType.BABY) {
+       return employees.find(e => e.id === 'baby-generic') || {
+            id: 'baby-generic',
+            name: 'BABY',
+            role: '',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 }
+       } as Employee;
+    }
+    if (selectedTemplate === TemplateType.ACTIVATION) {
+       return employees.find(e => e.id === 'gaming-generic') || {
+            id: 'gaming-generic',
+            name: 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?',
+            role: '1',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 }
+       } as Employee;
+    }
+    if (selectedTemplate === TemplateType.HIRING) {
+       return employees.find(e => e.id === 'hiring-generic') || {
+            id: 'hiring-generic',
+            name: 'Generic Hiring',
+            role: '',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 }
+       } as Employee;
+    }
+    return employees.find(e => e.id === selectedEmployeeId) || employees[0];
+  }, [employees, selectedEmployeeId, selectedTemplate]);
 
   // Define Theme based on selectedTemplate
   const theme = useMemo(() => {
@@ -839,6 +874,172 @@ export default function App() {
 
   // Reference for the Right Grid Area to constrain popup
   const controlsAreaRef = useRef<HTMLDivElement>(null);
+
+  // Unified On-Mount State Initialization (Restores backups + loads Supabase)
+  useEffect(() => {
+    // 1. Silent Local Backup Draft Restoration
+    const savedEmployees = localStorage.getItem('end-employees');
+    const savedSlides = localStorage.getItem('end-slides');
+    const savedProviderData = localStorage.getItem('end-provider-data');
+    const savedConfig = localStorage.getItem('end-config');
+
+    if (savedEmployees) {
+      try {
+        const parsed = JSON.parse(savedEmployees);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmployees(parsed);
+          const firstReal = parsed.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
+          if (firstReal) {
+            setSelectedEmployeeId(firstReal.id);
+          } else {
+            setSelectedEmployeeId(parsed[0].id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore employees backup", e);
+      }
+    }
+    if (savedSlides) {
+      try {
+        const parsed = JSON.parse(savedSlides);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSlides(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to restore slides backup", e);
+      }
+    }
+    if (savedProviderData) {
+      try {
+        setProviderData(JSON.parse(savedProviderData));
+      } catch (e) {
+        console.error("Failed to restore provider data backup", e);
+      }
+    }
+    if (savedConfig) {
+      try {
+        setConfig(JSON.parse(savedConfig));
+      } catch (e) {
+        console.error("Failed to restore canvas config backup", e);
+      }
+    }
+
+    // 2. Fetch remote databases to synchronize persistent records
+    fetchEmployees().then(data => {
+      if (data && data.length > 0) {
+        const genericHiring = INITIAL_EMPLOYEES.find(e => e.id === 'hiring-generic');
+        const genericBaby = INITIAL_EMPLOYEES.find(e => e.id === 'baby-generic');
+        const genericGaming = INITIAL_EMPLOYEES.find(e => e.id === 'gaming-generic');
+        
+        let finalData = data.map(e => {
+          if (e.id === 'gaming-generic') {
+            const isNameCorporate = e.name && (e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
+            if (isNameCorporate) {
+              const cleaned = {
+                ...e,
+                name: 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?',
+                role: '1',
+                photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+                photoScale: 1,
+                photoPosition: { x: 0, y: 0 }
+              };
+              upsertEmployee(cleaned).catch(console.error);
+              return cleaned;
+            }
+          }
+          if (e.id === 'baby-generic') {
+            const isNameCorporate = e.name && (e.name.toUpperCase() === 'MARCIA' || e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
+            const isRoleCorporate = e.role && (e.role.toLowerCase().includes('manager') || e.role.toLowerCase().includes('ceo') || e.role.toLowerCase().includes('developer') || e.role.toLowerCase().includes('designer'));
+            if (isNameCorporate || isRoleCorporate) {
+              const cleaned = {
+                ...e,
+                name: 'BABY',
+                role: '',
+                photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+                photoScale: 1,
+                photoPosition: { x: 0, y: 0 }
+              };
+              upsertEmployee(cleaned).catch(console.error);
+              return cleaned;
+            }
+          }
+          if (e.id === 'hiring-generic') {
+            const isNameCorporate = e.name && (e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
+            if (isNameCorporate) {
+              const cleaned = {
+                ...e,
+                name: 'Generic Hiring',
+                role: '',
+                photoUrl: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop',
+                photoScale: 1,
+                photoPosition: { x: 0, y: 0 }
+              };
+              upsertEmployee(cleaned).catch(console.error);
+              return cleaned;
+            }
+          }
+          return e;
+        });
+
+        if (genericHiring && !finalData.find(e => e.id === 'hiring-generic')) {
+          finalData.push(genericHiring);
+        }
+        if (genericBaby && !finalData.find(e => e.id === 'baby-generic')) {
+          finalData.push(genericBaby);
+        }
+        if (genericGaming && !finalData.find(e => e.id === 'gaming-generic')) {
+          finalData.push(genericGaming);
+        }
+        setEmployees(finalData);
+
+        const firstRealEmployee = finalData.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
+        if (firstRealEmployee) {
+          setSelectedEmployeeId(firstRealEmployee.id);
+        } else {
+          setSelectedEmployeeId(finalData[0].id);
+        }
+      }
+    });
+
+    fetchHiringImages().then(images => {
+      if (images && images.length > 0) {
+        setCustomHiringImages(images);
+      }
+    });
+
+    fetchBabyImages().then(images => {
+      if (images && images.length > 0) {
+        setCustomBabyImages(images);
+      }
+    });
+
+    fetchActivationImages().then(images => {
+      if (images && images.length > 0) {
+        setCustomActivationImages(images);
+      }
+    });
+  }, []);
+
+  // Automatic state backups for Slides, Provider Data, and Config
+  useEffect(() => {
+    if (slides && slides.length > 0 && slides !== INITIAL_SLIDES) {
+      localStorage.setItem('end-slides', JSON.stringify(slides));
+    }
+  }, [slides]);
+
+  useEffect(() => {
+    if (providerData && providerData.name) {
+      localStorage.setItem('end-provider-data', JSON.stringify(providerData));
+    }
+  }, [providerData]);
+
+  useEffect(() => {
+    if (config && config !== INITIAL_CONFIG) {
+      localStorage.setItem('end-config', JSON.stringify(config));
+    }
+  }, [config]);
+
+
 
   // --- IMAGE UPLOAD STATE ---
   // Allow ID to be 'PROVIDER' for special provider uploads
@@ -982,6 +1183,51 @@ export default function App() {
         } as Employee;
     }
 
+    if (selectedTemplate === TemplateType.ACTIVATION) {
+        return employees.find(e => e.id === 'gaming-generic') || {
+            id: 'gaming-generic',
+            name: 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?',
+            role: '1',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 },
+            dateStr: '', 
+            admissionDate: '',
+            tenure: ''
+        } as Employee;
+    }
+
+    if (selectedTemplate === TemplateType.BABY) {
+        return employees.find(e => e.id === 'baby-generic') || {
+            id: 'baby-generic',
+            name: 'BABY',
+            role: '',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 },
+            dateStr: '', 
+            admissionDate: '',
+            tenure: ''
+        } as Employee;
+    }
+
+    if (selectedTemplate === TemplateType.HIRING) {
+        return employees.find(e => e.id === 'hiring-generic') || {
+            id: 'hiring-generic',
+            name: 'Generic Hiring',
+            role: '',
+            department: '',
+            photoUrl: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop',
+            photoScale: 1,
+            photoPosition: { x: 0, y: 0 },
+            dateStr: '', 
+            admissionDate: '',
+            tenure: ''
+        } as Employee;
+    }
+
     if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
         // Always return an array in group mode to trigger the group template
         if (selectedEmployeeIds.length === 0) {
@@ -1009,7 +1255,7 @@ export default function App() {
   const currentCanvasData = getCanvasData();
   
   const filteredEmployees = useMemo(() => employees.filter(emp => 
-     emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && (
+     emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && emp.id !== 'gaming-generic' && (
        emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
        emp.role.toLowerCase().includes(searchQuery.toLowerCase())
      )
@@ -1055,7 +1301,10 @@ export default function App() {
       let previewWidth = 360;
       let previewHeight = 540;
 
-      if (isPresentation) {
+      if (selectedTemplate === TemplateType.ACTIVATION) {
+          previewWidth = 1200;
+          previewHeight = 800;
+      } else if (isPresentation) {
           previewWidth = 960;
           previewHeight = 540;
       } else if (isSignature) {
@@ -1109,7 +1358,7 @@ export default function App() {
 
   // 1. Zoom Initialization Logic
   useEffect(() => {
-      if (selectedTemplate === TemplateType.NEW_PROVIDER) {
+      if (selectedTemplate === TemplateType.NEW_PROVIDER || selectedTemplate === TemplateType.ACTIVATION) {
           setZoomLevel(0.45);
       } else {
           setZoomLevel(1);
@@ -1174,6 +1423,55 @@ export default function App() {
     }, 500);
   }, [saveHistory]);
 
+  const handleGenerateBackground = async () => {
+    if (!backgroundTheme || !backgroundTheme.trim()) {
+      toast.error("Por favor, digite um tema para a imagem de fundo.");
+      return;
+    }
+    
+    setIsGeneratingBg(true);
+    const toastId = toast.loading("Processando tema e gerando imagem de fundo 3:2 via Freepik Magnific AI...");
+    
+    try {
+      const generatedUrl = await generateBackground(backgroundTheme, selectedEmployee?.activationLogo || 'technology');
+      
+      // Save and optimize the generated image under activation_images/
+      let finalUrl = generatedUrl;
+      try {
+          const webpBlob = await convertUrlToWebPBlob(generatedUrl);
+          const webpFile = new File([webpBlob], `activation-${Date.now()}.webp`, { type: 'image/webp' });
+          finalUrl = await uploadActivationImageToStorage(webpFile);
+          await addActivationImage(finalUrl);
+          setCustomActivationImages(prev => [...prev, finalUrl]);
+      } catch (uploadErr) {
+          console.warn("[App] Failed to save generated background to Supabase storage, using direct fallback URL", uploadErr);
+          const fallbackUrl = generatedUrl + '#activation_images/';
+          await addActivationImage(fallbackUrl);
+          setCustomActivationImages(prev => [...prev, fallbackUrl]);
+          finalUrl = fallbackUrl;
+      }
+
+      // Update employee ID 'gaming-generic' which holds state for the template
+      updateEmployee('gaming-generic', 'photoUrl', finalUrl);
+      toast.success("Plano de fundo 3:2 gerado e aplicado com sucesso!", { id: toastId });
+    } catch (err: any) {
+      console.error("[App] Background generation error:", err);
+      toast.error(`Erro ao gerar plano de fundo: ${err.message || "Tente novamente."}`, { id: toastId });
+    } finally {
+      setIsGeneratingBg(false);
+    }
+  };
+
+  const handleThemeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleGenerateBackground();
+    }
+  };
+
+
+
+
   // Sync contenteditable changes back to state
   useEffect(() => {
     const handleBlur = (e: FocusEvent) => {
@@ -1181,22 +1479,22 @@ export default function App() {
       const field = target.getAttribute('data-field');
       if (field && target.hasAttribute('contenteditable')) {
         const value = target.innerText;
-        updateEmployee(selectedEmployeeId, field as keyof Employee, value);
+        updateEmployee(selectedEmployee.id, field as keyof Employee, value);
       }
     };
     document.addEventListener('focusout', handleBlur);
     return () => document.removeEventListener('focusout', handleBlur);
-  }, [selectedEmployeeId, updateEmployee]);
+  }, [selectedEmployee.id, updateEmployee]);
 
   const updatePhotoPosition = useCallback((axis: 'x' | 'y', value: number) => {
       setEmployeesWithHistory(prev => {
-          const emp = prev.find(e => e.id === selectedEmployeeId);
+          const emp = prev.find(e => e.id === selectedEmployee.id);
           if (!emp) return prev;
           const current = emp.photoPosition || { x: 0, y: 0 };
           const newPos = { ...current, [axis]: value };
-          return prev.map(e => e.id === selectedEmployeeId ? { ...e, photoPosition: newPos } : e);
+          return prev.map(e => e.id === selectedEmployee.id ? { ...e, photoPosition: newPos } : e);
       });
-  }, [selectedEmployeeId, setEmployeesWithHistory]);
+  }, [selectedEmployee.id, setEmployeesWithHistory]);
 
   const removeEmployee = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1354,8 +1652,10 @@ export default function App() {
               // Upload actual file to Supabase Storage
               const publicUrl = await uploadHiringImageToStorage(file);
               
-              // Update state and DB with the public URL
-              updateEmployee(uploadTarget.id, uploadTarget.field as keyof Employee, publicUrl);
+              // Update state and DB with the public URL, resetting scale and position for full-bleed
+              updateEmployee(uploadTarget.id, 'photoUrl', publicUrl);
+              updateEmployee(uploadTarget.id, 'photoScale', 1);
+              updateEmployee(uploadTarget.id, 'photoPosition', { x: 0, y: 0 });
               setCustomHiringImages(prev => [...prev, publicUrl]);
               await addHiringImage(publicUrl);
           } catch (err) {
@@ -1370,12 +1670,32 @@ export default function App() {
               // Upload actual file to Supabase Storage
               const publicUrl = await uploadBabyImageToStorage(file);
               
-              // Update state and DB with the public URL
-              updateEmployee(uploadTarget.id, uploadTarget.field as keyof Employee, publicUrl);
+              // Update state and DB with the public URL, resetting scale and position for full-bleed
+              updateEmployee(uploadTarget.id, 'photoUrl', publicUrl);
+              updateEmployee(uploadTarget.id, 'photoScale', 1);
+              updateEmployee(uploadTarget.id, 'photoPosition', { x: 0, y: 0 });
               setCustomBabyImages(prev => [...prev, publicUrl]);
               await addBabyImage(publicUrl);
           } catch (err) {
               console.error('Failed to upload baby image:', err);
+              toast.error('Falha ao enviar a imagem convertida para o servidor.');
+          }
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setUploadTarget(null);
+          return;
+      } else if (selectedTemplate === TemplateType.ACTIVATION && uploadTarget.field === 'photoUrl') {
+          try {
+              // Upload actual file to Supabase Storage
+              const publicUrl = await uploadActivationImageToStorage(file);
+              
+              // Update state and DB with the public URL, resetting scale and position for full-bleed
+              updateEmployee(uploadTarget.id, 'photoUrl', publicUrl);
+              updateEmployee(uploadTarget.id, 'photoScale', 1);
+              updateEmployee(uploadTarget.id, 'photoPosition', { x: 0, y: 0 });
+              setCustomActivationImages(prev => [...prev, publicUrl]);
+              await addActivationImage(publicUrl);
+          } catch (err) {
+              console.error('Failed to upload activation image:', err);
               toast.error('Falha ao enviar a imagem convertida para o servidor.');
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1407,11 +1727,15 @@ export default function App() {
                   }
               } else {
                   updateEmployee(uploadTarget.id, uploadTarget.field as keyof Employee, result);
+                  if (uploadTarget.field === 'photoUrl') {
+                      // Removed face auto-centering
+                  }
               }
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
           setUploadTarget(null);
       };
+
       reader.readAsDataURL(file);
   };
 
@@ -1424,11 +1748,23 @@ export default function App() {
         const clone = node.cloneNode(true) as HTMLElement;
         clone.style.transform = 'none'; // Reset scale for capture
         
-        // Remove rounded corners for export
-        const innerCard = clone.querySelector('div[style*="border-radius"]');
-        if (innerCard) {
-            (innerCard as HTMLElement).style.borderRadius = '0';
-        }
+        // Remove rounded corners for export, keeping circular elements (e.g. avatar, slide index badge) intact
+        const innerCards = clone.querySelectorAll('div[style*="border-radius"]');
+        innerCards.forEach((card) => {
+            const htmlCard = card as HTMLElement;
+            const styleStr = htmlCard.getAttribute('style') || '';
+            const hasCircleRadius = 
+                styleStr.includes('50%') || 
+                styleStr.includes('9999') || 
+                styleStr.includes('1000') || 
+                htmlCard.style.borderRadius.includes('50%') || 
+                htmlCard.style.borderRadius.includes('9999') || 
+                htmlCard.style.borderRadius.includes('1000') || 
+                htmlCard.classList.contains('rounded-full');
+            if (!hasCircleRadius) {
+                htmlCard.style.borderRadius = '0';
+            }
+        });
         clone.style.borderRadius = '0';
         
         // REMOVE SIGNATURE TEXT ONLY FOR EXPORT
@@ -1558,9 +1894,39 @@ export default function App() {
     if (!isMonthView || filteredEmployees.length === 0) return;
     
     setIsDownloading(true);
-    toast.info(`Iniciando exportação em lote de ${filteredEmployees.length} cartões...`);
+    const preflightToastId = toast.loading("Executando pré-teste de CORS e validando imagens para exportação...");
     
     try {
+        const checkImageCors = async (url: string): Promise<boolean> => {
+          if (!url) return true;
+          if (url.startsWith('data:')) return true;
+          if (!url.startsWith('http')) return true;
+          try {
+            const response = await fetch(url, { method: 'HEAD', mode: 'cors' });
+            return response.ok;
+          } catch (err) {
+            return false;
+          }
+        };
+
+        // Preflight CORS validation & silent self-healing routing
+        const sanitizedEmployees = await Promise.all(filteredEmployees.map(async (emp) => {
+            if (emp.photoUrl) {
+                const isCorsPermissive = await checkImageCors(emp.photoUrl);
+                if (!isCorsPermissive) {
+                    console.warn(`Compatibilidade: Roteando foto de ${emp.name} via proxy seguro devido a CORS restritivo.`);
+                    return {
+                        ...emp,
+                        photoUrl: `https://images.weserv.nl/?url=${encodeURIComponent(emp.photoUrl)}`
+                    };
+                }
+            }
+            return emp;
+        }));
+
+        toast.success("Teste de compatibilidade de imagens concluído com sucesso!", { id: preflightToastId });
+        toast.info(`Iniciando exportação em lote de ${sanitizedEmployees.length} cartões...`);
+
         const zip = new JSZip();
         const folder = zip.folder(`Aniversariantes_${MONTHS[selectedMonthIndex]}`);
         
@@ -1573,8 +1939,8 @@ export default function App() {
         container.style.zIndex = '-1';
         document.body.appendChild(container);
 
-        for (let i = 0; i < filteredEmployees.length; i++) {
-            const emp = filteredEmployees[i];
+        for (let i = 0; i < sanitizedEmployees.length; i++) {
+            const emp = sanitizedEmployees[i];
             const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
             
             const wrapper = document.createElement('div');
@@ -1582,11 +1948,15 @@ export default function App() {
             const node = wrapper.firstElementChild as HTMLElement;
             if (!node) continue;
             
-            // Remove rounded corners for export
-            const innerCard = node.querySelector('div[style*="border-radius"]');
-            if (innerCard) {
-                (innerCard as HTMLElement).style.borderRadius = '0';
-            }
+            // Remove rounded corners for export, keeping circular elements (e.g. avatar, slide index badge) intact
+            const innerCards = node.querySelectorAll('div[style*="border-radius"]');
+            innerCards.forEach((card) => {
+                const htmlCard = card as HTMLElement;
+                const styleStr = htmlCard.getAttribute('style') || '';
+                if (!styleStr.includes('50%') && !htmlCard.style.borderRadius.includes('50%')) {
+                    htmlCard.style.borderRadius = '0';
+                }
+            });
             node.style.borderRadius = '0';
             
             container.innerHTML = '';
@@ -1976,17 +2346,23 @@ export default function App() {
            <div className="h-10 w-px bg-white/40 rounded-full shadow-sm"></div>
            
            <div className="pt-1">
-             <svg viewBox="0 0 1850 580" className="h-12 w-auto fill-white overflow-visible" xmlns="http://www.w3.org/2000/svg">
+                          <svg viewBox="0 0 1100 180" className="h-8 w-auto fill-white overflow-visible" xmlns="http://www.w3.org/2000/svg">
                 <g id="Camada_1-2" data-name="Camada 1">
-                    <path className="cls-1" d="M1289.09,434.7c-37.09-25.82-38.22-82.43-35.93-123.11,1.06-21.24,8.5-69.53-15.63-79.78-38.5-16.37-61.29,40.52-73.52,64.51-.11-13.16,1.45-52.17-9.3-58.27-49.11-27.9-59.44,88.87-77.12,114.55-17.09,24.82-27.28,6.5-27.47-11.27-.33-21.09,7.18-36.83,9.08-56.6-10.17-24.78-31.49-9.71-35.97,10.69-4.49,20.41-14.31,60.83-34.09,71.52-4.61,2.52-10.06,3.01-15.05,1.35-32.33-10.74,3.39-91.73,29.41-100.1,17.69-5.69,37.02-1.49,44.83-17.83,6.35-11.57-1.66-27.3-14.49-30.15-39.86-9.05-76.06,36.38-91.86,66.44-16.97,32.3-23.2,80.34-61.9,94.45-61.18,20.08-60.41-59.7-45.52-95.93,5.51-13.4,18.59-40.59,36.51-35.57,16.2,4.54-9.62,37.43,5.37,44.91,13.99,7.13,29.84-2.38,36.43-15.02,20.47-39.3-19.14-76.53-57.06-58.42-40.27,19.24-43.97,52.73-92.5,66.74-2.54-32-18-73.48-57.23-71.07-46.17,8.52-42.05,64.44-8.44,85.66,13,8.2,21.56,10.36,36.62,12.15-2,19.91-7.59,39.99-23.18,53.59-11.12,9.7-27.25,10.31-36.09-2.43-12.68-18.25-6.31-44.37-.14-63.63-4.24-5.53-14.25-21.89-19.04-22.89-4.68,1.8-7.37,5.96-9.91,10.13-18.49,30.38-24.89,70.78-12.32,104.44,10.69,28.65,39.97,44.73,68.92,32.47,41.83-17.71,58-73.81,60.4-114.67,13.21-4.08,19.46-7.23,31.62-13.97-11.66,30.31-16.41,67.45-3.01,98.07,14.47,33.08,50.86,41.53,81.77,26.51,19.9-9.68,32.57-25.39,45.49-42.81,3.73,25.98,15.68,53.33,47.96,48.24,26.77-4.22,43.41-33.74,54.55-55.98,1.53,11.09,6.08,28.19,15.78,33.46,48.56,26.42,64.91-71.01,78.85-99,2.16-4.33,5.26-6.87,8.72-8.8,3.83-.24,2.17-.73,5.21,1.42,11.16,20.38-18.31,85.37-14.28,103.66,1.38,6.24,6.97,10.53,12.84,12.22,4.7,1.35,9.49.8,13.74-1.64,27.1-15.51,25.26-101.53,55.78-129.39,3.24-2.95,7.04-5.68,11.65-4.13,3.36,1.14,6.29,4.13,7.61,7.39,5.18,12.82-3.35,43.55-5.24,57.28-5.31,38.71-9.02,104.82,33.5,125.26,10.8,5.19,22.65,6.37,34,2.15,6.79-2.53,12.31-6.51,17.26-11.74,11.89-17.58,3.74-17.16-7.61-25.06ZM733.43,288.17l-2.89-.44c-15.51-5.25-43.2-25.32-21.92-40.36,5.31.11,6.17.21,10.91,2.53,9.1,4.46,19.31,29.51,13.9,38.27Z"/>
-                    <path className="cls-1" d="M368.85,50.03c-1.58,43.16-46.12,94.19-91.05,94.21-23.43-.68-46.34-20.94-19.87-39.31,17.38-12.06,43.87-21.16,50.51-43.74,2.84-9.68-8.27-17.26-17.2-16.94-34.56.85-70.89,28.84-95.27,51.34-23.03,21.25-54.02,59.35-55.21,91.68-1.36,36.79,46.57,31.43,69.49,24.8,18.75-5.42,60.41-25.97,62.09,7.08.48,7.59-7.28,17.88-13.03,22.2-16.81,12.97-38.89,21.89-57.36,32.77-55.22,32.87-111.59,85.48-119.04,152.64-2.48,22.31,2.56,49.69,17.5,66.54,39.15,44.16,111.47,23.35,149.51-11.5,9.26-8.49,15.79-15.4,23.62-24.99,5.76-7.94,12.24-15.45,18.1-23.46,7.34.35,11.98,3.2,18.49,6.62,3.98.82,4.73,1.53,8.31,3.67,1.99,6.74-.95,12.7-4.56,18.68-31.29,51.96-77.34,90.05-134.86,108.48-66.9,21.44-155.4.52-174.51-74.57-25.27-99.26,60.57-180.79,137.78-226.78,7.93-4.72,18.31-10.4,24.79-16.37-37.08,1.5-88.06-2.01-88.67-53.23-.45-37.95,31.1-78.27,56.04-104.44C181.22,49.96,245.66,2.79,312.95.05c28.82-1.17,57.02,19.18,55.89,49.98Z"/>
-                    <path className="cls-1" d="M310.12,439.97c-2.53-.29-4.94-.56-7.47-.95l-1.67,2.83c-2.6.58-6.88-1.23-9.67-2.14l-.26-2.12c-4.88,6.13-3.11,12.43-8.62,13.31-2.27.36-3.13,1.33-4.75,2.99-.04,2.54.11,2.42.64,4.97l-.58.41c-1.67-1.7-1.75-2.21-4.21-2.46,5.76-7.94,12.24-15.45,18.1-23.46,7.34.35,11.98,3.2,18.49,6.62Z"/>
-                    <path className="cls-1" d="M1667.66,301.18c-.26-.25-.51-.51-.76-.76,13.57-22.25,26.55-45.8,32.38-71.42,5.93-26.03-1.63-59.54-35.22-57.14-41.19,6.4-59.96,49.7-53.37,87.48,3.45,19.8,10.43,35.53,19.61,53.19-7.82,16-56.91,84.78-75.48,40.48-5.94-14.16,1.19-38.71,4.67-52.89,9.3-28.57-16.9-38.62-30.12-15.34-5.25,9.25-6.46,26.81-10.28,37.08-4.2,16.96-21.27,56.63-44.29,46.06-19.02-8.75-7.68-50.94.49-65.07,8.69-15.04,18.54-29.81,35.74-36.36,17.41-4.47,48.41-.75,40.16-32.68-6.95-18.72-31.6-17.02-45.92-10.27-34.97,16.47-55.28,48.56-70.45,83.26-13.95,31.88-28.47,101.35,14.64,119.29,32.97,13.71,61.78-27.31,73.77-54.27,2.52,12.52,5.38,26.54,17.06,33.55,24.33,14.59,52.76-12.01,67.58-27.37,16.25-17.95,22.42-27.59,36.59-46.15,24.79,30.83,62.79,78.97,57.85,119.16-2.14,17.46-9.23,33.76-23.09,45.04-13.24,10.6-30.15,15.49-47.01,13.6-13.12-1.5-26.48-7.75-34.39-18.6-5.7-7.74-8.09-17.43-6.66-26.93,1.84-11.7,18.54-31.47-6.06-33.43-30.64-2.44-54.15,22.84-55.7,52.38-3,57.15,53.78,91.54,105.28,91.65,34.33.84,67.47-10.32,92.65-34.55,20.79-20.01,36.32-49.53,36.43-80.43.22-65.89-58.09-111.53-96.1-158.56ZM1663.14,207.57c24.29,6.82-3.45,60.5-10.18,72.34-11.19-21.12-19.65-62.81,10.18-72.34Z"/>
-                    <path className="cls-1" d="M537.81,501.4c-19.6,30.22-65.58,33.98-93.54,13.6-24.17-17.64-34.65-46.37-39.04-74.93-4.79-30.17-2.63-60.55,2-90.53.6-9.06,11.11-50.1.32-55.27-20.67-9.9-37.56,37.87-43.24,51.22-9.74,22.85-16.64,49.08-27.85,71.52-2.71,5.44-4.45,8.18-10.01,11.17-14.98.5-21.26-2.68-24.6-17.55,7.29-29.26,23.01-74.76,13.42-104.58-2.65-8.26-14.51-4.3-19.47.41-14.6,13.89-23.23,33.68-30.27,52.25-10.91,26.73-16.23,77.02-54.55,76.35-15.36-.27-26.43-18.82-23.56-33.37,9.39-47.58,54.8-90.91,90.62-120.86,14.27-11.94,52.62-38.9,67.51-18.11,8.86,12.28,6.55,34.66,6.61,49.5l.73-1.27c13.11-22.98,41.6-103.51,87.92-84.15,6.33,2.64,11.49,15,12.34,21.1,2.84,19.19-1.67,42.61-4.09,62.14-5.98,48.18-10.27,115.69,34.23,147.76,11.71,8.22,25.84,11.62,40.02,10.54,4.07,0,11.34-1.53,15.15-.41,15.48,4.56,4.91,24.96-.62,33.47Z"/>
-                    <path className="cls-1" d="M542.2,28.9c92.97-5.62,88.81,205.43,74.72,264.75-11.35,47.79-22.73,125.36-79.96,141.38-31.63,8.86-57.55-19.74-61.94-48.04-6.5-37.86,1.23-77.77,22.49-110.06,11.98-16.32,40.6-48.22,67.23-37.8,3.31,1.71,7.01,6.88,7.48,10.59,3.67,28.53-30.11,19.9-42.71,47.56-9.33,20.5-18.06,39.19-12.48,61.78,6.96,28.2,32.94,20.37,43.93.94,9.39-15.29,14.34-28.67,18.45-45.69,17.65-73.2,2.99-158.68-43.07-219.05-6.7-9.96-16.35-19.33-19.48-31.2-5.15-19.55,8.1-31.38,25.32-35.16Z"/>
-                    <path className="cls-1" d="M1517.17,117.88c29.11-2.06,58.52,14.07,51.78,49.27-1.32,6.89-8.8,11.51-14.88,14.25-13.76-.84-24.8-4.15-39.04.02-65.89,21.26-99.8,97.5-123.04,157.17-9.57,24.57-22.97,84.28-50.71,90.76-5.99,1.37-12.27.17-17.32-3.33-21.41-14.63-18.79-57.01-21.16-80.61-1.64-16.45-1.71-25.48-5.38-42.62-2.22-10.36-7.58-29.14-13.76-37.66-9.83-13.55-26.18-30.04-2.73-42.5,8.2-4.35,17.83-5.09,26.6-2.05,54.78,19.26,12.82,142.79,37.33,150.33,28.83-8.78,47.78-233.12,172.31-253.02Z"/>
-                </g>
-             </svg>
+                    <g>
+                      <path d="M370.78,171.49c-29.91,11.8-61.61-3.84-71.52-33.41-7.43-22.16,0-46.12,17.7-60.24,18.46-14.74,43.74-16.42,64.03-3.06l.19-53.12c0-2.62,3.21-5.16,5.41-5.65l14.45.23c2.86.04,5.84,3.38,5.83,6.38l-.32,97.83c-.07,22.67-14.69,42.73-35.76,51.04ZM379.84,120.35c0-15.71-12.74-28.45-28.45-28.45s-28.45,12.74-28.45,28.45,12.74,28.45,28.45,28.45,28.45-12.74,28.45-28.45Z" style={{ fill: '#fff' }}/>
+                      <path d="M164.62,149.81c7.19.08,11.08,6.53,11.29,12.54.32,9.06-6.06,14.94-14.86,14.68-10.62-.32-20.62.7-31.45-.32-18.22-1.7-37.41-9.89-47.93-25.78L2.57,31.43c-3.9-5.89-3-14.22.26-20.28C5.62,6,11.04,1.65,18.19.36c10.79-1.95,23.45,4.12,26.6,15.41l18.99,68.06c2.45,8.78,7.04,16.36,12.85,23.2,10.34,12.18,21.29,23.16,34.12,32.78,7.45,5.59,16.94,9.61,26.28,9.7l27.59.29Z" style={{ fill: '#fff' }}/>
+                      <path d="M713.28,172.63c-6.62.47-11.14-1.73-12.16-8.56-15.87,11.23-36.51,12.42-53.69,2.53-22.67-13.06-31.9-40.32-23.49-64.92,9.75-28.51,40.4-43.39,68.72-31.85,18.01,7.34,31.53,24.68,32.73,44.55l.45,47.12c.03,3.12-1.13,6.78-3.12,8.52-2.25,1.97-5.75,2.34-9.44,2.6ZM700.96,119.42c0-15.19-12.31-27.5-27.5-27.5s-27.5,12.31-27.5,27.5,12.31,27.5,27.5,27.5,27.5-12.31,27.5-27.5Z" style={{ fill: '#fff' }}/>
+                      <path d="M521.53,120.17c0,29.84-24.19,54.03-54.04,54.03s-54.04-24.19-54.04-54.03,24.19-54.03,54.04-54.03,54.04,24.19,54.04,54.03ZM495.74,120.04c0-15.5-12.57-28.07-28.07-28.07s-28.07,12.57-28.07,28.07,12.57,28.07,28.07,28.07,28.07-12.57,28.07-28.07Z" style={{ fill: '#fff' }}/>
+                      <path d="M1014.03,170.68c-6.26.33-10.55-1.31-11.76-7.89-22.11,15.28-51.69,10.08-67.42-11.82-16.74-23.31-12.21-55.79,10.2-73.86,18.81-15.16,45.25-14.61,63.36,1.51,10.19,9.07,17.63,21.93,17.64,35.86l.02,45.99c0,2.67-1.05,6.21-2.59,7.59-2.36,2.11-5.76,2.42-9.46,2.62ZM1002.56,118.76c0-14.83-12.03-26.86-26.86-26.86s-26.86,12.02-26.86,26.86,12.03,26.86,26.86,26.86,26.86-12.02,26.86-26.86Z" style={{ fill: '#fff' }}/>
+                      <path d="M259.97,115.86c-.02-13.46-11.75-22.59-23.45-22.47-13.19.13-22.93,10.75-22.96,24.08l-.11,48.36c-.02,7.63-7.69,10.79-14.38,10.62-6.18-.16-12.5-3.27-12.49-10.32.02-17.5-.78-34.62.28-52.19,1.56-25.73,22.33-46.62,48.18-47.61s49.99,20.41,51.31,47.25l.33,49.79c.05,8.04-6.12,12.48-13.66,12.42-7.01-.06-12.95-3.81-12.96-11.42l-.09-48.52Z" style={{ fill: '#fff' }}/>
+                      <path d="M102.63,75.55c5.41,4.57,12.61,6.84,19.51,6.92l43.7.51c7.2.08,10.65,8.18,10.27,13.97s-4.83,12.68-12.03,12.68h-44.92c-24.44-.01-48.38-17.82-49.37-42.58-1.25-30.98,28.38-51.85,58.34-51.71l36.97.18c7.25.04,11.51,7.53,11.34,14.01-.17,6.91-5.01,13.18-12.35,13.25l-37.06.37c-9.16.09-18.96,3.63-24.76,10.08-5.93,6.59-6.57,16.47.36,22.32Z" style={{ fill: '#fff' }}/>
+                      <path d="M800.87,112.89c-.05-11.77-10.62-20.02-20.77-20.27-10.76-.27-21.51,8.1-21.6,19.97l-.39,48.2c-.06,7.22-5.59,11.67-12.47,11.78s-12.52-3.87-12.45-11.08l.47-50.99c1.82-23.63,20.22-43.05,43.95-44.15,25.62-1.18,46.98,19.63,48.12,45.03l.19,50.03c.03,7.01-6.07,10.4-12.29,10.52-6.81.13-12.51-3.61-12.55-10.76l-.22-48.29Z" style={{ fill: '#fff' }}/>
+                      <path d="M553.33,113.44c-2.76,12.05,2.05,23.41,11.48,29.56,9.95,6.49,22.56,6.55,32.02-1.55,1.34-1.15,4.05-2.66,5.54-2.82,1.7-.18,4.66,1.72,5.87,3.08l6.85,7.61c1.1,1.22,2.93,4,2.74,5.51-.24,1.98-2.08,4.24-3.92,5.81-18.24,15.66-44.34,18.01-64.26,3.83-15.74-11.2-23.73-29.61-22.27-48.74,1.4-18.25,12.4-35.37,29.38-44.19,19.6-10.18,42.49-6.43,58.49,8.44,2.88,2.67,3.57,5.79.71,8.82l-8.23,8.74c-2.35,2.49-6.36,3.74-9.31,1.27-7.64-6.4-17.19-8.81-27.06-5.53-8.33,2.77-15.7,9.97-18.03,20.16Z" style={{ fill: '#fff' }}/>
+                      <path d="M1086.81,166.37c-16.69,9.04-36.49,5.95-50.18-5.98-6.47-5.64-8.03-14.41-1.75-20.4,4.35-4.15,10.51-3.95,14.66.36,6.35,6.6,15.38,9.47,24.29,6.56,3.24-1.06,5.79-4.05,6.03-6.99.27-3.24-1.7-7.79-5.2-8.78l-17.12-4.82c-9.71-2.74-19.26-7.98-23.09-17.57-7.03-17.61,3.21-36.11,21.14-40.98,15.86-4.31,32.29.22,42.8,12.63,3.14,3.71,3.55,6.85.99,11.27-1.92,3.32-4.75,6.3-8.28,7.12-4.24.98-8.09-.65-11.33-3.68-4.91-4.58-11.5-6.73-18.04-4.18-2.65,1.03-4.64,4.45-4.59,7.06.04,2.27,2.47,5.9,5.08,6.62l19.67,5.44c9.29,2.57,17.11,9.41,20.03,18.59,4.66,14.65-1.24,30.21-15.12,37.73Z" style={{ fill: '#fff' }}/>
+                      <path d="M906.23,72.73c3.28-6.67,11.78-7.31,16.71-4.18,5.21,3.3,8.36,10.44,5.17,16.7l-41.04,80.67c-1.8,3.54-5.99,5.62-9.08,5.83-3.81.25-8.88-1.12-10.85-5l-42.25-83.13c-3.45-6.78,3.38-14.92,8.36-16.41,7.52-2.26,12.98,1.86,16.21,8.49l23.13,47.54c.63,1.29,3.17,3.33,4.45,3.31s3.78-2.04,4.43-3.36l24.77-50.44Z" style={{ fill: '#fff' }}/>
+                    </g>
+                 </g>
+              </svg>
           </div>
         </div>
       </header>
@@ -1994,10 +2370,16 @@ export default function App() {
 
   // Redesigned Floating Sidebar
   const SidebarContent = useMemo(() => (
-    <div 
-      style={{
-        transform: isSidebarOpen ? 'none' : 'translateX(calc(-100% - 30px))',
-        transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+    <motion.div 
+      initial={false}
+      animate={{
+        x: isSidebarOpen ? 0 : -370,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 240,
+        damping: 25,
+        mass: 0.8
       }}
       className={`absolute top-24 left-6 w-[340px] bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible`}
     >
@@ -2007,7 +2389,7 @@ export default function App() {
        {/* 1. Header Tabs */}
        <div className="p-4 shrink-0">
           <div className="flex bg-white/10 rounded-full p-1 h-14 relative">
-             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && selectedTemplate !== TemplateType.NEW_PROVIDER && (
+             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.ACTIVATION && (
                  <button 
                     onClick={() => { 
                         setActiveTab('DATA'); 
@@ -2085,7 +2467,7 @@ export default function App() {
                   <Settings size={22} />
                 </span>
              </button>
-             {(selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
+             {(selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) && (
                <button 
                   onClick={() => setActiveTab('IMAGES')} 
                   className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'IMAGES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
@@ -2124,14 +2506,23 @@ export default function App() {
                  transition={{ duration: 0.2 }}
                  className="h-full"
              >
-                {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY) && (
+                {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) && (
              <div className="animate-in slide-in-from-right-4 duration-300 pt-2">
                 <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Image Library</h3>
                 <div className="grid grid-cols-2 gap-3">
-                    {(selectedTemplate === TemplateType.HIRING ? customHiringImages : customBabyImages).map((img, i) => (
+                    {(selectedTemplate === TemplateType.HIRING 
+                        ? customHiringImages 
+                        : selectedTemplate === TemplateType.BABY 
+                          ? customBabyImages 
+                          : customActivationImages
+                    ).map((img, i) => (
                         <div key={`custom-${i}`} className="relative group">
                             <button 
-                                onClick={() => updateEmployee(selectedEmployee.id, 'photoUrl', img)}
+                                onClick={() => {
+                                    updateEmployee(selectedEmployee.id, 'photoUrl', img);
+                                    updateEmployee(selectedEmployee.id, 'photoScale', 1);
+                                    updateEmployee(selectedEmployee.id, 'photoPosition', { x: 0, y: 0 });
+                                }}
                                 className={`w-full relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${selectedEmployee.photoUrl === img ? 'border-cyan-500 scale-[0.98]' : 'border-transparent hover:border-white/20'}`}
                             >
                                 <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -2148,7 +2539,7 @@ export default function App() {
                                             return newImages;
                                         });
                                         deleteHiringImage(img).catch(console.error);
-                                    } else {
+                                    } else if (selectedTemplate === TemplateType.BABY) {
                                         setCustomBabyImages(prev => {
                                             const newImages = prev.filter((_, idx) => idx !== i);
                                             if (selectedEmployee.photoUrl === img) {
@@ -2157,6 +2548,15 @@ export default function App() {
                                             return newImages;
                                         });
                                         deleteBabyImage(img).catch(console.error);
+                                    } else {
+                                        setCustomActivationImages(prev => {
+                                            const newImages = prev.filter((_, idx) => idx !== i);
+                                            if (selectedEmployee.photoUrl === img) {
+                                                updateEmployee(selectedEmployee.id, 'photoUrl', newImages[0] || '');
+                                            }
+                                            return newImages;
+                                        });
+                                        deleteActivationImage(img).catch(console.error);
                                     }
                                 }}
                                 className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
@@ -2410,7 +2810,7 @@ export default function App() {
                    </div>
                ) : (
                    /* Standard Employee List/Detail Logic */
-                   (sidebarDataView === 'LIST' && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY) ? (
+                   (sidebarDataView === 'LIST' && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && selectedTemplate !== TemplateType.ACTIVATION) ? (
                      <>
                         {/* UPDATED SEARCH BAR - Fully Rounded & Larger */}
                         <div className={`relative flex items-center px-6 py-4 rounded-full border transition-all bg-white/5 border-white/10 focus-within:bg-white/10 shadow-inner`}>
@@ -2490,9 +2890,66 @@ export default function App() {
                    ) : (
                       // Detail View 
                       <div>
-                          {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
-                              <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
-                          )}
+                          {selectedTemplate === TemplateType.ACTIVATION ? (
+                              <div className="space-y-4">
+                                  <div>
+                                      <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Número da Ativação</div>
+                                      <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <Hash size={16} className="opacity-40 mr-3 text-white" />
+                                          <input 
+                                              value={selectedEmployee.role} 
+                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'role', e.target.value)} 
+                                              className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30 font-mono" 
+                                              placeholder="Ex: 1" 
+                                          />
+                                      </div>
+                                  </div>
+
+                                  <div>
+                                      <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Texto da Ativação</div>
+                                      <div className="flex items-start px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <Type size={16} className="opacity-40 mr-3 mt-1 text-white" />
+                                          <textarea 
+                                              value={selectedEmployee.name} 
+                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'name', e.target.value)} 
+                                              rows={3}
+                                              className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30 resize-none uppercase" 
+                                              placeholder="Texto da ativação" 
+                                          />
+                                      </div>
+                                  </div>
+
+                                  <div>
+                                      <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Tema do Plano de Fundo (AI)</div>
+                                      <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <Sparkles size={16} className="opacity-40 mr-3 text-cyan-400 animate-pulse" />
+                                          <input 
+                                              value={backgroundTheme} 
+                                              onChange={(e) => setBackgroundTheme(e.target.value)} 
+                                              onKeyDown={handleThemeKeyDown}
+                                              disabled={isGeneratingBg}
+                                              className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" 
+                                              placeholder="Ex: futebol de mesa, cyberpunk..." 
+                                          />
+                                          {isGeneratingBg ? (
+                                              <Loader2 className="animate-spin text-cyan-500 ml-2" size={16} />
+                                          ) : (
+                                              <button 
+                                                  onClick={handleGenerateBackground}
+                                                  className="text-[10px] bg-cyan-500 hover:bg-cyan-600 transition-colors text-slate-950 font-bold px-2 py-1 rounded"
+                                              >
+                                                  Gerar
+                                              </button>
+                                          )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 mt-1">Pressione Enter ou clique em Gerar para criar a imagem via Freepik Magnific.</p>
+                                  </div>
+                              </div>
+                          ) : (
+                              <>
+                                  {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
+                                      <button onClick={() => setSidebarDataView('LIST')} className="flex items-center gap-2 text-xs font-bold mb-6 text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full w-fit"><ArrowLeft size={14}/> Back to List</button>
+                                  )}
                                                <div className="space-y-3">
                                 {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                                     <>
@@ -2518,6 +2975,8 @@ export default function App() {
                                   <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
                               </>
                           )}
+                           </>
+                       )}
                       </div>
                    )
                )}
@@ -2628,10 +3087,14 @@ export default function App() {
                                setSelectedEmployeeId('baby-generic');
                                setSidebarDataView('DETAIL');
                                setActiveTab('IMAGES');
+                           } else if (t.id === TemplateType.ACTIVATION) {
+                               setSelectedEmployeeId('gaming-generic');
+                               setSidebarDataView('DETAIL');
+                               setActiveTab('IMAGES');
                            } else if (t.id === TemplateType.NEW_PROVIDER) {
                                if (activeTab === 'DATA') setActiveTab('TEMPLATES');
-                           } else if (selectedEmployeeId === 'hiring-generic' || selectedEmployeeId === 'baby-generic') {
-                               const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic');
+                           } else if (selectedEmployeeId === 'hiring-generic' || selectedEmployeeId === 'baby-generic' || selectedEmployeeId === 'gaming-generic') {
+                               const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
                                if (firstRealEmployee) {
                                    setSelectedEmployeeId(firstRealEmployee.id);
                                }
@@ -2658,8 +3121,8 @@ export default function App() {
 
                        {/* Text Content */}
                        <div className="absolute bottom-4 left-5 z-10">
-                          <div className="font-sans text-xl text-white font-bold mb-0.5 shadow-black drop-shadow-md">{t.label}</div>
-                          <div className="text-[10px] text-cyan-200 font-medium uppercase tracking-wide drop-shadow-md">{t.desc}</div>
+                          <div className="font-sans text-xl text-white font-normal mb-0.5 shadow-black drop-shadow-md">{t.label}</div>
+                          <div className="text-[10px] text-cyan-200 font-medium uppercase tracking-wide drop-shadow-md whitespace-pre-line">{t.desc}</div>
                        </div>
                     </button>
                   );
@@ -2695,7 +3158,7 @@ export default function App() {
 
 
 
-    </div>
+    </motion.div>
   ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, isPresentation, handleDownload, isSidebarOpen]);
 
   // --- HIRING EDITOR OVERLAY ---
@@ -2777,6 +3240,9 @@ export default function App() {
                        <div
                             ref={canvasWrapperRef}
                             style={{
+                                display: selectedTemplate === TemplateType.ACTIVATION ? 'flex' : undefined,
+                                flexDirection: selectedTemplate === TemplateType.ACTIVATION ? 'column' : undefined,
+                                alignItems: selectedTemplate === TemplateType.ACTIVATION ? 'center' : undefined,
                                 transform: `translate(${position.x}px, ${position.y}px) scale(${zoomLevel})`,
                                 transformOrigin: 'top left',
                                 transition: isDraggingCanvas ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -2785,18 +3251,69 @@ export default function App() {
                                 position: 'relative'
                             }}
                        >
-                           <MorphingCanvas html={previewHtml} templateType={selectedTemplate} orientation={orientation}>
-                               {renderHiringOverlay()}
-                           </MorphingCanvas>
+                           <div className="relative">
+                                <MorphingCanvas html={previewHtml} templateType={selectedTemplate} orientation={orientation}>
+                                    {renderHiringOverlay()}
+                                </MorphingCanvas>
+
+                                
+                            
+
+                               {isDownloading && (
+                                   <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
+                                       <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+                                       <motion.div 
+                                           className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)]"
+                                           animate={{ top: ['0%', '100%', '0%'] }}
+                                           transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                       />
+                                   </div>
+                               )}
+                            </div>
+
+                            {selectedTemplate === TemplateType.ACTIVATION && (
+                                <div className="w-[980px] mt-12 p-5 rounded-full bg-[#09090b]/95 backdrop-blur-md border border-white/10 shadow-2xl flex items-center gap-6 transition-all">
+                                    <div className="pl-6 text-cyan-400 shrink-0">
+                                        <Sparkles size={30} fill="currentColor" />
+                                    </div>
+                                    <input 
+                                        value={backgroundTheme} 
+                                        onChange={(e) => setBackgroundTheme(e.target.value)} 
+                                        onKeyDown={handleThemeKeyDown}
+                                        disabled={isGeneratingBg}
+                                        className="bg-transparent outline-none flex-1 px-2 py-4 text-lg md:text-xl font-medium text-white placeholder:text-slate-500" 
+                                        placeholder="Digite o tema do plano de fundo (ex: futebol de mesa, cyberpunk, custos operacionais)..." 
+                                    />
+                                    <button 
+                                        onClick={handleGenerateBackground}
+                                        disabled={isGeneratingBg}
+                                        title="Gerar Imagem"
+                                        className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-purple-600 hover:opacity-95 active:scale-[0.95] transition-all text-white rounded-full flex items-center justify-center shadow-lg mr-1 shrink-0 cursor-pointer disabled:cursor-default"
+                                    >
+                                        {isGeneratingBg ? (
+                                            <Loader2 className="animate-spin text-white" size={26} />
+                                        ) : (
+                                            <ArrowRight size={26} />
+                                        )}
+                                    </button>
+                                </div>
+                            )}
 
                            {/* NEW JOYSTICK & SLIDER */}
-                           {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
-                               <div 
+                           {viewMode === ViewMode.EDITOR && !isManagementMode && selectedTemplate !== TemplateType.PRESENTATION && selectedTemplate !== TemplateType.NEW_PROVIDER && selectedTemplate !== TemplateType.NEWSLETTER && (
+                               <motion.div 
+                                   initial={{ opacity: 0, scale: 0.8, x: 40 }}
+                                   animate={{ opacity: 1, scale: 1, x: 0 }}
+                                   transition={{ type: "spring", stiffness: 220, damping: 22 }}
                                    className="absolute -right-[100px] top-4 z-50 flex flex-col items-center gap-4"
                                >
                                   {/* Joystick */}
-                                  <div 
-                                      className={`w-[80px] h-[80px] rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 shadow-xl flex items-center justify-center transition-opacity duration-300 ${isJoystickDragging ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-100'}`}
+                                  <motion.div 
+                                      whileHover={{ scale: isJoystickDragging ? 1.05 : 1.04, opacity: 1 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      animate={{ scale: isJoystickDragging ? 1.05 : 1, opacity: isJoystickDragging ? 1 : 0.6 }}
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                      className="w-[80px] h-[80px] rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing"
                                       onMouseDown={handleJoystickStart}
                                   >
                                       <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
@@ -2809,11 +3326,14 @@ export default function App() {
                                       >
                                           <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
                                       </div>
-                                  </div>
+                                  </motion.div>
 
                                   {/* Scale Slider */}
-                                  <div 
-                                      className="h-[120px] w-[32px] bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center shadow-xl opacity-60 hover:opacity-100 transition-opacity"
+                                  <motion.div 
+                                      whileHover={{ scale: 1.04, opacity: 1 }}
+                                      animate={{ opacity: 0.6 }}
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                      className="h-[120px] w-[32px] bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center shadow-xl transition-all"
                                       onMouseDown={(e) => e.stopPropagation()} // Prevent canvas dragging when using slider
                                   >
                                       <input 
@@ -2823,20 +3343,13 @@ export default function App() {
                                           onChange={(e) => updateEmployee(selectedEmployee.id, 'photoScale', parseFloat(e.target.value))}
                                           className="w-[100px] h-[2px] appearance-none bg-white/20 rounded-full outline-none -rotate-90 cursor-ns-resize [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-md"
                                       />
-                                  </div>
-                               </div>
+                                  </motion.div>
+
+
+                               </motion.div>
                            )}
 
-                           {isDownloading && (
-                               <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
-                                   <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
-                                   <motion.div 
-                                       className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)]"
-                                       animate={{ top: ['0%', '100%', '0%'] }}
-                                       transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                                   />
-                               </div>
-                           )}
+                           
                        </div>
                     </div>
 
@@ -2858,36 +3371,62 @@ export default function App() {
                     )}
                     
                     {isSignature && (
-                        <div className="absolute top-6 right-8 z-30 flex items-start gap-3" ref={controlsAreaRef}>
+                        <motion.div 
+                            initial={{ opacity: 0, y: -20, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                            className="absolute top-6 right-8 z-30 flex items-start gap-3" 
+                            ref={controlsAreaRef}
+                        >
                             {employees.length > 1 && (
-                                <button className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold shadow-lg transition-all border bg-white dark:bg-slate-800 text-purple-600 border-slate-200 dark:border-white/10 hover:bg-purple-50" onClick={handleCopyAllHtml}>
+                                <motion.button 
+                                    whileHover={{ scale: 1.04 }}
+                                    whileTap={{ scale: 0.96 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold shadow-lg transition-all border bg-white dark:bg-slate-800 text-purple-600 border-slate-200 dark:border-white/10 hover:bg-purple-50" 
+                                    onClick={handleCopyAllHtml}
+                                >
                                     {hasCopied === 'ALL COPIED!' ? <CheckCircle2 size={18} /> : <List size={18} />}
                                     <span>{hasCopied === 'ALL COPIED!' ? 'List Copied!' : 'Copy List'}</span>
-                                </button>
+                                </motion.button>
                             )}
-                            <button className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold shadow-lg transition-all border bg-white dark:bg-slate-800 text-cyan-600 border-slate-200 dark:border-white/10 hover:bg-cyan-50" onClick={handleCopyHtml}>
+                            <motion.button 
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold shadow-lg transition-all border bg-white dark:bg-slate-800 text-cyan-600 border-slate-200 dark:border-white/10 hover:bg-cyan-50" 
+                                onClick={handleCopyHtml}
+                            >
                                 {hasCopied === 'COPIED!' ? <CheckCircle2 size={18} /> : <Code size={18} />}
                                     <span>{hasCopied === 'COPIED!' ? 'Copied!' : 'Copy HTML'}</span>
-                            </button>
-
+                            </motion.button>
+ 
                             <div className="relative">
-                                <button 
+                                <motion.button 
                                     ref={signatureButtonRef}
+                                    whileHover={{ scale: 1.04 }}
+                                    whileTap={{ scale: 0.96 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                     onClick={toggleSignatureControls} 
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold shadow-lg transition-all border ${showSignatureControls ? 'bg-cyan-500 text-white border-cyan-400' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-white/10'}`}
                                 >
                                     <SlidersHorizontal size={18} />
                                     <span>Signature Options</span>
-                                </button>
+                                </motion.button>
                                 
-                                {showSignatureControls && (
-                                    <div 
-                                        ref={popupRef}
-                                        onWheel={(e) => e.stopPropagation()}
-                                        className="signature-controls absolute mt-4 w-[340px] bg-white dark:bg-[#121212] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-                                        style={{ right: 0 }}
-                                    >
-                                        <div className="p-5 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+                                <AnimatePresence>
+                                    {showSignatureControls && (
+                                        <motion.div 
+                                            ref={popupRef}
+                                            onWheel={(e) => e.stopPropagation()}
+                                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                            className="signature-controls absolute mt-4 w-[340px] bg-white dark:bg-[#121212] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden"
+                                            style={{ right: 0 }}
+                                        >
+                                            <div className="p-5 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
                                             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><Link2 size={18} className="text-cyan-500"/> Social Links</h3>
                                             <button onClick={() => setShowSignatureControls(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white"><X size={18}/></button>
                                         </div>
@@ -2988,14 +3527,20 @@ export default function App() {
                                                 </p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 )}
+                                </AnimatePresence>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
                     
                     {isNewProvider && (
-                        <div className="absolute top-6 right-8 z-30 flex flex-col gap-2 items-end">
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                            className="absolute top-6 right-8 z-30 flex flex-col gap-2 items-end"
+                        >
                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-2 shadow-xl flex flex-col gap-2">
                                 <span className="text-[10px] uppercase font-bold text-white/50 px-2 pt-1">Format</span>
                                 <div className="grid grid-cols-2 gap-1">
@@ -3007,35 +3552,46 @@ export default function App() {
                                         { id: 'pr-small', label: 'PR Small', icon: RectangleHorizontal },
                                         { id: 'pr-large', label: 'PR Large', icon: RectangleHorizontal },
                                     ].map(fmt => (
-                                        <button 
+                                        <motion.button 
                                             key={fmt.id}
+                                            whileHover={{ scale: 1.04 }}
+                                            whileTap={{ scale: 0.96 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                             onClick={() => setProviderFormat(fmt.id as ProviderFormat)}
-                                            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${providerFormat === fmt.id ? 'bg-cyan-500 text-white' : 'hover:bg-white/10 text-slate-300'}`}
+                                            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${providerFormat === fmt.id ? 'bg-cyan-500 text-white shadow-lg' : 'hover:bg-white/10 text-slate-300'}`}
                                         >
                                             <fmt.icon size={14} />
                                             {fmt.label}
-                                        </button>
+                                        </motion.button>
                                     ))}
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
                     {(!isPresentation && !isSignature && !isNewProvider) && (
-                        <div className="absolute top-6 right-8 z-30 flex gap-2">
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                            className="absolute top-6 right-8 z-30 flex gap-2"
+                        >
                             {/* MODO MENSAL TOGGLE (Only for Birthday) */}
                             {selectedTemplate === TemplateType.BIRTHDAY && (
                                 <div className="flex gap-2">
                                     {isMonthView && (
                                         <>
-                                            <button 
+                                            <motion.button 
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                                 onClick={handleBatchExport}
                                                 disabled={isDownloading || filteredEmployees.length === 0}
                                                 className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-1 rounded-full shadow-xl flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Download size={14} />
                                                 Exportar Lote (ZIP)
-                                            </button>
+                                            </motion.button>
                                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-[10px] font-bold text-white uppercase leading-none">Apenas Nomes</span>
@@ -3079,13 +3635,16 @@ export default function App() {
                             {!isPresentation && (
                                 <div className="relative">
                                     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
-                                        <button 
+                                        <motion.button 
+                                            whileHover={{ scale: 1.04 }}
+                                            whileTap={{ scale: 0.96 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                             onClick={() => setShowExportDropdown(!showExportDropdown)}
                                             className="px-3 w-[84px] justify-between h-full rounded-full flex items-center text-white text-[10px] tracking-wider font-bold hover:bg-white/20 transition-all"
                                         >
                                             <span>{exportFormat.toUpperCase()}</span>
                                             <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
-                                        </button>
+                                        </motion.button>
                                     </div>
                                     
                                     <AnimatePresence>
@@ -3098,16 +3657,18 @@ export default function App() {
                                                 className="absolute top-full mt-2 right-0 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 w-24"
                                             >
                                                 {(['png', 'jpeg', 'pdf'] as const).map(fmt => (
-                                                    <button
+                                                    <motion.button
                                                         key={fmt}
+                                                        whileHover={{ x: 4, backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+                                                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                                         onClick={() => {
                                                             setExportFormat(fmt);
                                                             setShowExportDropdown(false);
                                                         }}
-                                                        className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors ${exportFormat === fmt ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                        className={`w-full text-left px-4 py-2 text-xs font-bold transition-all ${exportFormat === fmt ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300'}`}
                                                     >
                                                         {fmt.toUpperCase()}
-                                                    </button>
+                                                    </motion.button>
                                                 ))}
                                             </motion.div>
                                         )}
@@ -3115,40 +3676,97 @@ export default function App() {
                                 </div>
                             )}
 
-                            {/* LANGUAGE SWITCHER */}
-                            {selectedTemplate !== TemplateType.HIRING && (
-                                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
-                                    {(['en', 'pt', 'es'] as Language[]).map((lang) => (
-                                        <button
-                                            key={lang}
-                                            onClick={() => setLanguage(lang)}
-                                            className={`w-9 h-full rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                            {/* LOGO SELECTOR OR LANGUAGE SWITCHER */}
+                            {selectedTemplate === TemplateType.ACTIVATION ? (
+                                <div className="relative">
+                                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
+                                        <motion.button 
+                                            whileHover={{ scale: 1.04 }}
+                                            whileTap={{ scale: 0.96 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                            onClick={() => setShowLogoDropdown(!showLogoDropdown)}
+                                            className="px-3.5 py-2 w-[125px] justify-between h-full rounded-full flex items-center hover:bg-white/20 transition-all gap-2"
                                         >
-                                            {lang}
-                                        </button>
-                                    ))}
+                                            <div className="w-18 h-5 flex items-center justify-center shrink-0">
+                                                <SalsaLogo variant="light" brand={selectedEmployee?.activationLogo || 'technology'} className="w-full h-full object-contain" />
+                                            </div>
+                                            <ChevronDown size={14} className={`text-white/70 shrink-0 transition-transform ${showLogoDropdown ? 'rotate-180' : ''}`} />
+                                        </motion.button>
+                                    </div>
+                                    
+                                    <AnimatePresence>
+                                        {showLogoDropdown && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                transition={{ duration: 0.15 }}
+                                                className="absolute top-full mt-2 left-0 right-0 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 p-1 flex flex-col gap-0.5"
+                                            >
+                                                {(['technology', 'studio', 'omni', 'gator', 'consulting'] as const).map(brand => (
+                                                    <motion.button
+                                                        key={brand}
+                                                        whileHover={{ scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
+                                                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                                        onClick={() => {
+                                                            updateEmployee(selectedEmployee.id, 'activationLogo', brand);
+                                                            setShowLogoDropdown(false);
+                                                        }}
+                                                        className={`w-full rounded-xl transition-all flex items-center justify-center px-2 py-2 ${selectedEmployee?.activationLogo === brand || (brand === 'technology' && !selectedEmployee?.activationLogo) ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300'}`}
+                                                    >
+                                                        <div className="w-16 h-5 flex items-center justify-center shrink-0">
+                                                            <SalsaLogo variant="light" brand={brand} className="w-full h-full object-contain" />
+                                                        </div>
+                                                    </motion.button>
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
+                            ) : (
+                                selectedTemplate !== TemplateType.HIRING && (
+                                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
+                                        {(['en', 'pt', 'es'] as Language[]).map((lang) => (
+                                            <motion.button
+                                                key={lang}
+                                                whileHover={{ scale: 1.08 }}
+                                                whileTap={{ scale: 0.92 }}
+                                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                                onClick={() => setLanguage(lang)}
+                                                className={`w-9 h-full rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                            >
+                                                {lang}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                )
                             )}
 
                             {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full p-1 shadow-xl flex items-center h-[44px]">
-                                    <button 
+                                    <motion.button 
+                                        whileHover={{ scale: 1.08 }}
+                                        whileTap={{ scale: 0.92 }}
+                                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                         onClick={() => handleOrientationChange('portrait')} 
                                         className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         title="Portrait"
                                     >
                                         <RectangleVertical size={18} />
-                                    </button>
-                                    <button 
+                                    </motion.button>
+                                    <motion.button 
+                                        whileHover={{ scale: 1.08 }}
+                                        whileTap={{ scale: 0.92 }}
+                                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                         onClick={() => handleOrientationChange('landscape')} 
                                         className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                         title="Landscape"
                                     >
                                         <RectangleHorizontal size={18} />
-                                    </button>
+                                    </motion.button>
                                 </div>
                             )}
-                        </div>
+                        </motion.div>
                     )}
 
                 </div>

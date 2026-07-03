@@ -17,6 +17,9 @@ export interface Employee {
     linkedin?: string;
     instagram?: string;
     twitter?: string;
+    email?: string;
+    phone?: string;
+    skills?: string[];
   };
   department?: string; // Department/Team
   status?: 'Active' | 'Inactive' | 'On Leave'; // Employment Status
@@ -42,6 +45,7 @@ export interface Employee {
     role?: { x: number, y: number, scale: number };
     department?: { x: number, y: number, scale: number };
   };
+  activationLogo?: 'technology' | 'studio' | 'omni' | 'gator' | 'consulting';
 }
 
 export interface ChecklistItem {
@@ -79,7 +83,8 @@ export enum TemplateType {
   PRESENTATION = 'Presentation Slide',
   NEW_PROVIDER = 'New Provider', // New Template
   HIRING = 'Hiring',
-  BABY = 'Baby'
+  BABY = 'Baby',
+  ACTIVATION = 'General Disclosure'
 }
 
 export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-story' | 'banner-small' | 'banner-large';
@@ -121,6 +126,7 @@ export interface SlideElement {
   content: string; // Text content or Image URL
   children?: SlideElement[]; // For Grouping
   chartData?: ChartData; // For Charts
+  maskedBy?: string; // ID of the shape element masking/clipping this element
   style: {
     fontFamily?: string;
     fontWeight?: '300' | '400' | '700' | '900' | 'normal' | 'bold';
@@ -133,7 +139,7 @@ export interface SlideElement {
     textTransform?: 'uppercase' | 'none' | 'capitalize'; // Added for Akira style
     letterSpacing?: string; // Added for Akira style
     lineHeight?: number; // Added for text line height
-    variant?: 'sphere' | 'box' | 'triangle' | 'star' | 'arrow_right' | 'line' | 'pie'; // Extended Shapes including Pie
+    variant?: 'sphere' | 'box' | 'triangle' | 'star' | 'arrow_right' | 'line' | 'pie' | 'vector'; // Extended Shapes including Pie and Custom Vectors
     gradient?: string; // For shapes
     filter?: string; // NEW: Supports 'grayscale(100%)' etc.
     border?: string; // NEW: Supports borders

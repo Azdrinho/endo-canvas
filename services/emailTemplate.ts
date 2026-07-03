@@ -1,7 +1,7 @@
 // ... existing imports ... (I will include the whole file context for the function replacement if needed, but since I am replacing a function, I need to match the file structure carefully or just replace the function body if I can match context. The tool requires full file content usually if it's not a patch. But the prompt instructions say: "ONLY return the xml in the above format... To update files, you must output the following XML... content: Full content of file_1". Okay, I must return the FULL content of the file.)
 
 import { Employee, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat } from '../types';
-import { LOGO_CONTENT } from '../components/SalsaLogo';
+import { LOGO_CONTENT, LOGO_TECHNOLOGY, LOGO_STUDIO, LOGO_OMNI, LOGO_GATOR, LOGO_CONSULTING } from '../components/SalsaLogo';
 
 // --- STYLES ---
 
@@ -1240,15 +1240,40 @@ const generateLandscapeTemplate = (
     : employee.dateStr.toUpperCase().replace(/\s/g, '<br/>');
 
   const nameLen = employee.name.length;
+  // Scientific text fitting based on canvas.measureText for precise size calculation
   let nameFontSize = '24px';
-  if (nameLen > 15) nameFontSize = '20px';
-  if (nameLen > 22) nameFontSize = '18px';
-  if (nameLen > 28) nameFontSize = '16px';
-  if (nameLen > 35) nameFontSize = '14px';
-
   const nameParts = employee.name.split(' ');
   const firstName = nameParts[0] || '';
   const restName = nameParts.slice(1).join(' ') || '';
+
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        let size = 24;
+        const maxFrameW = sphereVariant === 'welcome' ? 220 : 175;
+        while (size > 10) {
+          ctx.font = `700 ${size}px 'Orkney', 'Inter', sans-serif`;
+          const w1 = ctx.measureText(firstName).width;
+          const w2 = ctx.measureText(restName).width;
+          if (Math.max(w1, w2) <= maxFrameW) {
+            break;
+          }
+          size -= 0.5;
+        }
+        nameFontSize = `${size}px`;
+      }
+    } catch (e) {
+      console.warn("Scientific name fitting failed in generateLandscapeTemplate, fallback to char approximation", e);
+    }
+  } else {
+    if (nameLen > 15) nameFontSize = '20px';
+    if (nameLen > 22) nameFontSize = '18px';
+    if (nameLen > 28) nameFontSize = '16px';
+    if (nameLen > 35) nameFontSize = '14px';
+  }
+
   const cleanLabel = bottomTextHtml.replace(/<[^>]*>?/gm, '');
   const maxLineLen = Math.max(firstName.length, restName.length);
   const collisionScore = maxLineLen + (cleanLabel.length * 0.6);
@@ -1347,15 +1372,40 @@ const generatePortraitTemplate = (
     : employee.dateStr.toUpperCase().replace(/\s/g, '<br/>');
 
   const nameLen = employee.name.length;
+  // Scientific text fitting based on canvas.measureText for precise size calculation
   let nameFontSize = '24px';
-  if (nameLen > 15) nameFontSize = '20px';
-  if (nameLen > 22) nameFontSize = '18px';
-  if (nameLen > 28) nameFontSize = '16px';
-  if (nameLen > 35) nameFontSize = '14px';
-
   const nameParts = employee.name.split(' ');
   const firstName = nameParts[0] || '';
   const restName = nameParts.slice(1).join(' ') || '';
+
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        let size = 24;
+        const maxFrameW = sphereVariant === 'welcome' ? 220 : 175;
+        while (size > 10) {
+          ctx.font = `700 ${size}px 'Orkney', 'Inter', sans-serif`;
+          const w1 = ctx.measureText(firstName).width;
+          const w2 = ctx.measureText(restName).width;
+          if (Math.max(w1, w2) <= maxFrameW) {
+            break;
+          }
+          size -= 0.5;
+        }
+        nameFontSize = `${size}px`;
+      }
+    } catch (e) {
+      console.warn("Scientific name fitting failed in generatePortraitTemplate, fallback to char approximation", e);
+    }
+  } else {
+    if (nameLen > 15) nameFontSize = '20px';
+    if (nameLen > 22) nameFontSize = '18px';
+    if (nameLen > 28) nameFontSize = '16px';
+    if (nameLen > 35) nameFontSize = '14px';
+  }
+
   const cleanLabel = bottomTextHtml.replace(/<[^>]*>?/gm, '');
   const maxLineLen = Math.max(firstName.length, restName.length);
   const collisionScore = maxLineLen + (cleanLabel.length * 0.6);
@@ -1702,8 +1752,155 @@ export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, l
        </div>
 
        <!-- Right Side (Image) -->
-       <div style="width: 45%; height: 100%; position: relative; z-index: 5; background: #f1f1f1; overflow: hidden;">
+       <div style="width: 45%; height: 100%; position: relative; z-index: 5; background: #ffffff; overflow: hidden;">
           <img src="${employee.photoUrl || 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />
+       </div>
+    </div>
+  `;
+};
+
+export const generateActivationTemplate = (employee: Employee): string => {
+  const cardWidth = 1200;
+  const cardHeight = 800;
+  const wordmark = (employee.name || 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?').trim();
+  const numberText = (employee.role || '1').trim();
+
+  // Support for joystick position and scale slider
+  const scale = employee.photoScale || 1;
+  const posX = employee.photoPosition?.x || 0;
+  // Apply a base offset of -110px to perfectly center the 3:2 background image in the visible top area (above the 320px footer)
+  const posY = (employee.photoPosition?.y || 0) - 110;
+
+  // Dynamically select brand gradient and logo content
+  const brand = (employee.activationLogo || 'technology') as string;
+  let gradientStart = '#55cbd7';
+  let gradientEnd = '#573b8d';
+  let brandLogoContent = LOGO_TECHNOLOGY;
+
+  if (brand === 'studio') {
+    gradientStart = '#e84e6f'; // Salsa Studio stripe/sphere colors
+    gradientEnd = '#f4becf';
+    brandLogoContent = LOGO_STUDIO;
+  } else if (brand === 'omni' || brand === 'safe') {
+    gradientStart = '#6813a5'; // Salsa Omni stripe/sphere colors
+    gradientEnd = '#cb9ff7';
+    brandLogoContent = LOGO_OMNI;
+  } else if (brand === 'gator') {
+    gradientStart = '#0d2b2a'; // Salsa Gator stripe/sphere colors
+    gradientEnd = '#13694a';
+    brandLogoContent = LOGO_GATOR;
+  } else if (brand === 'consulting') {
+    gradientStart = '#e6ab3e'; // Salsa Consulting stripe/sphere colors
+    gradientEnd = '#fcd8a9';
+    brandLogoContent = LOGO_CONSULTING;
+  }
+
+  // Local unique SVG helper to guarantee no ID collisions
+  const makeUniqueSvg = (svgString: string, uniqueId: string): string => {
+    let result = svgString.replace(/\bid=["']([^"']+)["']/g, (match, idVal) => {
+      return `id="${idVal}_${uniqueId}"`;
+    });
+    result = result.replace(/url\(\s*#([^)]+)\s*\)/g, (match, idVal) => {
+      return `url(#${idVal}_${uniqueId})`;
+    });
+    result = result.replace(/(href|xlink:href)=["']#([^"']+)["']/g, (match, attr, idVal) => {
+      return `${attr}="#${idVal}_${uniqueId}"`;
+    });
+    return result;
+  };
+
+  const uniqueId = Math.random().toString(36).substring(2, 9);
+  const finalLogoContent = makeUniqueSvg(brandLogoContent, uniqueId);
+
+  // Intelligent layout and sizing algorithm to maintain identical large font size up to 3 wrapped or manual lines
+  const textLength = wordmark.length;
+  const manualLines = wordmark.split(/<br\s*\/?>|\r?\n/i).length;
+  // Around 32 characters fit on a single line at 52px inside the 1000px content box
+  const wrappedLines = Math.ceil(textLength / 32);
+  const estimatedLines = Math.max(manualLines, wrappedLines);
+
+  let fontSize = 52;
+  let letterSpacing = '1.5px';
+  let lineHeight = '1.15';
+
+  if (estimatedLines <= 3) {
+    // Keep it exactly at 52px for up to 3 lines
+    fontSize = 52;
+    letterSpacing = '1.5px';
+    lineHeight = '1.15';
+  } else if (estimatedLines === 4) {
+    // Shrink slightly if it reaches 4 lines
+    fontSize = 44;
+    letterSpacing = '1.2px';
+    lineHeight = '1.15';
+  } else {
+    // For extreme lengths, keep it relatively large and readable, never shrinking too much
+    fontSize = 38;
+    letterSpacing = '1px';
+    lineHeight = '1.15';
+  }
+
+  const leftDotGrid = `
+    <svg style="position: absolute; top: 40px; left: 40px; width: 120px; height: 120px; opacity: 0.25; z-index: 5;" viewBox="0 0 120 120">
+      <defs>
+        <pattern id="dot-grid-left" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+          <circle cx="3" cy="3" r="2.5" fill="#ffffff" />
+        </pattern>
+      </defs>
+      <rect width="120" height="120" fill="url(#dot-grid-left)" />
+    </svg>
+  `;
+
+  const rightDotGrid = `
+    <svg style="position: absolute; bottom: 350px; right: 40px; width: 120px; height: 120px; opacity: 0.25; z-index: 5;" viewBox="0 0 120 120">
+      <defs>
+        <pattern id="dot-grid-right" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+          <circle cx="3" cy="3" r="2.5" fill="#ffffff" />
+        </pattern>
+      </defs>
+      <rect width="120" height="120" fill="url(#dot-grid-right)" />
+    </svg>
+  `;
+
+  return `
+    <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: #121212; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; font-family: 'Orkney', sans-serif;">
+       
+       <!-- Background Image -->
+       ${employee.photoUrl ? `
+       <img src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1; pointer-events: none;" />
+       ` : ''}
+
+       <!-- Dots patterns -->
+       ${leftDotGrid}
+       ${rightDotGrid}
+
+       <!-- Logo at Top Right -->
+       <div style="position: absolute; top: 40px; right: 45px; width: 200px; height: auto; z-index: 50;">
+         <svg viewBox="0 -10 1000 380" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="width: 100%; height: 100%; pointer-events: none; fill: #ffffff;">
+           ${finalLogoContent}
+         </svg>
+       </div>
+
+       <!-- Circle containing the number (positioned exactly on the top border of the footer) -->
+       <div style="position: absolute; bottom: 293px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; z-index: 60;">
+          <div contenteditable="true" data-field="role" style="width: 54px; height: 54px; border: 2px solid ${gradientStart}; background-color: #121212; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Orkney Light', 'Orkney', sans-serif; font-weight: 300; font-size: 24px; color: ${gradientStart}; outline: none; user-select: text; cursor: text; pointer-events: auto; white-space: nowrap; line-height: 1;">
+            ${numberText}
+          </div>
+       </div>
+
+       <!-- Bottom Section (Gradient footer) -->
+       <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 320px; background: ${gradientEnd}; background-image: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 30px 40px 30px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 10;">
+          
+          <!-- Sphere (Crisp circle with gradient matching Figma specifications) -->
+          <div style="position: absolute; width: 1000px; height: 1000px; border-radius: 50%; left: -470px; top: -100px; background: linear-gradient(135deg, ${gradientStart} 0%, ${gradientEnd} 100%); z-index: 1; pointer-events: none;"></div>
+
+          <!-- Main Text -->
+          <div style="width: 100%; max-width: 1000px; text-align: center; position: relative; z-index: 10; padding-top: 0px;">
+             <div contenteditable="true" data-field="name" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: ${fontSize}px; letter-spacing: ${letterSpacing}; color: white; text-transform: uppercase; margin: 0; line-height: ${lineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
+               ${wordmark}
+             </div>
+          </div>
+
        </div>
     </div>
   `;
@@ -1718,7 +1915,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
   const roleText = (employee.role || 'Account Manager').trim();
   let initialFontSize = 24;
   if (roleText.length > 24) {
-    initialFontSize = Math.max(10, Math.min(24, Math.floor(550 / roleText.length)));
+    initialFontSize = Math.max(13, Math.min(24, Math.floor(750 / roleText.length)));
   }
 
   return `
@@ -1916,12 +2113,37 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           const ARROW_DOWN_SVG = `<svg width="18" height="18" viewBox="0 0 270 270" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(41, 41) rotate(225 94.1 94.2)"><polygon points="165.23 0 165.23 50.7 87.09 50.7 188.21 152.7 152.4 188.48 50.7 87.09 50.7 165.23 0 165.23 0 0 165.23 0" fill="#ffffff"/></g></svg>`;
 
           let newRoleFontSize = '20px';
-          const len = newRole.length;
-          
-          if (len > 10) newRoleFontSize = '18px';
-          if (len > 18) newRoleFontSize = '15px';
-          if (len > 28) newRoleFontSize = '13px';
-          if (len > 40) newRoleFontSize = '11px';
+          if (typeof document !== 'undefined') {
+            try {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                let size = 20;
+                while (size > 9) {
+                  ctx.font = `700 ${size}px 'Orkney', 'Inter', sans-serif`;
+                  if (ctx.measureText(newRole).width <= 210) {
+                    break;
+                  }
+                  size -= 0.5;
+                }
+                newRoleFontSize = `${size}px`;
+              }
+            } catch (err) {
+              console.warn("Scientific fitting for newRole failed, falling back to char approximation", err);
+              const len = newRole.length;
+              if (len > 10) newRoleFontSize = '18px';
+              if (len > 18) newRoleFontSize = '15px';
+              if (len > 28) newRoleFontSize = '13px';
+              if (len > 40) newRoleFontSize = '11px';
+            }
+          } else {
+            const len = newRole.length;
+            if (len > 10) newRoleFontSize = '18px';
+            if (len > 18) newRoleFontSize = '15px';
+            if (len > 28) newRoleFontSize = '13px';
+            if (len > 40) newRoleFontSize = '11px';
+          }
+
 
           const changeLabelHtml = `
             <div style="display: flex; flex-direction: column; width: 100%;">
@@ -1972,6 +2194,10 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
 
         case TemplateType.BABY:
           cardHtml = generateBabyTemplate(employee, config, language);
+          break;
+
+        case TemplateType.ACTIVATION:
+          cardHtml = generateActivationTemplate(employee);
           break;
 
         default:

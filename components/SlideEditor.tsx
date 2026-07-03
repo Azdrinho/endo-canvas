@@ -6,12 +6,105 @@ import {
   Star, Minus, Search, Lock, Unlock, FileText, CheckSquare, RefreshCw, Layers as LayersIcon,
   Download, Sliders, Shield, Printer, Check, Circle, AlertCircle, PenTool, Highlighter,
   Underline, Upload, FolderOpen, Table, MessageSquare, MoreHorizontal, LayoutGrid, Scissors, Globe,
-  Smartphone, Instagram, Info, Link, Link2, Layers, Clock, PlusSquare, Eraser, Crop, Pin} from 'lucide-react';
+  Smartphone, Instagram, Info, Link, Link2, Layers, Clock, PlusSquare, Eraser, Crop, Pin, Presentation, Play} from 'lucide-react';
 import { Slide, SlideElement } from '../types';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import html2canvas from 'html2canvas';
+
+// --- GLOBAL CUSTOM FONT UTILITIES & MEMORY CACHE ---
+const fontCache: { [key: string]: string } = {};
+
+const fetchFontAsBase64 = async (urlOrUrls: string | string[]): Promise<string> => {
+  const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
+  let lastError: any = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    } catch (err) {
+      console.warn(`Failed to fetch font from ${url}:`, err);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('No valid URL provided');
+};
+
+const loadFontToVfs = async (doc: any, fontName: string, fontStyle: string, url: string | string[], filename: string) => {
+  const cacheKey = `${fontName}-${fontStyle}`;
+  try {
+    let base64 = fontCache[cacheKey];
+    if (!base64) {
+      base64 = await fetchFontAsBase64(url);
+      fontCache[cacheKey] = base64;
+    }
+    doc.addFileToVFS(filename, base64);
+    doc.addFont(filename, fontName, fontStyle);
+  } catch (err) {
+    console.error(`Failed to load font ${fontName} (${fontStyle}):`, err);
+  }
+};
+
+const FONT_URLS: { [key: string]: { regular: string | string[]; bold?: string | string[]; light?: string | string[]; medium?: string | string[] } } = {
+  'inter': {
+    regular: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZhrib2Bg-4.ttf',
+    bold: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fMZhrib2Bg-4.ttf'
+  },
+  'space grotesk': {
+    regular: 'https://fonts.gstatic.com/s/spacegrotesk/v13/V8mDoQDjQSkFtoMM3T6r8E79F75pPKIu02g.ttf',
+    bold: 'https://fonts.gstatic.com/s/spacegrotesk/v13/V8mDoQDjQSkFtoMM3T6r8E79F75pPKIuxGg.ttf'
+  },
+  'jetbrains mono': {
+    regular: 'https://fonts.gstatic.com/s/jetbrainsmono/v18/t6qY3r92MXPhuX6E2shmFf9VAt8.ttf',
+    bold: 'https://fonts.gstatic.com/s/jetbrainsmono/v18/t6qY3r92MXPhuX6E2shmFf9VAt8VMA.ttf'
+  },
+  'playfair display': {
+    regular: 'https://fonts.gstatic.com/s/playfairdisplay/v37/nuFvD-vYSZ27K1_K_NPGKb_O_L2HZU5_XW3OWY_8.ttf',
+    bold: 'https://fonts.gstatic.com/s/playfairdisplay/v37/nuFvD-vYSZ27K1_K_NPGKb_O_L2HZU5_XW3OWUv8.ttf'
+  },
+  'montserrat': {
+    regular: 'https://fonts.gstatic.com/s/montserrat/v25/JTUHjIg1_i6t8kCHKm4MV96RxZY8.ttf',
+    bold: 'https://fonts.gstatic.com/s/montserrat/v25/JTUHjIg1_i6t8kCHKm4MV96RxYY8.ttf'
+  },
+  'orkney': {
+    light: [
+      'https://db.onlinewebfonts.com/t/6ac09869bcd949ed727771cfba1ea124.ttf',
+      'https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/e312fbe98717cc43f339cfdfc63e2714/OrkneyLight.otf'
+    ],
+    regular: [
+      'https://cdn.jsdelivr.net/gh/brazil-gringo/ponto-de-partida@master/app/assets/fonts/Orkney-Regular.ttf',
+      'https://db.onlinewebfonts.com/t/1aab5ed24c6a9f95b69de27350a83559.ttf',
+      'https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/79dfef230a8a6bebc2db8416d80dff80/OrkneyRegular.otf'
+    ],
+    medium: [
+      'https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/844781ca8c8cbebc2db8416d80dff80/OrkneyMedium.otf'
+    ],
+    bold: [
+      'https://cdn.jsdelivr.net/gh/brazil-gringo/ponto-de-partida@master/app/assets/fonts/Orkney-Bold.ttf',
+      'https://db.onlinewebfonts.com/t/393278564a51e60f06a099a531631e7c.ttf',
+      'https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/f311fbe94717cc43f339cfdfc63e2714/OrkneyBold.otf'
+    ]
+  }
+};
+
+const normalizeFontFamily = (familyStr: string): string => {
+  if (!familyStr) return 'inter';
+  return familyStr
+    .replace(/['"]/g, '')   // strip all quotes
+    .split(',')[0]          // get the first font before comma
+    .trim()                 // trim whitespace
+    .toLowerCase();         // convert to lowercase
+};
 
 interface SlideEditorProps {
   slides: Slide[];
@@ -30,11 +123,24 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 }) => {
   // --- APPLICATION ENVIRONMENT & WORKSPACE STATES ---
   const [editMode, setEditMode] = useState<'EDIT' | 'LIVE_FILL'>('EDIT');
-  const [zoom, setZoom] = useState<number>(0.85);
-  const [pageSizeType, setPageSizeType] = useState<'A4' | 'LETTER' | 'A3' | 'SLIDE_16_9' | 'CUSTOM'>('A4');
+  const [zoom, setZoom] = useState<number>(0.75);
+  const [pageSizeType, setPageSizeType] = useState<'A4' | 'LETTER' | 'A3' | 'SLIDE_16_9' | 'CUSTOM'>('SLIDE_16_9');
   const [customWidth, setCustomWidth] = useState<number>(840);
   const [customHeight, setCustomHeight] = useState<number>(1188);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // --- MODO DE APRESENTAÇÃO DE SLIDES (ESTILO POWERPOINT) ---
+  const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
+  const [presentationSlideIndex, setPresentationSlideIndex] = useState<number>(0);
+  const [presentationLaserActive, setPresentationLaserActive] = useState<boolean>(false);
+  const [presentationPenActive, setPresentationPenActive] = useState<boolean>(false);
+  const [presentationHighlighterActive, setPresentationHighlighterActive] = useState<boolean>(false);
+  const [presentationPenColor, setPresentationPenColor] = useState<string>('#ef4444');
+  const [presentationLaserPos, setPresentationLaserPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [presentationDrawings, setPresentationDrawings] = useState<Record<number, { points: { x: number; y: number }[]; color: string; width: number }[]>>({});
+  const [currentDrawingPoints, setCurrentDrawingPoints] = useState<{ x: number; y: number }[]>([]);
+  const [isPresentationDrawing, setIsPresentationDrawing] = useState<boolean>(false);
+  const [presentationDimensions, setPresentationDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
 
   const getPageDimensions = () => {
     switch (pageSizeType) {
@@ -117,6 +223,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [clipboard, setClipboard] = useState<any[]>([]);
   const [copiedStyle, setCopiedStyle] = useState<any>(null);
   const [activeThumbnailMenuIndex, setActiveThumbnailMenuIndex] = useState<number | null>(null);
+  const [thumbnailMenuPosition, setThumbnailMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [draggedSlideIndex, setDraggedSlideIndex] = useState<number | null>(null);
+  const [dragOverSlideIndex, setDragOverSlideIndex] = useState<number | null>(null);
   const [actionHistory, setActionHistory] = useState<{ description: string; timestamp: Date }[]>([
     { description: 'Criação do documento', timestamp: new Date() }
   ]);
@@ -682,6 +791,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   // --- KEYBOARD SHORTCUTS ENGINE ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isPresentationMode) return;
+
       const isTyping = document.activeElement && (
         document.activeElement.tagName === 'INPUT' || 
         document.activeElement.tagName === 'TEXTAREA' ||
@@ -873,7 +984,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedIds, clipboard, currentSlide, currentSlideIndex, slides, copiedStyle, croppingImageId]);
+  }, [selectedIds, clipboard, currentSlide, currentSlideIndex, slides, copiedStyle, croppingImageId, isPresentationMode]);
 
   // --- PAGES MANAGEMENT CODE ---
   const addPage = () => {
@@ -1039,6 +1150,16 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     triggerUpdate(nextSlides);
     onSelectSlide(Math.max(0, index - 1));
     toast.success(`Página ${index + 1} removida!`);
+  };
+
+  const handleReorderSlides = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= slides.length || toIndex < 0 || toIndex >= slides.length) return;
+    const nextSlides = [...slides];
+    const [removed] = nextSlides.splice(fromIndex, 1);
+    nextSlides.splice(toIndex, 0, removed);
+    triggerUpdate(nextSlides, 'Reordenar página');
+    onSelectSlide(toIndex);
+    toast.success(`Ordem da página ajustada!`);
   };
 
   const processImageFileToWebp = (file: File, dropX: number, dropY: number, targetSlideIndex: number) => {
@@ -1426,12 +1547,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       if (resizeHandle.includes('e')) newW = Math.max(20, initialResizeDims.w + deltaX);
       if (resizeHandle.includes('s')) newH = Math.max(20, initialResizeDims.h + deltaY);
       if (resizeHandle.includes('w')) {
-        const dW = Math.max(-initialResizeDims.x, deltaX);
+        const dW = deltaX;
         newW = Math.max(20, initialResizeDims.w - dW);
         newX = initialResizeDims.x + dW;
       }
       if (resizeHandle.includes('n')) {
-        const dH = Math.max(-initialResizeDims.y, deltaY);
+        const dH = deltaY;
         newH = Math.max(20, initialResizeDims.h - dH);
         newY = initialResizeDims.y + dH;
       }
@@ -1496,8 +1617,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       });
 
       // Apply snap offset
-      const finalX = snappedX !== null ? snappedX : Math.max(0, targetX);
-      const finalY = snappedY !== null ? snappedY : Math.max(0, targetY);
+      const finalX = snappedX !== null ? snappedX : targetX;
+      const finalY = snappedY !== null ? snappedY : targetY;
 
       // Compute actual translation delta to apply to other selected elements proportionally
       const actualDeltaX = finalX - initialPos.x;
@@ -1520,8 +1641,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 if (initOffset) {
                   return {
                     ...item,
-                    x: Math.max(0, Math.round(initOffset.x + actualDeltaX)),
-                    y: Math.max(0, Math.round(initOffset.y + actualDeltaY))
+                    x: Math.round(initOffset.x + actualDeltaX),
+                    y: Math.round(initOffset.y + actualDeltaY)
                   };
                 }
               }
@@ -1748,6 +1869,394 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     toast.success('Assinado com Criptografia de Infraestrutura ICP-Brasil!');
   };
 
+  // Helper to ensure any image format (WebP, JPEG, PNG, or external URL) is a clean, CORS-friendly PNG Data URL for jsPDF
+  const ensurePngDataUrl = (content: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      if (!content) {
+        resolve(null);
+        return;
+      }
+      const img = new Image();
+      if (content.startsWith('http')) {
+        img.crossOrigin = 'anonymous';
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          const pngUrl = canvas.toDataURL('image/png');
+          resolve(pngUrl);
+        } catch (err) {
+          if (content.startsWith('data:image/webp')) {
+            resolve(null);
+          } else if (content.startsWith('data:')) {
+            resolve(content);
+          } else {
+            resolve(null);
+          }
+        }
+      };
+      img.onerror = () => {
+        if (content.startsWith('data:') && !content.startsWith('data:image/webp')) {
+          resolve(content);
+        } else {
+          resolve(null);
+        }
+      };
+      img.src = content;
+    });
+  };
+
+  // Parse colors (hex, rgb, rgba) cleanly to prevent jsPDF encodeColorString crashes
+  const parseColorToJsPdfColor = (colorStr: string): { r: number; g: number; b: number; alpha: number } => {
+    const result = { r: 0, g: 0, b: 0, alpha: 1 };
+    if (!colorStr) return result;
+    
+    colorStr = colorStr.trim().toLowerCase();
+    
+    if (colorStr.startsWith('rgba')) {
+      const match = colorStr.match(/rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+      if (match) {
+        result.r = parseInt(match[1], 10);
+        result.g = parseInt(match[2], 10);
+        result.b = parseInt(match[3], 10);
+        result.alpha = parseFloat(match[4]);
+      }
+    } else if (colorStr.startsWith('rgb')) {
+      const match = colorStr.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+      if (match) {
+        result.r = parseInt(match[1], 10);
+        result.g = parseInt(match[2], 10);
+        result.b = parseInt(match[3], 10);
+        result.alpha = 1;
+      }
+    } else if (colorStr.startsWith('#')) {
+      let hex = colorStr.substring(1);
+      if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      }
+      if (hex.length === 6) {
+        result.r = parseInt(hex.substring(0, 2), 16);
+        result.g = parseInt(hex.substring(2, 4), 16);
+        result.b = parseInt(hex.substring(4, 6), 16);
+        result.alpha = 1;
+      } else if (hex.length === 8) {
+        result.r = parseInt(hex.substring(0, 2), 16);
+        result.g = parseInt(hex.substring(2, 4), 16);
+        result.b = parseInt(hex.substring(4, 6), 16);
+        result.alpha = parseInt(hex.substring(6, 8), 16) / 255;
+      }
+    } else if (colorStr === 'transparent') {
+      result.alpha = 0;
+    } else {
+      try {
+        const tempDiv = document.createElement('div');
+        tempDiv.style.color = colorStr;
+        document.body.appendChild(tempDiv);
+        const computedColor = window.getComputedStyle(tempDiv).color;
+        document.body.removeChild(tempDiv);
+        const match = computedColor.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/);
+        if (match) {
+          result.r = parseInt(match[1], 10);
+          result.g = parseInt(match[2], 10);
+          result.b = parseInt(match[3], 10);
+          result.alpha = match[4] !== undefined ? parseFloat(match[4]) : 1;
+        }
+      } catch (e) {
+        if (colorStr === 'white') { result.r = 255; result.g = 255; result.b = 255; }
+        else if (colorStr === 'black') { result.r = 0; result.g = 0; result.b = 0; }
+        else if (colorStr === 'red') { result.r = 255; result.g = 0; result.b = 0; }
+        else if (colorStr === 'green') { result.r = 0; result.g = 255; result.b = 0; }
+        else if (colorStr === 'blue') { result.r = 0; result.g = 0; result.b = 255; }
+      }
+    }
+    return result;
+  };
+
+  const interpolateColor = (c1: {r: number, g: number, b: number}, c2: {r: number, g: number, b: number}, factor: number) => {
+    return {
+      r: Math.round(c1.r + (c2.r - c1.r) * factor),
+      g: Math.round(c1.g + (c2.g - c1.g) * factor),
+      b: Math.round(c1.b + (c2.b - c1.b) * factor)
+    };
+  };
+
+  const generateGradientDataUrl = (startColor: string, endColor: string, angle: number, width: number, height: number, isRadial: boolean = false) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, width * 2);
+      canvas.height = Math.max(1, height * 2);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      ctx.scale(2, 2);
+
+      let grad;
+      if (isRadial) {
+        grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
+      } else {
+        const alpha = (angle * Math.PI) / 180;
+        const dx = Math.sin(alpha);
+        const dy = -Math.cos(alpha);
+        const halfLen = (Math.abs(width * dx) + Math.abs(height * dy)) / 2;
+        
+        const x1 = width / 2 - dx * halfLen;
+        const y1 = height / 2 - dy * halfLen;
+        const x2 = width / 2 + dx * halfLen;
+        const y2 = height / 2 + dy * halfLen;
+
+        grad = ctx.createLinearGradient(x1, y1, x2, y2);
+      }
+      grad.addColorStop(0, startColor);
+      grad.addColorStop(1, endColor);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      return canvas.toDataURL('image/png');
+    } catch (e) {
+      console.error("Failed to generate gradient data URL:", e);
+      return null;
+    }
+  };
+
+  const generateShapeGradientDataUrl = (
+    startColor: string,
+    endColor: string,
+    angle: number,
+    width: number,
+    height: number,
+    isRadial: boolean = false,
+    borderRadius: number = 0,
+    isCircle: boolean = false
+  ) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, width * 2);
+      canvas.height = Math.max(1, height * 2);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      ctx.scale(2, 2);
+
+      ctx.beginPath();
+      if (isCircle) {
+        const radius = Math.min(width, height) / 2;
+        ctx.arc(width / 2, height / 2, radius, 0, Math.PI * 2);
+      } else if (borderRadius > 0) {
+        const r = Math.min(borderRadius, width / 2, height / 2);
+        ctx.roundRect(0, 0, width, height, r);
+      } else {
+        ctx.rect(0, 0, width, height);
+      }
+      ctx.clip();
+
+      let grad;
+      if (isRadial) {
+        grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
+      } else {
+        const alpha = (angle * Math.PI) / 180;
+        const dx = Math.sin(alpha);
+        const dy = -Math.cos(alpha);
+        const halfLen = (Math.abs(width * dx) + Math.abs(height * dy)) / 2;
+
+        const x1 = width / 2 - dx * halfLen;
+        const y1 = height / 2 - dy * halfLen;
+        const x2 = width / 2 + dx * halfLen;
+        const y2 = height / 2 + dy * halfLen;
+        grad = ctx.createLinearGradient(x1, y1, x2, y2);
+      }
+      grad.addColorStop(0, startColor);
+      grad.addColorStop(1, endColor);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      return canvas.toDataURL('image/png');
+    } catch (e) {
+      console.error("Failed to generate shape gradient data URL:", e);
+      return null;
+    }
+  };
+
+  const drawBackground = (doc: any, bg: string, width: number, height: number) => {
+    if (!bg) {
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, width, height, 'F');
+      return;
+    }
+    const trimmed = bg.trim();
+    if (trimmed.includes('gradient')) {
+      const isRadial = trimmed.includes('radial-gradient');
+      
+      const colorMatches = trimmed.match(/(rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}|[a-zA-Z]+)/g) || [];
+      const colors = colorMatches.filter(c => {
+        const l = c.toLowerCase();
+        return l.startsWith('#') || l.startsWith('rgb') || l.includes('deg') === false;
+      });
+
+      let startColor = '#1e293b';
+      let endColor = '#0f172a';
+      if (colors.length >= 2) {
+        startColor = colors[0];
+        endColor = colors[colors.length - 1];
+      } else if (colors.length === 1) {
+        startColor = colors[0];
+        endColor = colors[0];
+      }
+
+      let angle = 135;
+      const angleMatch = trimmed.match(/(\d+)deg/);
+      if (angleMatch) {
+        angle = parseInt(angleMatch[1], 10);
+      }
+
+      const gradImg = generateGradientDataUrl(startColor, endColor, angle, width, height, isRadial);
+      if (gradImg) {
+        doc.addImage(gradImg, 'PNG', 0, 0, width, height, undefined, 'FAST');
+      } else {
+        doc.setFillColor(30, 41, 59);
+        doc.rect(0, 0, width, height, 'F');
+      }
+      return;
+    }
+    
+    const col = parseColorToJsPdfColor(trimmed);
+    doc.setFillColor(col.r, col.g, col.b);
+    doc.rect(0, 0, width, height, 'F');
+  };
+
+  const drawShapeGradient = (doc: any, x: number, y: number, w: number, h: number, startColor: string, endColor: string, angle: number, borderRadius: number = 0, isCircle: boolean = false) => {
+    const gradImg = generateShapeGradientDataUrl(startColor, endColor, angle, w, h, false, borderRadius, isCircle);
+    if (gradImg) {
+      doc.addImage(gradImg, 'PNG', x, y, w, h, undefined, 'FAST');
+    } else {
+      const c1 = parseColorToJsPdfColor(startColor);
+      doc.setFillColor(c1.r, c1.g, c1.b);
+      if (isCircle) {
+        doc.roundedRect(x, y, w, h, w / 2, h / 2, 'F');
+      } else if (borderRadius > 0) {
+        doc.roundedRect(x, y, w, h, borderRadius, borderRadius, 'F');
+      } else {
+        doc.rect(x, y, w, h, 'F');
+      }
+    }
+  };
+
+  const drawSvgPathOnJsPdf = (doc: any, pathStr: string, startX: number, startY: number, w: number, h: number, fillColor: string, strokeColor?: string, strokeWidth?: number) => {
+    try {
+      doc.saveGraphicsState();
+      
+      const col = parseColorToJsPdfColor(fillColor || '#0284c7');
+      doc.setFillColor(col.r, col.g, col.b);
+      
+      if (strokeColor && strokeColor !== 'none') {
+        const sCol = parseColorToJsPdfColor(strokeColor);
+        doc.setStrokeColor(sCol.r, sCol.g, sCol.b);
+        if (strokeWidth !== undefined) {
+          doc.setLineWidth(strokeWidth * 0.708333);
+        }
+      }
+
+      // Regex to extract commands and coordinate lists
+      const pathCommandRegex = /([a-df-z]+)([^a-df-z]*)/gi;
+      let match;
+      
+      let currentX = startX;
+      let currentY = startY;
+      
+      // We assume the coordinates in the pathStr are scaled within 0 to 100 range.
+      const scaleX = w / 100;
+      const scaleY = h / 100;
+      
+      const styleStr = (strokeColor && strokeColor !== 'none') ? 'FD' : 'F';
+
+      while ((match = pathCommandRegex.exec(pathStr)) !== null) {
+        const cmd = match[1];
+        const argsStr = match[2].trim();
+        const nums = argsStr.split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+        
+        const uppercaseCmd = cmd.toUpperCase();
+        const isRelative = cmd !== uppercaseCmd;
+        
+        if (uppercaseCmd === 'M' && nums.length >= 2) {
+          let x = nums[0] * scaleX;
+          let y = nums[1] * scaleY;
+          if (isRelative) {
+            currentX += x;
+            currentY += y;
+          } else {
+            currentX = startX + x;
+            currentY = startY + y;
+          }
+          doc.moveTo(currentX, currentY);
+        } else if (uppercaseCmd === 'L' && nums.length >= 2) {
+          for (let k = 0; k < nums.length; k += 2) {
+            if (k + 1 < nums.length) {
+              let x = nums[k] * scaleX;
+              let y = nums[k + 1] * scaleY;
+              if (isRelative) {
+                currentX += x;
+                currentY += y;
+              } else {
+                currentX = startX + x;
+                currentY = startY + y;
+              }
+              doc.lineTo(currentX, currentY);
+            }
+          }
+        } else if (uppercaseCmd === 'C' && nums.length >= 6) {
+          for (let k = 0; k < nums.length; k += 6) {
+            if (k + 5 < nums.length) {
+              let cp1x = nums[k] * scaleX;
+              let cp1y = nums[k + 1] * scaleY;
+              let cp2x = nums[k + 2] * scaleX;
+              let cp2y = nums[k + 3] * scaleY;
+              let destX = nums[k + 4] * scaleX;
+              let destY = nums[k + 5] * scaleY;
+              
+              if (isRelative) {
+                cp1x += currentX;
+                cp1y += currentY;
+                cp2x += currentX;
+                cp2y += currentY;
+                destX += currentX;
+                destY += currentY;
+              } else {
+                cp1x = startX + cp1x;
+                cp1y = startY + cp1y;
+                cp2x = startX + cp2x;
+                cp2y = startY + cp2y;
+                destX = startX + destX;
+                destY = startY + destY;
+              }
+              
+              if (typeof doc.curveTo === 'function') {
+                doc.curveTo(cp1x, cp1y, cp2x, cp2y, destX, destY);
+              } else {
+                doc.lineTo(destX, destY);
+              }
+              currentX = destX;
+              currentY = destY;
+            }
+          }
+        } else if (uppercaseCmd === 'Z') {
+          doc.close();
+        }
+      }
+      
+      doc.fill(styleStr);
+      doc.restoreGraphicsState();
+    } catch (err) {
+      console.warn("Could not render vector path on jsPDF:", err);
+    }
+  };
+
   // --- DOCUMENT EXPORT CONVERSIONS ENGINE ---
   const executeConversion = async (format: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'jpeg') => {
     const toastId = toast.loading(`Compilando e convertendo documento para ${format.toUpperCase()}...`);
@@ -1770,56 +2279,268 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             creator: "Acrobat Secure Security Engine v3.0"
           });
         }
-        for (let i = 0; i < slides.length; i++) {
-          if (i > 0) doc.addPage([pdfWidth, pdfHeight], pdfOrientation);
-          const p = slides[i];
+
+        const scaleFac = 0.708333;
+
+         // Scan all slides for custom fonts
+        const usedFontFamilies = new Set<string>();
+        for (const p of slides) {
+          for (const el of p.elements) {
+            if (el.type === 'text') {
+              const family = normalizeFontFamily(el.style?.fontFamily || 'Inter');
+              if (family.includes('inter')) usedFontFamilies.add('inter');
+              else if (family.includes('space') || family.includes('grotesk')) usedFontFamilies.add('space grotesk');
+              else if (family.includes('jetbrains') || family.includes('mono')) usedFontFamilies.add('jetbrains mono');
+              else if (family.includes('playfair') || family.includes('display')) usedFontFamilies.add('playfair display');
+              else if (family.includes('montserrat')) usedFontFamilies.add('montserrat');
+              else if (family.includes('orkney')) usedFontFamilies.add('orkney');
+            }
+          }
+        }
+
+        // Load used custom fonts
+        for (const family of usedFontFamilies) {
+          const urls = FONT_URLS[family];
+          const nameMap: { [key: string]: string } = {
+            'inter': 'Inter',
+            'space grotesk': 'Space Grotesk',
+            'jetbrains mono': 'JetBrains Mono',
+            'playfair display': 'Playfair Display',
+            'montserrat': 'Montserrat',
+            'orkney': 'Orkney'
+          };
+          const fontName = nameMap[family] || family;
           
-          doc.setFillColor('#ffffff');
-          doc.rect(0, 0, pdfWidth, pdfHeight, 'F');
+          await loadFontToVfs(doc, fontName, 'normal', urls.regular, `${family}-regular.ttf`);
+          if (urls.bold) {
+            await loadFontToVfs(doc, fontName, 'bold', urls.bold, `${family}-bold.ttf`);
+          }
+          if (urls.light) {
+            await loadFontToVfs(doc, fontName, 'light', urls.light, `${family}-light.ttf`);
+          }
+          if (urls.medium) {
+            await loadFontToVfs(doc, fontName, 'medium', urls.medium, `${family}-medium.ttf`);
+          }
+        }
 
-          // Header Text
-          doc.setFontSize(10);
-          doc.setTextColor('#64748b');
-          doc.text(headerText, 30, 30);
-          doc.line(30, 35, pdfWidth - 30, 35);
+        // Save state to disable overlays
+        const prevSelectedIds = new Set(selectedIds);
+        const prevEditingTextId = editingTextId;
+        const prevMeasureModeActive = measureModeActive;
+        const prevCroppingImageId = croppingImageId;
 
-          // Watermark
-          if (watermark) {
-            doc.saveGraphicsState();
-            doc.setFontSize(54);
-            doc.setTextColor('#e2e8f0');
-            doc.text(watermark, pdfWidth / 4, pdfHeight / 2, { angle: pdfOrientation === 'landscape' ? 20 : 35 });
-            doc.restoreGraphicsState();
+        // Temporarily clear selections and interactive overlays
+        setSelectedIds(new Set());
+        setEditingTextId(null);
+        setMeasureModeActive(false);
+        setCroppingImageId(null);
+
+        // Give React time to re-render without highlights/handles
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Recursive drawing function to handle nested/masked elements cleanly
+        const drawElement = async (el: any, allElements: any[]) => {
+          if (el.isRedacted) {
+            doc.setFillColor('#000000');
+            doc.rect(el.x * scaleFac, el.y * scaleFac, el.width * scaleFac, el.height * scaleFac, 'F');
+            return;
           }
 
-          p.elements.filter(el => !el.isComment).forEach(el => {
-            const scaleFac = 0.708333;
-            if (el.isRedacted) {
-              doc.setFillColor('#000000');
-              doc.rect(el.x * scaleFac, el.y * scaleFac, el.width * scaleFac, el.height * scaleFac, 'F');
-            } else if (el.type === 'text') {
-              doc.setFontSize((el.style.fontSize || 14) * 0.75); // Keep original text size scale factor for font size
-              doc.setTextColor(el.style.color || '#000000');
-              doc.text(el.content, el.x * scaleFac, el.y * scaleFac);
-            } else if (el.type === 'image' && el.content.startsWith('http')) {
+          if (el.type === 'text') {
+            const pdfFontSize = (el.style?.fontSize || 14) * scaleFac;
+            doc.setFontSize(pdfFontSize);
+            
+            const tColor = parseColorToJsPdfColor(el.style?.color || '#000000');
+            doc.setTextColor(tColor.r, tColor.g, tColor.b);
+
+            let fontFamily = 'helvetica';
+            const origFamily = normalizeFontFamily(el.style?.fontFamily || 'Inter');
+            let familyKey = '';
+            
+            if (origFamily.includes('inter')) {
+              fontFamily = 'Inter';
+              familyKey = 'inter';
+            } else if (origFamily.includes('space') || origFamily.includes('grotesk')) {
+              fontFamily = 'Space Grotesk';
+              familyKey = 'space grotesk';
+            } else if (origFamily.includes('jetbrains') || origFamily.includes('mono')) {
+              fontFamily = 'JetBrains Mono';
+              familyKey = 'jetbrains mono';
+            } else if (origFamily.includes('playfair') || origFamily.includes('display')) {
+              fontFamily = 'Playfair Display';
+              familyKey = 'playfair display';
+            } else if (origFamily.includes('montserrat')) {
+              fontFamily = 'Montserrat';
+              familyKey = 'montserrat';
+            } else if (origFamily.includes('orkney')) {
+              fontFamily = 'Orkney';
+              familyKey = 'orkney';
+            } else if (origFamily.includes('serif')) {
+              fontFamily = 'times';
+            } else if (origFamily.includes('code') || origFamily.includes('courier')) {
+              fontFamily = 'courier';
+            }
+
+            // Determine font style based on available weights in FONT_URLS
+            let actualStyle = 'normal';
+            const weight = String(el.style?.fontWeight || 'normal').toLowerCase();
+            const availableVariants: { regular: string | string[]; bold?: string | string[]; light?: string | string[]; medium?: string | string[] } = FONT_URLS[familyKey] || { regular: '' };
+
+            if (weight === 'bold' || weight === '700' || weight === '800' || weight === '900') {
+              actualStyle = availableVariants.bold ? 'bold' : 'normal';
+            } else if (weight === '300' || weight === 'light') {
+              actualStyle = availableVariants.light ? 'light' : 'normal';
+            } else if (weight === '600' || weight === 'medium' || weight === '500') {
+              actualStyle = availableVariants.medium ? 'medium' : (availableVariants.bold ? 'bold' : 'normal');
+            }
+
+            if (el.style?.fontStyle === 'italic') {
+              if (fontFamily === 'helvetica' || fontFamily === 'times' || fontFamily === 'courier') {
+                actualStyle = actualStyle === 'bold' ? 'bolditalic' : 'italic';
+              }
+            }
+            doc.setFont(fontFamily, actualStyle);
+
+            // Alignment and X coordinate adjustment
+            const alignment = el.style?.textAlign || 'left';
+            let pdfX = el.x * scaleFac;
+            if (alignment === 'center') {
+              pdfX = (el.x + el.width / 2) * scaleFac;
+            } else if (alignment === 'right') {
+              pdfX = (el.x + el.width) * scaleFac;
+            }
+
+            // Adjust Y for baseline offset
+            const pdfY = (el.y * scaleFac) + (pdfFontSize * 0.82);
+            const lineHeightFac = el.style?.lineHeight || 1.2;
+
+            // Split text precisely to fit container width
+            const lines = doc.splitTextToSize(el.content || '', el.width * scaleFac);
+            
+            // Draw line-by-line using precise line heights so layout is perfectly identical
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const lineY = pdfY + (lineIdx * pdfFontSize * lineHeightFac);
+              doc.text(lines[lineIdx], pdfX, lineY, {
+                align: alignment
+              });
+            }
+          } else if (el.type === 'image') {
+            try {
+              const pngDataUrl = await ensurePngDataUrl(el.content);
+              if (pngDataUrl) {
+                const crop = el.style?.crop;
+                if (crop && (crop.left > 0 || crop.top > 0 || crop.right > 0 || crop.bottom > 0)) {
+                  // Non-destructive crop rendering via Canvas
+                  const croppedImg = await new Promise<string | null>((resolveCrop) => {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const w = img.naturalWidth;
+                      const h = img.naturalHeight;
+                      
+                      const cropLeftPx = (crop.left / 100) * w;
+                      const cropTopPx = (crop.top / 100) * h;
+                      const cropWidthPx = w - cropLeftPx - ((crop.right / 100) * w);
+                      const cropHeightPx = h - cropTopPx - ((crop.bottom / 100) * h);
+
+                      canvas.width = Math.max(1, cropWidthPx);
+                      canvas.height = Math.max(1, cropHeightPx);
+                      
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        ctx.drawImage(img, cropLeftPx, cropTopPx, cropWidthPx, cropHeightPx, 0, 0, canvas.width, canvas.height);
+                        resolveCrop(canvas.toDataURL('image/png'));
+                      } else {
+                        resolveCrop(null);
+                      }
+                    };
+                    img.onerror = () => resolveCrop(null);
+                    img.src = pngDataUrl;
+                  });
+
+                  if (croppedImg) {
+                    doc.addImage(
+                      croppedImg,
+                      'PNG',
+                      el.x * scaleFac,
+                      el.y * scaleFac,
+                      el.width * scaleFac,
+                      el.height * scaleFac,
+                      undefined,
+                      pdfCompressionQuality === 'LOW' ? 'FAST' : 'SLOW'
+                    );
+                  } else {
+                    doc.addImage(
+                      pngDataUrl,
+                      'PNG',
+                      el.x * scaleFac,
+                      el.y * scaleFac,
+                      el.width * scaleFac,
+                      el.height * scaleFac,
+                      undefined,
+                      pdfCompressionQuality === 'LOW' ? 'FAST' : 'SLOW'
+                    );
+                  }
+                } else {
+                  doc.addImage(
+                    pngDataUrl, 
+                    'PNG', 
+                    el.x * scaleFac, 
+                    el.y * scaleFac, 
+                    el.width * scaleFac, 
+                    el.height * scaleFac,
+                    undefined,
+                    pdfCompressionQuality === 'LOW' ? 'FAST' : 'SLOW'
+                  );
+                }
+              }
+            } catch (imgErr) {
+              console.error("Failed to add image to PDF:", imgErr);
+            }
+          } else if (el.type === 'shape') {
+            doc.saveGraphicsState();
+            
+            // Apply opacity if set
+            const opacity = el.style?.opacity !== undefined ? el.style.opacity : 1;
+            if (opacity < 1) {
               try {
-                // Respect compression settings Low (FAST speed, smaller footprint) & Medium/High (SLOW speed, lossless detail)
-                doc.addImage(
-                  el.content, 
-                  'JPEG', 
-                  el.x * scaleFac, 
-                  el.y * scaleFac, 
-                  el.width * scaleFac, 
-                  el.height * scaleFac,
-                  undefined,
-                  pdfCompressionQuality === 'LOW' ? 'FAST' : 'SLOW'
-                );
-              } catch {}
-            } else if (el.type === 'shape') {
-              const bg = el.style?.useGradient ? (el.style.gradientColorStart || '#0284c7') : (el.style?.backgroundColor || '#0284c7');
-              doc.setFillColor(bg);
-              const rx = el.style?.borderRadius ?? (el.id?.includes('circ') ? 100 : 0);
-              if (el.id?.includes('circ')) {
+                const GState = (doc as any).GState || (jsPDF as any).GState;
+                if (GState) {
+                  doc.setGState(new GState({ opacity }));
+                }
+              } catch (gsErr) {
+                console.warn("Could not set GState opacity:", gsErr);
+              }
+            }
+
+            const rx = el.style?.borderRadius ?? (el.id?.includes('circ') || el.style?.variant === 'sphere' ? 100 : 0);
+            const isCircle = el.id?.includes('circ') || el.style?.variant === 'sphere';
+            const isVector = el.style?.variant === 'vector';
+
+            if (isVector) {
+              drawSvgPathOnJsPdf(
+                doc, 
+                el.content, 
+                el.x * scaleFac, 
+                el.y * scaleFac, 
+                el.width * scaleFac, 
+                el.height * scaleFac, 
+                el.style?.backgroundColor || '#0284c7', 
+                el.style?.borderColor, 
+                el.style?.borderWidth
+              );
+            } else if (el.style?.useGradient) {
+              const startColor = el.style.gradientColorStart || '#0284c7';
+              const endColor = el.style.gradientColorEnd || '#ec4899';
+              const angle = el.style.gradientAngle ?? 135;
+              drawShapeGradient(doc, el.x * scaleFac, el.y * scaleFac, el.width * scaleFac, el.height * scaleFac, startColor, endColor, angle, rx * scaleFac, isCircle);
+            } else {
+              const bg = el.style?.backgroundColor || '#0284c7';
+              const sColor = parseColorToJsPdfColor(bg);
+              doc.setFillColor(sColor.r, sColor.g, sColor.b);
+              
+              if (isCircle) {
                 doc.roundedRect(el.x * scaleFac, el.y * scaleFac, el.width * scaleFac, el.height * scaleFac, (el.width / 2) * scaleFac, (el.height / 2) * scaleFac, 'F');
               } else if (rx > 0) {
                 const maxR = Math.min(rx, el.width / 2, el.height / 2);
@@ -1828,18 +2549,167 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 doc.rect(el.x * scaleFac, el.y * scaleFac, el.width * scaleFac, el.height * scaleFac, 'F');
               }
             }
-          });
+            doc.restoreGraphicsState();
 
-          // Footer Text
-          doc.setFontSize(10);
-          doc.setTextColor('#64748b');
-          doc.text(footerText, 30, pdfHeight - 32);
-          if (autoPageNumbers) {
-            doc.text(`Página ${i + 1} de ${slides.length}`, pdfWidth - 95, pdfHeight - 32);
+            // Render nested/masked elements inside this parent's clipping mask
+            const children = allElements.filter(child => child.maskedBy === el.id);
+            if (children.length > 0) {
+              doc.saveGraphicsState();
+              
+              const parentX = el.x * scaleFac;
+              const parentY = el.y * scaleFac;
+              const parentW = el.width * scaleFac;
+              const parentH = el.height * scaleFac;
+
+              // Temporarily set opacity to 0 to make clipping path stroke/fill invisible
+              const GState = (doc as any).GState || (jsPDF as any).GState;
+              if (GState) {
+                doc.setGState(new GState({ opacity: 0 }));
+              }
+
+              if (isCircle) {
+                doc.roundedRect(parentX, parentY, parentW, parentH, parentW / 2, parentH / 2, 'S');
+              } else if (rx > 0) {
+                const maxR = Math.min(rx, el.width / 2, el.height / 2) * scaleFac;
+                doc.roundedRect(parentX, parentY, parentW, parentH, maxR, maxR, 'S');
+              } else {
+                doc.rect(parentX, parentY, parentW, parentH, 'S');
+              }
+              doc.clip();
+
+              // Restore opacity to original parent opacity for drawing children
+              if (GState) {
+                const originalOpacity = el.style?.opacity !== undefined ? el.style.opacity : 1;
+                doc.setGState(new GState({ opacity: originalOpacity }));
+              }
+
+              for (const child of children) {
+                await drawElement(child, allElements);
+              }
+
+              doc.restoreGraphicsState();
+            }
+          } else if (el.isFormField) {
+            const formX = el.x * scaleFac;
+            const formY = el.y * scaleFac;
+            const formW = el.width * scaleFac;
+            const formH = el.height * scaleFac;
+
+            doc.saveGraphicsState();
+            doc.setFillColor(241, 245, 249);
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(1);
+            doc.roundedRect(formX, formY, formW, formH, 2, 2, 'FD');
+            doc.restoreGraphicsState();
+
+            doc.setFontSize(7);
+            doc.setTextColor(100, 116, 139);
+            doc.setFont('helvetica', 'bold');
+            doc.text((el.formFieldName || '').toUpperCase(), formX + 4, formY + 8);
+
+            if (el.formFieldType === 'checkbox') {
+              const checked = el.content === 'true' || el.content === true;
+              doc.rect(formX + 4, formY + 12, 10, 10);
+              if (checked) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.setTextColor(14, 116, 144);
+                doc.text('✓', formX + 5.5, formY + 20.5);
+              }
+            } else if (el.formFieldType === 'signature') {
+              if (el.content && (el.content.startsWith('data:') || el.content.startsWith('http'))) {
+                try {
+                  const sigUrl = await ensurePngDataUrl(el.content);
+                  if (sigUrl) {
+                    doc.addImage(sigUrl, 'PNG', formX + 4, formY + 12, formW - 8, formH - 18, undefined, 'FAST');
+                  }
+                } catch (sigErr) {
+                  console.error("Failed to add signature image to PDF:", sigErr);
+                }
+              } else {
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(8);
+                doc.setTextColor(148, 163, 184);
+                doc.text('Aguardando Assinatura...', formX + 6, formY + formH - 6);
+              }
+            } else {
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(9);
+              doc.setTextColor(30, 41, 59);
+              doc.text(el.content || '', formX + 4, formY + formH - 6);
+            }
           }
+        };
+
+        try {
+          for (let i = 0; i < slides.length; i++) {
+            if (i > 0) doc.addPage([pdfWidth, pdfHeight], pdfOrientation);
+            const p = slides[i];
+            
+            drawBackground(doc, p.background || '#ffffff', pdfWidth, pdfHeight);
+
+            // Header Text
+            if (pageSizeType !== 'SLIDE_16_9') {
+              doc.setFontSize(10);
+              doc.setTextColor('#64748b');
+              doc.text(headerText, 30, 30);
+              doc.line(30, 35, pdfWidth - 30, 35);
+            }
+
+            // Watermark
+            if (watermark) {
+              doc.saveGraphicsState();
+              doc.setFontSize(54);
+              doc.setTextColor('#e2e8f0');
+              doc.text(watermark, pdfWidth / 4, pdfHeight / 2, { angle: pdfOrientation === 'landscape' ? 20 : 35 });
+              doc.restoreGraphicsState();
+            }
+
+            // Filter out comments and masked elements (since masked elements are drawn nested inside parents)
+            doc.saveGraphicsState();
+            
+            // Temporarily set opacity to 0 to make clipping path stroke/fill invisible
+            const GState = (doc as any).GState || (jsPDF as any).GState;
+            if (GState) {
+              doc.setGState(new GState({ opacity: 0 }));
+            }
+            doc.rect(0, 0, pdfWidth, pdfHeight, 'S');
+            doc.clip();
+
+            // Restore opacity to 1 for rendering the actual elements
+            if (GState) {
+              doc.setGState(new GState({ opacity: 1 }));
+            }
+
+            const elements = p.elements.filter(el => !el.isComment && !el.maskedBy);
+            for (const el of elements) {
+              await drawElement(el, p.elements);
+            }
+
+            doc.restoreGraphicsState();
+
+            // Footer Text
+            if (pageSizeType !== 'SLIDE_16_9') {
+              doc.setFontSize(10);
+              doc.setTextColor('#64748b');
+              doc.text(footerText, 30, pdfHeight - 32);
+              if (autoPageNumbers) {
+                doc.text(`Página ${i + 1} de ${slides.length}`, pdfWidth - 95, pdfHeight - 32);
+              }
+            }
+          }
+          doc.save('documento_acrobat.pdf');
+          toast.success('Conversão concluída para PDF com Alta Fidelidade Vetorial!', { id: toastId });
+        } catch (error) {
+          console.error("Vector rendering failed:", error);
+          toast.error('Erro na exportação vetorial do PDF.', { id: toastId });
+        } finally {
+          // Restore user selections and view options
+          setSelectedIds(prevSelectedIds);
+          setEditingTextId(prevEditingTextId);
+          setMeasureModeActive(prevMeasureModeActive);
+          setCroppingImageId(prevCroppingImageId);
         }
-        doc.save('documento_acrobat.pdf');
-        toast.success('Conversão concluída para PDF!', { id: toastId });
       } else if (format === 'pptx') {
         const pres = new pptxgen();
         slides.forEach((p, idx) => {
@@ -1904,9 +2774,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         element.click();
         toast.success('Word (DOC) exportado com sucesso!', { id: toastId });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Ocorreu um erro ao exportar o documento.', { id: toastId });
+      toast.error(`Ocorreu um erro ao exportar o documento: ${err.message || err}`, { id: toastId });
     }
   };
 
@@ -2127,9 +2997,10 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
           // Extract editable vector text elements using PDF.js getTextContent
           let textItems: any[] = [];
+          let textRaw: any = null;
           try {
-            const textRaw = await page.getTextContent();
-            textItems = textRaw.items;
+            textRaw = await page.getTextContent();
+            textItems = textRaw ? textRaw.items : [];
           } catch (te) {
             console.warn("Failed to get text layer:", te);
           }
@@ -2228,6 +3099,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             size: number;
             width: number;
             height: number;
+            fontName?: string;
           }
 
           const reconstructedLines: ParsedLine[] = [];
@@ -2250,7 +3122,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 y: rawY,
                 size: size,
                 width: width,
-                height: height
+                height: height,
+                fontName: item.fontName
               });
               continue;
             }
@@ -2276,6 +3149,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               lastLine.width = (rawX + width) - lastLine.x;
               lastLine.height = Math.max(lastLine.height, height);
               lastLine.size = Math.max(lastLine.size, size);
+              if (!lastLine.fontName) {
+                lastLine.fontName = item.fontName;
+              }
             } else {
               reconstructedLines.push({
                 str: item.str,
@@ -2283,7 +3159,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 y: rawY,
                 size: size,
                 width: width,
-                height: height
+                height: height,
+                fontName: item.fontName
               });
             }
           }
@@ -2322,6 +3199,17 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             }
           }
 
+          const detectSupportedFontFamily = (pdfFontFamily: string): string => {
+            if (!pdfFontFamily) return 'Inter';
+            const clean = pdfFontFamily.toLowerCase();
+            if (clean.includes('space') || clean.includes('grotesk')) return 'Space Grotesk';
+            if (clean.includes('mono') || clean.includes('jetbrains')) return 'JetBrains Mono';
+            if (clean.includes('playfair') || clean.includes('serif')) return 'Playfair Display';
+            if (clean.includes('montserrat')) return 'Montserrat';
+            if (clean.includes('orkney')) return 'Orkney';
+            return 'Inter';
+          };
+
           // Create interactive, editable text layers from grouped paragraphs!
           let textZIndex = 1;
           for (let p = 0; p < paragraphs.length; p++) {
@@ -2336,6 +3224,20 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             const paraText = para.lines.map(l => l.str).join('\n');
             const paraFontSize = para.lines[0].size;
 
+            let pdfFontFamily = 'Inter';
+            if (textRaw?.styles) {
+              for (const line of para.lines) {
+                if (line.fontName && textRaw.styles[line.fontName]) {
+                  const sObj = textRaw.styles[line.fontName];
+                  if (sObj && sObj.fontFamily) {
+                    pdfFontFamily = sObj.fontFamily;
+                    break;
+                  }
+                }
+              }
+            }
+            const mappedFontFamily = detectSupportedFontFamily(pdfFontFamily);
+
             slideElements.push({
               id: `el-pdf-text-${Date.now()}-${pageNum}-${p}`,
               type: 'text',
@@ -2346,7 +3248,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               content: paraText,
               zIndex: textZIndex++,
               style: {
-                fontFamily: 'Inter',
+                fontFamily: mappedFontFamily,
                 fontSize: Math.round(paraFontSize),
                 color: '#1e293b',
                 backgroundColor: 'transparent',
@@ -2455,6 +3357,140 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       }
       toast.success('Documento importado e montado na área de trabalho!', { id: loader });
     }, 1500);
+  };
+
+  const handleRecreateSlideFromImage = async (file: File) => {
+    setIsRecreatingSlide(true);
+    const loader = toast.loading("Enviando imagem do slide para recriação por IA...");
+    try {
+      const reader = new FileReader();
+      reader.onload = async (eRes) => {
+        const base64Data = eRes.target?.result as string;
+        if (!base64Data) {
+          toast.error("Falha ao ler o arquivo de imagem.", { id: loader });
+          setIsRecreatingSlide(false);
+          return;
+        }
+
+        // Dynamically detect the size and aspect ratio of the uploaded image
+        const imgObj = new Image();
+        imgObj.onload = async () => {
+          const isLandscape = imgObj.width > imgObj.height;
+          const detectedPageSizeType = isLandscape ? 'SLIDE_16_9' : 'A4';
+          
+          // Switch page size type so the editor adapts to the identified size
+          setPageSizeType(detectedPageSizeType);
+          
+          try {
+            const response = await fetch("/api/gemini/recreate-slide", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: base64Data }),
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Erro de processamento no servidor.");
+            }
+            
+            const slideData = await response.json();
+            console.log("[Recreate Slide] Received slide layout:", slideData);
+            
+            // Map the dimensions according to the detected page type
+            let docWidth = 840;
+            let docHeight = 1188;
+            if (detectedPageSizeType === 'SLIDE_16_9') {
+              docWidth = 1050;
+              docHeight = 590;
+            }
+            
+            // Dynamic scale coordinate system based on the canvas dimensions returned from Gemini
+            const sourceWidth = slideData.canvasWidth || 1000;
+            const sourceHeight = slideData.canvasHeight || 1000;
+            
+            const scaleX = (val: number) => (val / sourceWidth) * docWidth;
+            const scaleY = (val: number) => (val / sourceHeight) * docHeight;
+            
+            // Create a mapping of Gemini's returned custom element ID to our newly generated client-side local ID
+            const idMap: { [geminiId: string]: string } = {};
+            const processedList = (slideData.elements || []).map((el: any, i: number) => {
+              const localId = `ai-recreated-el-${Date.now()}-${i}`;
+              if (el.id) {
+                idMap[el.id] = localId;
+              }
+              return { ...el, localId };
+            });
+
+            const newElements = processedList.map((el: any) => {
+              const scaledWidth = scaleX(el.width || 200);
+              const scaledHeight = scaleY(el.height || 100);
+              const scaledX = scaleX(el.x || 100);
+              const scaledY = scaleY(el.y || 100);
+              
+              // Get the mapped parent ID for maskedBy if it references a gemini ID
+              const maskedByLocalId = el.maskedBy && idMap[el.maskedBy] ? idMap[el.maskedBy] : el.maskedBy;
+              
+              return {
+                id: el.localId,
+                type: el.type || 'text',
+                x: Math.max(-500, Math.min(docWidth + 500, scaledX)), // Allow negative coordinates for masked overflow elements
+                y: Math.max(-500, Math.min(docHeight + 500, scaledY)), // Allow negative coordinates for masked overflow elements
+                width: Math.max(10, Math.min(docWidth * 2, scaledWidth)),
+                height: Math.max(10, Math.min(docHeight * 2, scaledHeight)),
+                content: el.content || "",
+                zIndex: el.zIndex || 1,
+                maskedBy: maskedByLocalId,
+                style: {
+                  fontFamily: el.style?.fontFamily || 'Inter',
+                  fontWeight: el.style?.fontWeight || 'normal',
+                  fontSize: el.style?.fontSize ? Math.max(8, Math.min(96, el.style.fontSize)) : 14,
+                  color: el.style?.color || '#000000',
+                  backgroundColor: el.style?.backgroundColor || 'transparent',
+                  useGradient: el.style?.useGradient || false,
+                  gradientType: el.style?.gradientType || 'linear',
+                  gradientColorStart: el.style?.gradientColorStart || '#3b82f6',
+                  gradientColorEnd: el.style?.gradientColorEnd || '#ec4899',
+                  gradientAngle: el.style?.gradientAngle ?? 135,
+                  borderRadius: el.style?.borderRadius !== undefined 
+                    ? el.style.borderRadius 
+                    : (el.style?.variant === 'sphere' || el.id?.includes('circ') ? 9999 : 0),
+                  border: el.style?.border || 'none',
+                  opacity: el.style?.opacity !== undefined ? el.style.opacity : 1,
+                  textAlign: el.style?.textAlign || 'left',
+                  variant: el.style?.variant || 'box',
+                }
+              };
+            });
+            
+            const newSlide = {
+              id: `slide-recreated-${Date.now()}`,
+              elements: newElements,
+              background: slideData.background || '#ffffff'
+            };
+            
+            const nextSlides = [...slides, newSlide];
+            triggerUpdate(nextSlides, "Recriou slide a partir de imagem");
+            onSelectSlide(nextSlides.length - 1);
+            toast.success(`Slide ${isLandscape ? "Slide (16:9)" : "Retrato (A4)"} recriado com sucesso por IA!`, { id: loader });
+          } catch (serverErr: any) {
+            console.error("Server slide recreation error:", serverErr);
+            toast.error(`Falha do servidor: ${serverErr.message}`, { id: loader });
+          } finally {
+            setIsRecreatingSlide(false);
+          }
+        };
+        imgObj.onerror = () => {
+          toast.error("Falha ao analisar a orientação da imagem do slide.", { id: loader });
+          setIsRecreatingSlide(false);
+        };
+        imgObj.src = base64Data;
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("Error in slide recreation read:", err);
+      toast.error(`Erro ao ler imagem: ${err.message}`, { id: loader });
+      setIsRecreatingSlide(false);
+    }
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2903,6 +3939,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [textSubTab, setTextSubTab] = useState<'editar' | 'efeitos' | 'animacao'>('editar');
   const [shapeSubTab, setShapeSubTab] = useState<'inserir' | 'editar'>('inserir');
   const [arquivosSubTab, setArquivosSubTab] = useState<'banco' | 'uploads' | 'importacao'>('banco');
+  const [isRecreatingSlide, setIsRecreatingSlide] = useState<boolean>(false);
   const [showColorPickerInline, setShowColorPickerInline] = useState<boolean>(false);
   const [showOpacitySliderInline, setShowOpacitySliderInline] = useState<boolean>(false);
   const [userUploadedImages, setUserUploadedImages] = useState<string[]>([
@@ -2914,6 +3951,186 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     { id: 'c2', slideIndex: 0, text: 'Confirmar os limites do contraste para padrões corporativos.', author: 'Gerência', timestamp: new Date() }
   ]);
   const [newCommentText, setNewCommentText] = useState<string>('');
+
+  useEffect(() => {
+    const handleResize = () => {
+      setPresentationDimensions({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // --- FULLSCREEN CONTROLLER ---
+  useEffect(() => {
+    if (isPresentationMode) {
+      const enterFullscreen = async () => {
+        try {
+          if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (err) {
+          console.warn('Fullscreen request failed:', err);
+        }
+      };
+      enterFullscreen();
+
+      const handleFullscreenChange = () => {
+        if (!document.fullscreenElement) {
+          setIsPresentationMode(false);
+          setPresentationLaserActive(false);
+          setPresentationPenActive(false);
+          setPresentationHighlighterActive(false);
+        }
+      };
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      };
+    } else {
+      const exitFullscreen = async () => {
+        try {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            await document.exitFullscreen();
+          }
+        } catch (err) {
+          console.warn('Fullscreen exit failed:', err);
+        }
+      };
+      exitFullscreen();
+    }
+  }, [isPresentationMode]);
+
+  // --- GLOBAL MOUSE POSITION TRACKER (FOR REAL-TIME SMOOTH LASER POINTER) ---
+  useEffect(() => {
+    if (!isPresentationMode || !presentationLaserActive) return;
+    const handleMouseMoveGlobal = (e: MouseEvent) => {
+      setPresentationLaserPos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMoveGlobal);
+    return () => window.removeEventListener('mousemove', handleMouseMoveGlobal);
+  }, [isPresentationMode, presentationLaserActive]);
+
+  // --- GLOBAL DRAWING EVENTS (FOR PEN & HIGHLIGHTER TO BE BUTTERY SMOOTH) ---
+  useEffect(() => {
+    if (!isPresentationDrawing) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById('presentation-slide-canvas');
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const scaleX = (presentationDimensions.width - 100) / docWidth;
+      const scaleY = (presentationDimensions.height - 120) / docHeight;
+      const scale = Math.min(scaleX, scaleY, 1.5);
+
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
+
+      setCurrentDrawingPoints(prev => [...prev, { x, y }]);
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsPresentationDrawing(false);
+      if (currentDrawingPoints.length > 1) {
+        const isHighlight = presentationHighlighterActive;
+        setPresentationDrawings(prev => {
+          const currentSlideDrawings = prev[presentationSlideIndex] || [];
+          return {
+            ...prev,
+            [presentationSlideIndex]: [
+              ...currentSlideDrawings,
+              {
+                points: currentDrawingPoints,
+                color: isHighlight ? 'rgba(234, 179, 8, 0.45)' : presentationPenColor,
+                width: isHighlight ? 12 : 3
+              }
+            ]
+          };
+        });
+      }
+      setCurrentDrawingPoints([]);
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [
+    isPresentationDrawing, 
+    currentDrawingPoints, 
+    presentationSlideIndex, 
+    presentationHighlighterActive, 
+    presentationPenColor, 
+    presentationDimensions, 
+    docWidth, 
+    docHeight
+  ]);
+
+  useEffect(() => {
+    if (!isPresentationMode) return;
+
+    const handlePresentationKeys = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPresentationMode(false);
+        setPresentationLaserActive(false);
+        setPresentationPenActive(false);
+        setPresentationHighlighterActive(false);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+        e.preventDefault();
+        if (presentationSlideIndex < slides.length - 1) {
+          setPresentationSlideIndex(prev => prev + 1);
+          setCurrentDrawingPoints([]);
+        } else {
+          toast.info('Fim da apresentação de slides. Pressione ESC para sair.');
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'Backspace' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (presentationSlideIndex > 0) {
+          setPresentationSlideIndex(prev => prev - 1);
+          setCurrentDrawingPoints([]);
+        }
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setPresentationSlideIndex(0);
+        setCurrentDrawingPoints([]);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setPresentationSlideIndex(slides.length - 1);
+        setCurrentDrawingPoints([]);
+      } else if (e.key.toLowerCase() === 'l') {
+        setPresentationLaserActive(prev => !prev);
+        setPresentationPenActive(false);
+        setPresentationHighlighterActive(false);
+      } else if (e.key.toLowerCase() === 'p') {
+        setPresentationPenActive(prev => !prev);
+        setPresentationLaserActive(false);
+        setPresentationHighlighterActive(false);
+      } else if (e.key.toLowerCase() === 'e') {
+        setPresentationDrawings(prev => ({
+          ...prev,
+          [presentationSlideIndex]: []
+        }));
+      }
+    };
+
+    window.addEventListener('keydown', handlePresentationKeys);
+    return () => window.removeEventListener('keydown', handlePresentationKeys);
+  }, [isPresentationMode, presentationSlideIndex, slides.length]);
+
+  useEffect(() => {
+    const handleF5 = (e: KeyboardEvent) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+        setPresentationSlideIndex(currentSlideIndex);
+        setIsPresentationMode(true);
+        toast.success('Iniciando apresentação de slides estilo PowerPoint! Pressione ESC para sair.');
+      }
+    };
+    window.addEventListener('keydown', handleF5);
+    return () => window.removeEventListener('keydown', handleF5);
+  }, [currentSlideIndex]);
 
   const reorderPageAtIndex = (index: number, direction: 'up' | 'down') => {
     if (direction === 'up' && index === 0) return;
@@ -3049,6 +4266,42 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           </div>
         </div>
       )}
+
+      {/* AI RECREATING SLIDE LOADING OVERLAY */}
+      {isRecreatingSlide && (
+        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-[150] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="text-center space-y-6 max-w-lg">
+            <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-pink-500/20 to-purple-500/20 border border-pink-500/30 rounded-full flex items-center justify-center text-pink-400">
+              <Sparkles size={40} className="animate-pulse text-pink-400" />
+              <div className="absolute inset-0 border-2 border-dashed border-pink-500/40 rounded-full animate-spin [animation-duration:8s]"></div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black tracking-tight uppercase bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent animate-pulse">
+                IA Recriando o Slide
+              </h2>
+              <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto leading-relaxed">
+                Analisando a hierarquia visual, as posições, dimensões, cores dos textos e formas estruturais do documento para recriá-lo perfeitamente na sua área de trabalho...
+              </p>
+            </div>
+            
+            {/* Visual scan animation line bar */}
+            <div className="w-64 h-1.5 bg-slate-900 rounded-full mx-auto overflow-hidden relative border border-slate-800">
+              <div className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 w-1/3 rounded-full animate-[shimmer_1.5s_infinite] [animation-timing-function:linear]" style={{
+                animationName: 'shimmer',
+                animationDuration: '1.5s',
+                animationIterationCount: 'infinite'
+              }}></div>
+            </div>
+            <style>{`
+              @keyframes shimmer {
+                0% { left: -30%; width: 30%; }
+                50% { width: 50%; }
+                100% { left: 100%; width: 30%; }
+              }
+            `}</style>
+          </div>
+        </div>
+      )}
       
       {/* SECURITY LOCK DRAWER OVERLAY */}
       {isLockedByPass && (
@@ -3103,14 +4356,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
             {/* Icons loop */}
             {([
-              { key: 'pesquisar', icon: <Search size={18}/>, name: 'Pesqu.' },
-              { key: 'conteudo', icon: <Plus size={18}/>, name: 'Layouts' },
               { key: 'texto', icon: <Type size={18}/>, name: 'Texto' },
               { key: 'arquivos', icon: <FolderOpen size={18}/>, name: 'Arquivos' },
               { key: 'formas', icon: <Box size={18}/>, name: 'Formas' },
-              { key: 'tabelas', icon: <Table size={18}/>, name: 'Tabelas' },
-              { key: 'comentarios', icon: <MessageSquare size={18}/>, name: 'Revisão' },
-              { key: 'assinaturas', icon: <PenTool size={18}/>, name: 'Assinar' },
               { key: 'configuracoes', icon: <Sliders size={18}/>, name: 'Ajustes' }
             ] as const).map(tab => {
               const isActive = activeLeftTab === tab.key;
@@ -3136,115 +4384,13 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           {/* Locked state indicator bottom aspect */}
           <div className="space-y-1 text-center w-full">
             <div className={`w-2.5 h-2.5 rounded-full mx-auto ${isLockedByPass ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
-            <span className="text-[7px] text-slate-500 uppercase block font-mono">{isLockedByPass ? 'PASSLOCK' : 'PRISTINE'}</span>
+            {isLockedByPass && <span className="text-[7px] text-slate-500 uppercase block font-mono">PASSLOCK</span>}
           </div>
         </div>
 
         {/* Floating Expandable Context panel width 64 */}
         {activeLeftTab !== null && (
           <div className="w-64 bg-[#11141a] border-r border-slate-800/40 shrink-0 select-none animate-in slide-in-from-left duration-250 z-20">
-            {activeLeftTab === 'pesquisar' && (
-              <div className="flex flex-col h-full">
-                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
-                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400">Pesquisar & Substituir</span>
-                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
-                </div>
-                <div className="p-4 space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Buscar por</label>
-                    <div className="relative">
-                      <Search size={12} className="absolute left-2.5 top-2.5 text-slate-500" />
-                      <input 
-                        type="text" 
-                        placeholder="Palavra-chave..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 pl-8 text-xs text-white outline-none focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Substituir por</label>
-                    <input 
-                      type="text" 
-                      placeholder="Novo termo..."
-                      value={replaceQuery}
-                      onChange={(e) => setReplaceQuery(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white outline-none focus:border-cyan-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <button 
-                      onClick={() => handleSearchAndReplace(false)}
-                      className="py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white rounded-lg text-xs font-bold border border-slate-800"
-                    >
-                      Buscar
-                    </button>
-                    <button 
-                      onClick={() => handleSearchAndReplace(true)}
-                      className="py-2 bg-cyan-600 hover:bg-cyan-550 text-white rounded-lg text-xs font-bold"
-                    >
-                      Substituir
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'conteudo' && (
-              <div className="flex flex-col h-full">
-                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
-                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400">Adicionar Conteúdo</span>
-                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
-                </div>
-                <div className="p-4 space-y-4">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Estruturas Prontas</span>
-                  <div className="space-y-2">
-                    <button 
-                      onClick={() => addPresetLayout('corporate_headers')}
-                      className="w-full text-left p-3 rounded-lg border border-slate-800/80 bg-slate-950/40 hover:bg-slate-950 hover:border-cyan-500/40 transition-all text-xs"
-                    >
-                      <div className="font-bold text-slate-100 mb-0.5">Cabeçalhos Corporativos</div>
-                      <div className="text-[10px] text-slate-500 leading-snug">Insere Caixa de Título Principal + Subtítulo estruturado no topo da página.</div>
-                    </button>
-                    <button 
-                      onClick={() => addPresetLayout('two_columns')}
-                      className="w-full text-left p-3 rounded-lg border border-slate-800/80 bg-slate-950/40 hover:bg-slate-950 hover:border-cyan-500/40 transition-all text-xs"
-                    >
-                      <div className="font-bold text-slate-100 mb-0.5">Layout de Duo de Colunas</div>
-                      <div className="text-[10px] text-slate-500 leading-snug">Duas colunas de textos dispostas horizontalmente de forma simétrica.</div>
-                    </button>
-                    <button 
-                      onClick={() => addPresetLayout('signed_footer')}
-                      className="w-full text-left p-3 rounded-lg border border-slate-800/80 bg-slate-950/40 hover:bg-slate-950 hover:border-cyan-500/40 transition-all text-xs"
-                    >
-                      <div className="font-bold text-slate-100 mb-0.5">Rodapé Estruturado e Assinatura</div>
-                      <div className="text-[10px] text-slate-500 leading-snug">Insere linha divisória fina com campo pré-configurado de Assinatura.</div>
-                    </button>
-                  </div>
-
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold pt-2">Elementos Individuais</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => addElement('text')} className="p-2.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:text-white text-center flex flex-col items-center gap-1.5 cursor-pointer">
-                      <Type size={14}/> Texto
-                    </button>
-                    <button onClick={() => addElement('image')} className="p-2.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:text-white text-center flex flex-col items-center gap-1.5 cursor-pointer">
-                      <ImageIcon size={14}/> Imagem
-                    </button>
-                    <button onClick={() => addElement('shape')} className="p-2.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:text-white text-center flex flex-col items-center gap-1.5 cursor-pointer">
-                      <Box size={14}/> Forma
-                    </button>
-                    <button onClick={() => addElement('form')} className="p-2.5 bg-cyan-950/20 hover:bg-cyan-950/40 border border-cyan-800/50 rounded-lg text-xs font-bold text-cyan-400 hover:text-cyan-300 text-center flex flex-col items-center gap-1.5 cursor-pointer">
-                      <CheckSquare size={14}/> Form Input
-                    </button>
-                    <button onClick={() => addElement('comment' as any)} className="col-span-2 p-2 bg-amber-950/40 hover:bg-amber-950/60 border border-amber-800/40 rounded-lg text-[10px] font-bold text-amber-400 hover:text-amber-300 text-center flex items-center justify-center gap-2 cursor-pointer transition-all">
-                      <MessageSquare size={12} className="stroke-[2.5px]"/> Comentário / Sticky Note (Acrobat)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeLeftTab === 'texto' && (
               <div className="flex flex-col h-full bg-[#11141a]">
                 {/* Header title & close button */}
@@ -3812,7 +4958,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                     updateElementProps(selectedEl.id, { style: { opacity: parseFloat(e.target.value) } });
                                   }
                                 }}
-                                className="w-full accent-cyan-400 bg-slate-900 rounded-lg h-1"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
                           )}
@@ -3916,175 +5062,112 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
                 </div>
 
-                {/* Sub-Tabs Selector Header */}
-                <div className="px-3 pt-2 pb-2 bg-[#090b0e] border-b border-slate-900/60 flex gap-1 shrink-0">
-                  {([
-                    { id: 'banco', label: 'Banco' },
-                    { id: 'uploads', label: 'Uploads' },
-                    { id: 'importacao', label: 'Importador' }
-                  ] as const).map(tab => {
-                    const isActive = arquivosSubTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setArquivosSubTab(tab.id)}
-                        className={`flex-1 py-1.5 px-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer text-center ${isActive ? 'bg-slate-800 text-cyan-400 border border-slate-700/50 shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'}`}
-                      >
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Sub-Tab content region */}
+                {/* Sub-Tab content region (showing Uploads directly) */}
                 <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4">
-                  {arquivosSubTab === 'banco' && (
-                    <div className="space-y-3">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-widest block font-bold">Imagens Corporativas Premium</span>
-                      <div className="grid grid-cols-1 gap-2.5">
-                        {stockImages.map((img, i) => (
-                          <div 
-                            key={i} 
-                            onClick={() => {
-                              if (isLockedByPass) return;
-                              const newEl: any = {
-                                id: `stock-img-${Date.now()}-${i}`,
-                                type: 'image',
-                                x: 100,
-                                y: 350,
-                                width: 380,
-                                height: 250,
-                                content: img.url,
-                                zIndex: currentSlide.elements.length + 1,
-                                style: { opacity: 1, rotation: 0 }
-                              };
-                              triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                              setSelectedIds(new Set([newEl.id]));
-                              toast.success('Imagem inserida!');
-                            }}
-                            className="relative cursor-pointer group rounded-xl overflow-hidden border border-slate-800 bg-[#0F1115] hover:border-cyan-500/50 hover:scale-[1.01] transition-all h-28"
-                          >
-                            <img src={img.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent p-2.5 flex items-end">
-                              <span className="text-[9px] font-bold text-white uppercase tracking-wider">{img.name}</span>
+                  <div className="space-y-4">
+                    <div className="border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/50 transition-all rounded-xl p-4 text-center cursor-pointer relative">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (loadRes) => {
+                              if (loadRes.target?.result) {
+                                setUserUploadedImages(prev => [...prev, loadRes.target!.result as string]);
+                                toast.success('Imagem carregada com sucesso para uploads!');
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Upload size={20} className="mx-auto text-slate-500 mb-2" />
+                      <span className="text-[11px] block text-slate-300 font-bold">Arraste uma Imagem</span>
+                      <span className="text-[9px] text-slate-600 block mt-0.5">JPEG, PNG • Max 5MB</span>
+                    </div>
+
+                    {/* RECRIAR SLIDE COM IA */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                      <span className="text-[10px] text-pink-400 uppercase tracking-widest block font-bold flex items-center gap-1">
+                        <Sparkles size={11} className="text-pink-400 animate-pulse" /> Recriação por IA
+                      </span>
+                      
+                      <div className={`relative border border-dashed ${isRecreatingSlide ? 'border-pink-500/50 bg-pink-950/10' : 'border-slate-800 hover:border-pink-500/30'} p-4 rounded-xl bg-slate-950/40 hover:scale-[1.01] transition-all text-center cursor-pointer`}>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await handleRecreateSlideFromImage(file);
+                            }
+                          }}
+                          disabled={isRecreatingSlide}
+                          className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        {isRecreatingSlide ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-center gap-2">
+                              <RefreshCw size={14} className="text-pink-400 animate-spin" />
+                              <span className="text-xs text-pink-400 font-extrabold">IA analisando e recriando...</span>
+                            </div>
+                            <span className="text-[8px] text-slate-500 block">Identificando formas, textos, cores e posições no slide de origem</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload size={16} className="mx-auto text-pink-400 mb-1" />
+                            <span className="text-xs text-pink-400 font-extrabold block">Recriar Slide a partir de Imagem</span>
+                            <span className="text-[9px] text-slate-500 block leading-normal text-slate-400">
+                              Envie uma imagem e a IA vai gerar formas, textos e layout idênticos na área de trabalho!
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Mídia Enviada ({userUploadedImages.length})</span>
+                      <div className="grid grid-cols-2 gap-2 p-0.5">
+                        {userUploadedImages.map((img, i) => (
+                          <div key={i} className="relative group rounded-lg overflow-hidden border border-slate-800 bg-slate-950 aspect-video">
+                            <img src={img} className="w-full h-full object-cover" />
+                            <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => {
+                                  if (isLockedByPass) return;
+                                  const newEl: any = {
+                                    id: `img-${Date.now()}-${i}`,
+                                    type: 'image',
+                                    x: 100,
+                                    y: 100,
+                                    width: 300,
+                                    height: 200,
+                                    content: img,
+                                    zIndex: currentSlide.elements.length + 1,
+                                    style: { opacity: 1, rotation: 0 }
+                                  };
+                                  triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
+                                  setSelectedIds(new Set([newEl.id]));
+                                }}
+                                className="p-0.5 px-1 bg-cyan-700 rounded text-[8px] font-bold text-white hover:bg-cyan-600 font-mono"
+                              >
+                                Inserir
+                              </button>
+                              <button 
+                                onClick={() => setUserUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
+                                className="text-red-400 hover:text-red-350"
+                              >
+                                <Trash2 size={8}/>
+                              </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  {arquivosSubTab === 'uploads' && (
-                    <div className="space-y-4">
-                      <div className="border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/50 transition-all rounded-xl p-4 text-center cursor-pointer relative">
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (loadRes) => {
-                                if (loadRes.target?.result) {
-                                  setUserUploadedImages(prev => [...prev, loadRes.target!.result as string]);
-                                  toast.success('Imagem carregada com sucesso para uploads!');
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                        <Upload size={20} className="mx-auto text-slate-500 mb-2" />
-                        <span className="text-[11px] block text-slate-300 font-bold">Arraste uma Imagem</span>
-                        <span className="text-[9px] text-slate-600 block mt-0.5">JPEG, PNG • Max 5MB</span>
-                      </div>
-
-                      <div className="space-y-2 pt-2">
-                        <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Mídia Enviada ({userUploadedImages.length})</span>
-                        <div className="grid grid-cols-2 gap-2 p-0.5">
-                          {userUploadedImages.map((img, i) => (
-                            <div key={i} className="relative group rounded-lg overflow-hidden border border-slate-800 bg-slate-950 aspect-video">
-                              <img src={img} className="w-full h-full object-cover" />
-                              <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                  onClick={() => {
-                                    if (isLockedByPass) return;
-                                    const newEl: any = {
-                                      id: `img-${Date.now()}-${i}`,
-                                      type: 'image',
-                                      x: 100,
-                                      y: 100,
-                                      width: 300,
-                                      height: 200,
-                                      content: img,
-                                      zIndex: currentSlide.elements.length + 1,
-                                      style: { opacity: 1, rotation: 0 }
-                                    };
-                                    triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                                    setSelectedIds(new Set([newEl.id]));
-                                  }}
-                                  className="p-0.5 px-1 bg-cyan-700 rounded text-[8px] font-bold text-white hover:bg-cyan-600 font-mono"
-                                >
-                                  Inserir
-                                </button>
-                                <button 
-                                  onClick={() => setUserUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
-                                  className="text-red-400 hover:text-red-350"
-                                >
-                                  <Trash2 size={8}/>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {arquivosSubTab === 'importacao' && (
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-bold">Importação Direta</span>
-                        <div className="relative border border-slate-800 p-3 rounded-lg bg-slate-950/50 hover:border-cyan-500/30 transition-all text-center">
-                          <input 
-                            type="file" 
-                            accept="image/*,.pdf,.doc,.docx"
-                            onChange={handleImportFile}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                          />
-                          <span className="text-xs text-cyan-400 font-extrabold block">Selecionar Documento / Imagem</span>
-                          <span className="text-[9px] text-slate-500 block leading-none mt-1">Reconhece PDF e importa elementos vetoriais</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-2">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-bold">Formatos de Exportação</span>
-                        <div className="grid grid-cols-1 gap-2">
-                          <button onClick={() => executeConversion('pdf')} className="p-2 w-full bg-gradient-to-r from-cyan-600/20 to-cyan-600/10 hover:from-cyan-600/30 font-bold rounded-lg text-xs flex items-center gap-2 border border-cyan-800/20 text-left">
-                            <FileText size={12} className="text-cyan-400"/> PDF Corporativo Premium
-                          </button>
-                          <button onClick={() => executeConversion('docx')} className="p-2 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-lg text-xs text-left text-slate-350 flex items-center gap-2">
-                            <FileText size={12} className="text-indigo-400" /> Exportar Microsoft Word (DOC)
-                          </button>
-                          <button onClick={() => executeConversion('pptx')} className="p-2 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-lg text-xs text-left text-slate-350 flex items-center gap-2">
-                            <LayersIcon size={12} className="text-amber-500" /> Keynote / PowerPoint (PPTX)
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button 
-                          onClick={() => {
-                            toast.info('Dividindo arquivo selecionado... Páginas 1 e ' + slides.length + ' extraídas!');
-                          }}
-                          className="w-full text-center py-2 border border-slate-800/80 bg-slate-900/30 hover:bg-slate-900 rounded-lg text-[10px] font-bold text-slate-400"
-                        >
-                          Utilitário: Dividir PDF / Extrair
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -4211,7 +5294,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               <span className="text-cyan-400 font-extrabold">
                                 {selectedEl.style?.borderRadius !== undefined 
                                   ? `${selectedEl.style.borderRadius}px` 
-                                  : (selectedEl.id?.includes('circ') ? '9999px (Círculo)' : '4px')}
+                                  : (selectedEl.id?.includes('circ') || selectedEl.style?.variant === 'sphere' ? '9999px (Círculo)' : '4px')}
                               </span>
                             </div>
                             <div className="flex items-center bg-[#0a0d14] border border-slate-800 p-2.5 rounded-xl h-10 w-full">
@@ -4220,9 +5303,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 min="0"
                                 max="120"
                                 step="1"
-                                value={selectedEl.style?.borderRadius !== undefined ? selectedEl.style.borderRadius : (selectedEl.id?.includes('circ') ? 100 : 4)}
+                                value={selectedEl.style?.borderRadius !== undefined ? selectedEl.style.borderRadius : (selectedEl.id?.includes('circ') || selectedEl.style?.variant === 'sphere' ? 100 : 4)}
                                 onChange={(e) => updateElementProps(selectedEl.id, { style: { borderRadius: parseInt(e.target.value) } })}
-                                className="w-full h-1 bg-[#181d28] accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
                           </div>
@@ -4241,7 +5324,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="0.05"
                                 value={selectedEl.style?.opacity ?? 1}
                                 onChange={(e) => updateElementProps(selectedEl.id, { style: { opacity: parseFloat(e.target.value) } })}
-                                className="w-full h-1 bg-[#181d28] accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
                           </div>
@@ -4260,7 +5343,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="5"
                                 value={selectedEl.style?.rotation || 0}
                                 onChange={(e) => updateElementProps(selectedEl.id, { style: { rotation: parseInt(e.target.value) } })}
-                                className="w-full h-1 bg-[#181d28] accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
                           </div>
@@ -4403,7 +5486,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                     step="15"
                                     value={selectedEl.style?.gradientAngle ?? 135}
                                     onChange={(e) => updateElementProps(selectedEl.id, { style: { gradientAngle: parseInt(e.target.value) } })}
-                                    className="w-full h-1 bg-[#181d28] accent-cyan-400 rounded-lg cursor-pointer"
+                                    className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                                   />
                                 </div>
                               )}
@@ -4465,7 +5548,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     // shapeSubTab === 'inserir'
                     return (
                       <div className="space-y-4">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Formas & Corretivo</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Inserir Formas</span>
                         <div className="grid grid-cols-2 gap-1.5 font-sans">
                           <button 
                             onClick={() => {
@@ -4482,7 +5565,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               setSelectedIds(new Set([newEl.id]));
                               setShapeSubTab('editar');
                             }}
-                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center gap-1.5 cursor-pointer transition-colors"
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <div className="w-6 h-5 bg-slate-500 rounded-sm" />
                             <span className="text-[9px] text-slate-350 font-bold">Retângulo</span>
@@ -4497,15 +5580,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 x: 200, y: 350, width: 125, height: 125,
                                 content: 'Circle',
                                 zIndex: currentSlide.elements.length + 1,
-                                style: { backgroundColor: '#ef4444', borderRadius: 500, opacity: 1, rotation: 0 }
+                                style: { backgroundColor: '#3b82f6', borderRadius: 500, opacity: 1, rotation: 0 }
                               };
                               triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
                               setSelectedIds(new Set([newEl.id]));
                               setShapeSubTab('editar');
                             }}
-                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center gap-1.5 cursor-pointer transition-colors"
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
-                            <div className="w-5 h-5 bg-red-500 rounded-full" />
+                            <div className="w-5 h-5 bg-blue-500 rounded-full" />
                             <span className="text-[9px] text-slate-350 font-bold">Círculo</span>
                           </button>
 
@@ -4513,336 +5596,89 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             onClick={() => {
                               if (isLockedByPass) return;
                               const newEl: any = {
-                                id: `shape-whiteout-${Date.now()}`,
+                                id: `shape-tri-${Date.now()}`,
                                 type: 'shape',
-                                x: 150, y: 150, width: 160, height: 50,
-                                content: 'Whiteout',
+                                x: 200, y: 350, width: 120, height: 110,
+                                content: 'Triangle',
                                 zIndex: currentSlide.elements.length + 1,
-                                style: { backgroundColor: '#ffffff', borderRadius: 0, opacity: 1, rotation: 0, border: 'none' }
+                                style: { backgroundColor: '#10b981', opacity: 1, rotation: 0, shapeVariant: 'triangle' }
                               };
                               triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
                               setSelectedIds(new Set([newEl.id]));
                               setShapeSubTab('editar');
-                              toast.success('Corretivo criado! Arraste e redimensione para cobrir/apagar logos, textos ou gráficos do PDF original.');
                             }}
-                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Apague ou masque qualquer parte do PDF original"
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
-                            <div className="w-6 h-5 bg-white border border-dashed border-cyan-500 flex items-center justify-center">
-                              <Eraser size={10} className="text-cyan-500" />
-                            </div>
-                            <span className="text-[9px] text-cyan-400 font-bold">Corretivo</span>
+                            <div className="w-5 h-5 bg-emerald-500" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }} />
+                            <span className="text-[9px] text-slate-350 font-bold">Triângulo</span>
                           </button>
 
                           <button 
                             onClick={() => {
                               if (isLockedByPass) return;
                               const newEl: any = {
-                                id: `shape-redact-${Date.now()}`,
-                                type: 'redact',
-                                x: 150, y: 150, width: 180, height: 44,
-                                content: 'Redact Block',
+                                id: `shape-star-${Date.now()}`,
+                                type: 'shape',
+                                x: 200, y: 350, width: 120, height: 120,
+                                content: 'Star',
                                 zIndex: currentSlide.elements.length + 1,
-                                style: { backgroundColor: '#000000', borderRadius: 0, opacity: 1, rotation: 0, border: 'none' }
+                                style: { backgroundColor: '#f59e0b', opacity: 1, rotation: 0, shapeVariant: 'star' }
                               };
                               triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
                               setSelectedIds(new Set([newEl.id]));
-                              toast.success('Tarja de Censura (Redact) criada! Arraste e posicione-a sobre informações confidenciais do PDF.');
+                              setShapeSubTab('editar');
                             }}
-                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Ocultar de forma segura informações confidenciais do PDF"
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
-                            <div className="w-6 h-5 bg-black border border-red-500 flex items-center justify-center text-red-500">
-                              <Shield size={10} />
-                            </div>
-                            <span className="text-[9px] text-red-400 font-bold">Censurar (Redact)</span>
+                            <div className="w-5 h-5 bg-amber-500" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }} />
+                            <span className="text-[9px] text-slate-350 font-bold">Estrela</span>
                           </button>
-                        </div>
-
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold pt-2">Anotação com Caneta</span>
-                        <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl space-y-3">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-slate-400 font-bold">Paleta de cores</span>
-                          </div>
-                          <div className="flex gap-2 justify-center">
-                            {['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#a855f7'].map(col => (
-                              <button 
-                                key={col}
-                                onClick={() => setSelectedColor(col)}
-                                className={`w-5 h-5 rounded-full transition-transform cursor-pointer ${selectedColor === col ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'}`}
-                                style={{ backgroundColor: col }}
-                              />
-                            ))}
-                          </div>
-
-                          {/* Brush thickness choice */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[9px] text-slate-500">
-                              <span>Espessura da Caneta</span>
-                              <span className="text-cyan-400 font-bold">{drawingWidth}px</span>
-                            </div>
-                            <input 
-                              type="range"
-                              min="1"
-                              max="20"
-                              step="1"
-                              value={drawingWidth}
-                              onChange={(e) => setDrawingWidth(parseInt(e.target.value))}
-                              className="w-full h-1 bg-slate-900 accent-cyan-500 rounded-lg cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[8px] text-slate-600">
-                              <span>Fina</span>
-                              <span>Média</span>
-                              <span>Grossa</span>
-                            </div>
-                          </div>
 
                           <button 
-                            onClick={clearDrawing}
-                            className="w-full py-1.5 text-[9px] font-bold border border-slate-850 hover:bg-slate-950 bg-slate-950 rounded-lg text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
+                            onClick={() => {
+                              if (isLockedByPass) return;
+                              const newEl: any = {
+                                id: `shape-arrow-${Date.now()}`,
+                                type: 'shape',
+                                x: 200, y: 350, width: 140, height: 80,
+                                content: 'Arrow',
+                                zIndex: currentSlide.elements.length + 1,
+                                style: { backgroundColor: '#a855f7', opacity: 1, rotation: 0, shapeVariant: 'arrow' }
+                              };
+                              triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
+                              setSelectedIds(new Set([newEl.id]));
+                              setShapeSubTab('editar');
+                            }}
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
-                            Limpar Rabisco Caneta
+                            <div className="w-6 h-4 bg-purple-500" style={{ clipPath: 'polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)' }} />
+                            <span className="text-[9px] text-slate-350 font-bold">Seta</span>
                           </button>
-                        </div>
 
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold pt-2">Carimbos Administrativos</span>
-                        <div className="grid grid-cols-1 gap-2">
-                          {['APROVADO', 'VERIFICADO', 'CONFIDENCIAL', 'CANCELADO'].map(stamp => (
-                            <button
-                              key={stamp}
-                              onClick={() => {
-                                if (isLockedByPass) return;
-                                const newEl: any = {
-                                  id: `stamp-${Date.now()}`,
-                                  type: 'text',
-                                  x: 350,
-                                  y: 150,
-                                  width: 180,
-                                  height: 48,
-                                  content: stamp,
-                                  zIndex: currentSlide.elements.length + 1,
-                                  style: {
-                                    fontFamily: 'Inter',
-                                    fontSize: 18,
-                                    color: stamp === 'APROVADO' ? '#16a34a' : stamp === 'CONFIDENCIAL' ? '#ca8a04' : '#dc2626',
-                                    fontWeight: '900',
-                                    border: `3px solid ${stamp === 'APROVADO' ? '#16a34a' : stamp === 'CONFIDENCIAL' ? '#ca8a04' : '#dc2626'}`,
-                                    borderRadius: 6,
-                                    textAlign: 'center',
-                                    rotation: -12,
-                                    opacity: 0.85
-                                  }
-                                };
-                                triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                                toast.success(`Carimbo ${stamp} estampado!`);
-                              }}
-                              className="py-1.5 border border-slate-800 hover:border-slate-705 hover:bg-slate-950/80 rounded-lg text-xs font-bold text-center capitalize text-slate-300 pointer-events-auto cursor-pointer transition-all animate-in fade-in-50"
-                            >
-                              Carimbo: {stamp}
-                            </button>
-                          ))}
+                          <button 
+                            onClick={() => {
+                              if (isLockedByPass) return;
+                              const newEl: any = {
+                                id: `shape-line-${Date.now()}`,
+                                type: 'shape',
+                                x: 200, y: 350, width: 200, height: 4,
+                                content: 'Line',
+                                zIndex: currentSlide.elements.length + 1,
+                                style: { backgroundColor: '#64748b', opacity: 1, rotation: 0 }
+                              };
+                              triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
+                              setSelectedIds(new Set([newEl.id]));
+                              setShapeSubTab('editar');
+                            }}
+                            className="p-2 border border-slate-800 bg-[#0d1117] hover:bg-[#141822] rounded-xl text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <div className="w-6 h-1 bg-slate-500 rounded-full" />
+                            <span className="text-[9px] text-slate-350 font-bold">Linha</span>
+                          </button>
                         </div>
                       </div>
                     );
                   })()}
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'tabelas' && (
-              <div className="flex flex-col h-full">
-                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
-                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400">Tabelas</span>
-                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
-                </div>
-                <div className="p-4 space-y-4">
-                  <div className="bg-[#0F1115] border border-slate-800 p-3.5 rounded-xl space-y-2.5 font-sans">
-                    <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Criar Nova Grade</span>
-                    <p className="text-[10px] text-slate-500 leading-snug">Insira um mock de tabela formatada automaticamente para relatórios de faturamento.</p>
-                    
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <button 
-                        onClick={() => {
-                          if (isLockedByPass) return;
-                          const t1: any = {
-                            id: `grid-${Date.now()}`,
-                            type: 'text',
-                            x: 100, y: 500, width: 640, height: 180,
-                            content: 'PRODUTO        | QUANTIDADE  | STATUS        | TOTAL\n--------------------------------------------------------------\nSalsa Casino   | 14.500      | ATIVO         | R$ 103.976,00\nSalsa Bingo    | 3.200       | AGUARDANDO    | R$ 29.391,00\nSalsa Sport    | 22.800      | ATIVO         | R$ 143.078,00',
-                            zIndex: currentSlide.elements.length + 1,
-                            style: { fontFamily: 'JetBrains Mono', fontSize: 13, color: '#334155', fontWeight: 'normal', lineHeight: 1.6 }
-                          };
-                          triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, t1] } : s));
-                          setSelectedIds(new Set([t1.id]));
-                          toast.success('Grade de tabela inserida com sucesso!');
-                        }}
-                        className="p-2 border border-slate-800 hover:border-cyan-500/40 bg-slate-950/80 rounded text-[10px] font-bold text-center text-slate-300"
-                      >
-                        Grade 4x3 (Mono)
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if (isLockedByPass) return;
-                          const t1: any = {
-                            id: `grid-${Date.now()}`,
-                            type: 'text',
-                            x: 100, y: 500, width: 640, height: 150,
-                            content: 'MÉTRICA        | OUTUBRO     | NOVEMBRO     | DEZEMBRO\n--------------------------------------------------------------\nNovos Usuários | +12%        | +18%         | +25%\nSessão Média   | 18.5 min    | 22.1 min     | 25.0 min',
-                            zIndex: currentSlide.elements.length + 1,
-                            style: { fontFamily: 'JetBrains Mono', fontSize: 13, color: '#1e293b', fontWeight: 'normal', lineHeight: 1.6 }
-                          };
-                          triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, t1] } : s));
-                          setSelectedIds(new Set([t1.id]));
-                          toast.success('Grade de faturamento inserida!');
-                        }}
-                        className="p-2 border border-slate-800 hover:border-cyan-500/40 bg-slate-950/80 rounded text-[10px] font-bold text-center text-slate-300"
-                      >
-                        Grade Períodos
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'comentarios' && (
-              <div className="flex flex-col h-full font-sans">
-                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
-                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400">Canal de Comentários</span>
-                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
-                </div>
-                <div className="p-4 space-y-4 flex flex-col h-[calc(100%-60px)]">
-                  <div className="flex-1 overflow-y-auto space-y-2 max-h-[340px] custom-scrollbar">
-                    {comments.map((c) => (
-                      <div key={c.id} className="p-3 rounded-lg border border-slate-800 bg-slate-950/40 space-y-1">
-                        <div className="flex justify-between items-center text-[9px]">
-                          <span className="text-cyan-400 font-extrabold">{c.author}</span>
-                          <span className="text-slate-500 font-mono text-[8px]">Pág. {c.slideIndex + 1}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-350 leading-snug">{c.text}</p>
-                        <div className="text-[8px] text-slate-600 font-mono text-right">{new Date(c.timestamp).toLocaleTimeString()}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-1.5 pt-2 border-t border-slate-800/85">
-                    <button 
-                      onClick={() => {
-                        setIsAddingStickyPin(!isAddingStickyPin);
-                        if (!isAddingStickyPin) {
-                          toast.info('Modo Alfinete Ativado! Clique em qualquer parte do PDF/Slide para fixar a nota na coordenada exata.');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer ${
-                        isAddingStickyPin 
-                          ? 'bg-amber-600 animate-pulse text-white font-extrabold ring-2 ring-amber-500' 
-                          : 'bg-amber-500 hover:bg-amber-450 text-slate-900 font-extrabold'
-                      }`}
-                    >
-                      <Pin size={12} className="stroke-[2.5px]"/> {isAddingStickyPin ? 'Aguardando Clique no PDF...' : '📍 Fixar Nota em Coordenada Exata'}
-                    </button>
-
-                    <div className="py-2 flex items-center text-slate-600 justify-center gap-2">
-                      <div className="h-px bg-slate-800 flex-1"></div>
-                      <span className="text-[8px] uppercase tracking-wider font-extrabold select-none">Ou Comentário Geral</span>
-                      <div className="h-px bg-slate-800 flex-1"></div>
-                    </div>
-
-                    <textarea
-                      placeholder="Escreva sua revisão..."
-                      value={newCommentText}
-                      onChange={(e) => setNewCommentText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500 h-16 resize-none"
-                    />
-                    <button 
-                      onClick={() => {
-                        if (!newCommentText) return;
-                        setComments(prev => [...prev, { id: `c-${Date.now()}`, slideIndex: currentSlideIndex, text: newCommentText, author: 'Você (Revisor)', timestamp: new Date() }]);
-                        setNewCommentText('');
-                        toast.success('Comentário postado e sincronizado com os revisores!');
-                      }}
-                      className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700/60 rounded-lg text-xs font-bold"
-                    >
-                      Postar Nota Geral
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'assinaturas' && (
-              <div className="flex flex-col h-full font-sans">
-                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
-                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400">Assinaturas Digitais</span>
-                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
-                </div>
-                <div className="p-4 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
-                  <div className="bg-[#0F1115] border border-slate-800 p-3 rounded-lg space-y-2">
-                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Caneta Assinatura</span>
-                    <button 
-                      onClick={() => {
-                        setSignatureTargetBoxId(`el-form-${Date.now()}`);
-                        const newEl: any = {
-                          id: `el-form-${Date.now()}`,
-                          type: 'text',
-                          x: 295, y: 880, width: 250, height: 100,
-                          content: 'Pressione "Assinar" na barra',
-                          zIndex: currentSlide.elements.length + 1,
-                          style: { fontFamily: 'Inter', fontSize: 13, color: '#475569', backgroundColor: '#f8fafc', border: '2px dashed #0284c7', borderRadius: 4, textAlign: 'center' },
-                          isFormField: true,
-                          formFieldType: 'signature',
-                          formFieldName: 'Assinatura_Diretoria'
-                        };
-                        triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                        setSelectedIds(new Set([newEl.id]));
-                        setSigPadOpen(true);
-                        toast.info('Abra a lousa de assinaturas para desenhar no campo e autenticar.');
-                      }}
-                      className="w-full py-2 bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-bold rounded-lg text-xs text-center block"
-                    >
-                      Assinar com Mouse / Touch
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Assinatura Digitada</span>
-                    <input 
-                      type="text" 
-                      placeholder="Nome completo..."
-                      value={sigTypeText}
-                      onChange={(e) => setSigTypeText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-xs text-white outline-none"
-                    />
-                    <div className="grid grid-cols-1 gap-1">
-                      {[
-                        { name: 'Manuscrita Elegante', font: 'Brush Script MT, cursive' },
-                        { name: 'SaaS Tech', font: 'Courier New, monospace' },
-                        { name: 'Moderna Slanted', font: 'Times New Roman, serif' }
-                      ].map(opt => (
-                        <button 
-                          key={opt.name}
-                          onClick={() => {
-                            if (!sigTypeText) return;
-                            const newEl: any = {
-                              id: `sig-typed-${Date.now()}`,
-                              type: 'text',
-                              x: 295, y: 920, width: 250, height: 50,
-                              content: sigTypeText,
-                              zIndex: currentSlide.elements.length + 1,
-                              style: { fontFamily: opt.font, fontSize: 24, color: '#0369a1', textAlign: 'center' }
-                            };
-                            triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                            setSelectedIds(new Set([newEl.id]));
-                            toast.success('Assinatura manuscrita digital deitada com sucesso!');
-                          }}
-                          className="p-1 px-2 text-[9px] hover:bg-slate-900 border border-slate-850 rounded text-left text-slate-355 truncate flex items-center justify-between"
-                        >
-                          <span style={{ fontFamily: opt.font }}>{sigTypeText || 'Visualização'}</span>
-                          <span className="text-[8px] text-slate-500">{opt.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -5033,63 +5869,6 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     </div>
                   </div>
 
-                  {/* HEADER & FOOTER TEXT INPUTS */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Texto cabeçalho fixo</label>
-                    <input 
-                      type="text" 
-                      value={headerText} 
-                      onChange={(e) => setHeaderText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-xs text-white outline-none focus:border-cyan-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Texto rodapé fixo</label>
-                    <input 
-                      type="text" 
-                      value={footerText} 
-                      onChange={(e) => setFooterText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-xs text-white outline-none focus:border-cyan-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Marca d'água de proteção</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: CONFIDENCIAL..."
-                      value={watermark} 
-                      onChange={(e) => setWatermark(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-xs text-white outline-none focus:border-cyan-500"
-                    />
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-800 space-y-1 bg-slate-950/20 p-2.5 rounded-lg border border-slate-850">
-                    <span className="text-[9px] text-amber-400 font-black tracking-wider block uppercase">Criptografia de Senha</span>
-                    <div className="flex gap-1.5 items-center pt-1">
-                      <input 
-                        type="password" 
-                        placeholder="Senha mestre"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="bg-slate-950 border border-slate-800 rounded p-1 text-[11px] flex-1 text-white outline-none"
-                      />
-                      <button 
-                        onClick={() => {
-                          if (password) {
-                            setIsLockedByPass(true);
-                            toast.success('Documento criptografado!');
-                          } else {
-                            toast.error('Informe uma senha!');
-                          }
-                        }}
-                        className="p-1 px-2 bg-amber-600 hover:bg-amber-500 rounded text-[10px] text-white font-bold"
-                      >
-                        Trancar
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -5373,26 +6152,6 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         {/* UPPER MAIN RIBBON: EDITING CONTROLS & SEARCH */}
         <div className="h-16 border-b border-[#1e293b] bg-[#0c1017] px-6 flex items-center justify-between shrink-0 gap-4">
           
-          {/* LEFT COMMAND DUO: MODES SELECTOR */}
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setEditMode('EDIT')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${editMode === 'EDIT' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white bg-slate-900'}`}
-            >
-              ✏️ Modo Designer
-            </button>
-            <button 
-              onClick={() => {
-                setEditMode('LIVE_FILL');
-                setSelectedIds(new Set());
-              }}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${editMode === 'LIVE_FILL' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white bg-slate-900'}`}
-              title="Permite interagir com os campos e formular assinaturas"
-            >
-              📋 Preenchimento & Assinatura
-            </button>
-          </div>
-
           {/* DYNAMIC MIDDLE GLOBAL SEARCH CONTROLLER */}
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-full px-3 h-9 max-w-sm flex-1">
             <Search size={14} className="text-slate-500 mr-2"/>
@@ -5443,10 +6202,21 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             </button>
             <div className="w-px h-5 bg-slate-800 mx-1"></div>
             <button 
-              onClick={() => setConversionModalOpen(true)}
+              onClick={() => {
+                setPresentationSlideIndex(currentSlideIndex);
+                setIsPresentationMode(true);
+                toast.success('Iniciando apresentação de slides estilo PowerPoint! Pressione ESC para sair.');
+              }}
+              className="p-2 px-3 border border-slate-800 hover:border-cyan-500/50 rounded-xl text-slate-400 hover:text-[#22d3ee] bg-slate-900 transition-all flex items-center gap-1.5 cursor-pointer text-xs font-black uppercase tracking-wider"
+              title="Apresentar Slides (F5)"
+            >
+              <Presentation size={14} className="text-cyan-400" /> APRESENTAR
+            </button>
+            <button 
+              onClick={() => executeConversion('pdf')}
               className="p-2 px-4 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 rounded-xl text-xs font-black tracking-wide text-white flex items-center gap-2 shadow-lg shadow-cyan-950/50"
             >
-              <Download size={14}/> EXPORTAR / CONVERSÃO
+              <Download size={14}/> EXPORTAR
             </button>
           </div>
         </div>
@@ -5475,31 +6245,6 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           >
             <Maximize size={13} className={activeLeftTab === 'redimensionar' ? 'text-cyan-400' : ''} />
             Redimensionar
-          </button>
-
-          <div className="w-px h-4 bg-slate-800 mx-1"></div>
-
-          <button 
-            onClick={() => {
-              setPageOrganizerOpen(true);
-              toast.info('Abrindo organizador de páginas estilo Acrobat...');
-            }}
-            className="px-4 py-1.5 rounded-full text-xs font-extrabold text-slate-400 hover:text-white hover:bg-[#11141a] transition-all duration-200 cursor-pointer flex items-center gap-1.5"
-          >
-            <Layers size={13} className="text-cyan-400" />
-            Organizar Páginas
-          </button>
-
-          <button 
-            onClick={() => {
-              setEditMode(editMode === 'LIVE_FILL' ? 'EDIT' : 'LIVE_FILL');
-              setSelectedIds(new Set());
-              toast.info(editMode === 'LIVE_FILL' ? 'Caneta e realce desativados.' : 'Modo Canetas & Realce Acrobat Ativado!');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${editMode === 'LIVE_FILL' ? 'bg-[#ef4444] text-white border border-red-700/60 shadow' : 'text-slate-400 hover:text-white hover:bg-[#11141a]'}`}
-          >
-            <PenTool size={13} className={editMode === 'LIVE_FILL' ? 'text-white' : 'text-amber-400'} />
-            Desbloquear Tinta
           </button>
         </div>
 
@@ -5757,7 +6502,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   onMouseMove={isSlideActive ? handleMouseMove : undefined}
                   onMouseUp={isSlideActive ? handleMouseUp : undefined}
                   onContextMenu={(e) => handleCanvasContextMenu(e, idx)}
-                  className="bg-white text-slate-950 relative border shadow-md w-full h-full select-none"
+                  id={`slide-canvas-export-${idx}`}
+                  className="bg-white text-slate-950 relative shadow-md w-full h-full select-none overflow-hidden"
                   style={{
                     width: `${docWidth}px`,
                     height: `${docHeight}px`,
@@ -5770,10 +6516,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   }}
                 >
                   {/* RUNNING HEADER LAYER */}
-                  <div className="absolute top-6 left-12 right-12 flex justify-between border-b border-slate-200 pb-2 text-[10px] text-slate-400 select-none">
-                    <span>{headerText.toUpperCase()}</span>
-                    <span>Acrobat Pro Document</span>
-                  </div>
+                  {pageSizeType !== 'SLIDE_16_9' && (
+                    <div className="absolute top-6 left-12 right-12 flex justify-between border-b border-slate-200 pb-2 text-[10px] text-slate-400 select-none">
+                      <span>{headerText.toUpperCase()}</span>
+                      <span>Acrobat Pro Document</span>
+                    </div>
+                  )}
 
                   {/* WATERMARK BACKGROUND LAYER */}
                   {watermark && (
@@ -5926,7 +6674,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                   {/* CANVAS INTERACTIVE PLAYGROUND ELEMENTS */}
                   <div className="absolute inset-0 pt-20 pb-20 px-12 z-10">
-                    {slide.elements.map((el: any) => {
+                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any) => {
                       const isSelected = selectedIds.has(el.id);
                       
                       return (
@@ -6038,7 +6786,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             backgroundColor: el.type === 'shape' ? 'transparent' : el.style?.backgroundColor,
                             borderRadius: el.style?.borderRadius !== undefined 
                               ? `${el.style.borderRadius}px` 
-                              : (el.id?.includes('circ') ? '9999px' : undefined),
+                              : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? '9999px' : undefined),
                             border: el.style?.border || 'none'
                           }}
                         >
@@ -6048,7 +6796,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               className={`absolute -inset-[2.5px] rounded-[inherit] pointer-events-none z-[49] border transition-colors duration-75 ${
                                 isSelected 
                                   ? 'border-2 border-blue-500 ring-4 ring-blue-500/10' 
-                                  : 'border border-dashed border-slate-300/40 hover:border-blue-500/50 group-hover:border-blue-500/50'
+                                  : 'border border-transparent hover:border-blue-500/50 group-hover:border-blue-500/50'
                                }`} 
                              />
                            )}
@@ -6280,36 +7028,58 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                           ) : el.type === 'text' ? (
                             
                             // --- TEXT ELEMENT INLINE EDIT ---
-                            <textarea
-                              id={`textarea-${el.id}`}
-                              value={el.content}
-                              onChange={(e) => updateElementProps(el.id, { content: e.target.value })}
-                              onBlur={() => setEditingTextId(null)}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Escape') {
-                                  e.stopPropagation();
-                                  (e.target as HTMLTextAreaElement).blur();
-                                }
-                              }}
-                              disabled={editMode === 'LIVE_FILL'}
-                              className="w-full h-full bg-transparent border-none resize-none outline-none select-text custom-scrollbar focus:ring-0"
-                              style={{
-                                fontFamily: el.style.fontFamily || 'Inter',
-                                fontSize: `${el.style.fontSize || 14}px`,
-                                color: el.style.color || '#1e293b',
-                                textAlign: el.style.textAlign || 'left',
-                                fontWeight: el.style.fontWeight || 'normal',
-                                lineHeight: el.style.lineHeight || 1.2,
-                                letterSpacing: el.style.letterSpacing || 'normal',
-                                fontStyle: el.style.fontStyle || 'normal',
-                                textDecoration: el.style.textDecoration || 'none',
-                                textTransform: el.style.textTransform || 'none',
-                                opacity: el.style.opacity ?? 1,
-                                paddingLeft: el.style.indent ? `${el.style.indent}px` : undefined,
-                                pointerEvents: editingTextId === el.id ? 'auto' : 'none',
-                              }}
-                            />
+                            editingTextId === el.id ? (
+                              <textarea
+                                id={`textarea-${el.id}`}
+                                value={el.content}
+                                onChange={(e) => updateElementProps(el.id, { content: e.target.value })}
+                                onBlur={() => setEditingTextId(null)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') {
+                                    e.stopPropagation();
+                                    (e.target as HTMLTextAreaElement).blur();
+                                  }
+                                }}
+                                disabled={editMode === 'LIVE_FILL'}
+                                className="w-full h-full bg-transparent border-none resize-none outline-none select-text custom-scrollbar focus:ring-0 p-0 m-0"
+                                style={{
+                                  fontFamily: el.style.fontFamily || 'Inter',
+                                  fontSize: `${el.style.fontSize || 14}px`,
+                                  color: el.style.color || '#1e293b',
+                                  textAlign: el.style.textAlign || 'left',
+                                  fontWeight: el.style.fontWeight || 'normal',
+                                  lineHeight: el.style.lineHeight || 1.2,
+                                  letterSpacing: el.style.letterSpacing || 'normal',
+                                  fontStyle: el.style.fontStyle || 'normal',
+                                  textDecoration: el.style.textDecoration || 'none',
+                                  textTransform: el.style.textTransform || 'none',
+                                  opacity: el.style.opacity ?? 1,
+                                  paddingLeft: el.style.indent ? `${el.style.indent}px` : undefined,
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-full bg-transparent overflow-visible whitespace-pre-wrap break-words leading-tight select-none"
+                                style={{
+                                  fontFamily: el.style.fontFamily || 'Inter',
+                                  fontSize: `${el.style.fontSize || 14}px`,
+                                  color: el.style.color || '#1e293b',
+                                  textAlign: el.style.textAlign || 'left',
+                                  fontWeight: el.style.fontWeight || 'normal',
+                                  lineHeight: el.style.lineHeight || 1.2,
+                                  letterSpacing: el.style.letterSpacing || 'normal',
+                                  fontStyle: el.style.fontStyle || 'normal',
+                                  textDecoration: el.style.textDecoration || 'none',
+                                  textTransform: el.style.textTransform || 'none',
+                                  opacity: el.style.opacity ?? 1,
+                                  paddingLeft: el.style.indent ? `${el.style.indent}px` : undefined,
+                                  pointerEvents: 'none',
+                                }}
+                              >
+                                {el.content}
+                              </div>
+                            )
                           ) : el.type === 'comment' ? (
                             <div className="w-full h-full flex items-center justify-center bg-amber-400 border border-amber-500 rounded-full shadow-lg relative group/comment cursor-pointer">
                               <MessageSquare size={20} className="text-amber-950" />
@@ -6384,7 +7154,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             
                             // --- FORM SHAPED ELEMENTS ---
                             <div 
-                              className="w-full h-full"
+                              className="w-full h-full relative overflow-hidden"
                               style={{
                                 ...(el.style?.useGradient
                                   ? {
@@ -6395,10 +7165,90 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                   : { backgroundColor: el.style?.backgroundColor || '#0284c7' }),
                                 borderRadius: el.style?.borderRadius !== undefined 
                                   ? `${el.style.borderRadius}px` 
-                                  : (el.id?.includes('circ') ? '9999px' : '4px'),
-                                border: el.style?.border || 'none'
+                                  : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? '9999px' : '4px'),
+                                border: el.style?.border || 'none',
+                                clipPath: el.style?.shapeVariant === 'triangle'
+                                  ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                                  : el.style?.shapeVariant === 'star'
+                                  ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                                  : el.style?.shapeVariant === 'arrow'
+                                  ? 'polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)'
+                                  : undefined
                               }}
-                            />
+                            >
+                              {slide.elements
+                                .filter((child: any) => child.maskedBy === el.id)
+                                .map((child: any) => {
+                                  const isChildSelected = selectedIds.has(child.id);
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      onMouseDown={(e) => {
+                                        if (editMode === 'LIVE_FILL' || isLockedByPass) return;
+                                        e.stopPropagation();
+                                        openSidebarForElement(child);
+                                        wasSelectedOnMouseDownRef.current = selectedIds.has(child.id);
+                                        mouseDownCoordsRef.current = { x: e.clientX, y: e.clientY };
+                                        if (child.isLocked) {
+                                          setSelectedIds(new Set([child.id]));
+                                          return;
+                                        }
+                                        handleMouseDown(e, child);
+                                      }}
+                                      className={`absolute select-none pointer-events-auto ${isChildSelected ? 'ring-2 ring-cyan-500 ring-offset-1' : ''}`}
+                                      style={{
+                                        left: `${child.x - el.x}px`,
+                                        top: `${child.y - el.y}px`,
+                                        width: `${child.width}px`,
+                                        height: `${child.height}px`,
+                                        zIndex: child.zIndex || 1,
+                                        transform: child.style?.rotation ? `rotate(${child.style.rotation}deg)` : undefined,
+                                        opacity: child.style?.opacity !== undefined ? child.style.opacity : 1,
+                                      }}
+                                    >
+                                      {child.type === 'shape' && (
+                                        <div
+                                          className="w-full h-full"
+                                          style={{
+                                            ...(child.style?.useGradient
+                                              ? {
+                                                  background: child.style.gradientType === 'radial'
+                                                    ? `radial-gradient(circle, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                                    : `linear-gradient(${child.style.gradientAngle ?? 135}deg, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                                }
+                                              : { backgroundColor: child.style?.backgroundColor || '#0284c7' }),
+                                            borderRadius: child.style?.borderRadius !== undefined 
+                                              ? `${child.style.borderRadius}px` 
+                                              : (child.id?.includes('circ') || child.style?.variant === 'sphere' ? '9999px' : '4px'),
+                                            border: child.style?.border || 'none'
+                                          }}
+                                        />
+                                      )}
+                                      {child.type === 'text' && (
+                                        <div
+                                          className="w-full h-full bg-transparent whitespace-pre-wrap break-words leading-tight"
+                                          style={{
+                                            fontFamily: child.style.fontFamily || 'Inter',
+                                            fontSize: `${child.style.fontSize || 14}px`,
+                                            color: child.style.color || '#1e293b',
+                                            textAlign: child.style.textAlign || 'left',
+                                            fontWeight: child.style.fontWeight || 'normal',
+                                            lineHeight: child.style.lineHeight || 1.2,
+                                            letterSpacing: child.style.letterSpacing || 'normal',
+                                            fontStyle: child.style.fontStyle || 'normal',
+                                            textDecoration: child.style.textDecoration || 'none',
+                                            textTransform: child.style.textTransform || 'none',
+                                            opacity: child.style.opacity ?? 1,
+                                            pointerEvents: 'none',
+                                          }}
+                                        >
+                                          {child.content}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           )}
 
                            {/* FIGMA / CANVA PREMIUM FLOATING QUICK TOOLBAR ABOVE ELEMENT */}
@@ -6989,10 +7839,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   />
 
                   {/* RUNNING FOOTER LAYER */}
-                  <div className="absolute bottom-6 left-12 right-12 flex justify-between border-t border-slate-200 pt-2 text-[10px] text-slate-400 select-none">
-                    <span>{footerText.toUpperCase()}</span>
-                    {autoPageNumbers && <span>Página {idx + 1} de {slides.length}</span>}
-                  </div>
+                  {pageSizeType !== 'SLIDE_16_9' && (
+                    <div className="absolute bottom-6 left-12 right-12 flex justify-between border-t border-slate-200 pt-2 text-[10px] text-slate-400 select-none">
+                      <span>{footerText.toUpperCase()}</span>
+                      {autoPageNumbers && <span>Página {idx + 1} de {slides.length}</span>}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -7027,6 +7879,33 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               return (
                 <div 
                   key={slide.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', idx.toString());
+                    setDraggedSlideIndex(idx);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggedSlideIndex !== null && dragOverSlideIndex !== idx) {
+                      setDragOverSlideIndex(idx);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverSlideIndex === idx) {
+                      setDragOverSlideIndex(null);
+                    }
+                  }}
+                  onDragEnd={() => {
+                    setDraggedSlideIndex(null);
+                    setDragOverSlideIndex(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const fromIdx = draggedSlideIndex !== null ? draggedSlideIndex : parseInt(e.dataTransfer.getData('text/plain'));
+                    handleReorderSlides(fromIdx, idx);
+                    setDraggedSlideIndex(null);
+                    setDragOverSlideIndex(null);
+                  }}
                   onClick={() => {
                     onSelectSlide(idx);
                     setActiveThumbnailMenuIndex(null);
@@ -7035,23 +7914,253 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     isActive 
                       ? 'border-[3px] border-slate-900 dark:border-cyan-400 shadow-md scale-[1.02] z-40 w-28'
                       : 'border border-slate-300 dark:border-slate-800 hover:border-slate-400 w-24 bg-white dark:bg-slate-950'
+                  } ${
+                    draggedSlideIndex === idx ? 'opacity-30 scale-95' : ''
+                  } ${
+                    dragOverSlideIndex === idx && draggedSlideIndex !== idx ? 'ring-4 ring-cyan-500/50 border-cyan-400 scale-[1.05]' : ''
                   }`}
                 >
                   {/* Miniature canvas screen content preview */}
-                  <div className="absolute inset-0 bg-white opacity-95 rounded-lg overflow-hidden">
-                    <div className="absolute inset-0 p-1 opacity-55 overflow-hidden">
-                      {(!activeElementId || idx === currentSlideIndex) && slide.elements.map(el => (
-                        <div 
-                          key={el.id} 
-                          className={`absolute rounded ${el.isRedacted ? 'bg-black': 'bg-slate-300'}`}
-                          style={{ 
-                            left: `${(el.x / docWidth) * 100}%`, 
-                            top: `${(el.y / docHeight) * 100}%`, 
-                            width: `${(el.width / docWidth) * 100}%`, 
-                            height: `${(el.height / docHeight) * 100}%` 
-                          }}
-                        />
-                      ))}
+                  <div className="absolute inset-0 rounded-lg overflow-hidden" style={{ background: slide.background || '#ffffff' }}>
+                    <div className="absolute inset-0 p-1 overflow-hidden">
+                      {slide.elements.filter((item: any) => !item.maskedBy).map(el => {
+                        const left = `${(el.x / docWidth) * 100}%`;
+                        const top = `${(el.y / docHeight) * 100}%`;
+                        const width = `${(el.width / docWidth) * 100}%`;
+                        const height = `${(el.height / docHeight) * 100}%`;
+                        const opacity = el.style?.opacity ?? 1;
+                        const rotation = el.style?.rotation ? `rotate(${el.style.rotation}deg)` : 'none';
+
+                        const commonStyle: React.CSSProperties = {
+                          position: 'absolute',
+                          left,
+                          top,
+                          width,
+                          height,
+                          opacity,
+                          transform: rotation,
+                          zIndex: el.zIndex,
+                        };
+
+                        if (el.isRedacted || el.type === 'redact') {
+                          return (
+                            <div 
+                              key={el.id} 
+                              style={{ ...commonStyle, backgroundColor: '#000000' }} 
+                              className="rounded-[1px]"
+                            />
+                          );
+                        }
+
+                        if (el.type === 'text') {
+                          const fontSize = Math.max(1, (el.style?.fontSize || 14) * 0.08);
+                          return (
+                            <div
+                              key={el.id}
+                              style={{
+                                ...commonStyle,
+                                fontFamily: el.style?.fontFamily || 'Inter',
+                                fontSize: `${fontSize}px`,
+                                color: el.style?.color || '#1e293b',
+                                textAlign: el.style?.textAlign || 'left',
+                                fontWeight: el.style?.fontWeight || 'normal',
+                                lineHeight: 1,
+                                letterSpacing: 'normal',
+                                fontStyle: el.style?.fontStyle || 'normal',
+                                textDecoration: el.style?.textDecoration || 'none',
+                                textTransform: el.style?.textTransform || 'none',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-all',
+                                overflow: 'hidden',
+                                paddingLeft: el.style?.indent ? `${el.style.indent * 0.08}px` : undefined,
+                              }}
+                            >
+                              {el.content}
+                            </div>
+                          );
+                        }
+
+                        if (el.type === 'image') {
+                          const crop = el.style?.crop || { left: 0, top: 0, right: 0, bottom: 0 };
+                          const scaleX = 100 / (100 - crop.left - crop.right);
+                          const scaleY = 100 / (100 - crop.top - crop.bottom);
+                          const posX = -crop.left * scaleX;
+                          const posY = -crop.top * scaleY;
+
+                          return (
+                            <div key={el.id} style={commonStyle} className="overflow-hidden">
+                              <img 
+                                src={el.content} 
+                                alt="" 
+                                className="absolute select-none pointer-events-none max-w-none w-full h-full"
+                                style={{
+                                  width: `${scaleX * 100}%`,
+                                  height: `${scaleY * 100}%`,
+                                  left: `${posX}%`,
+                                  top: `${posY}%`,
+                                }}
+                              />
+                            </div>
+                          );
+                        }
+
+                        if (el.type === 'shape' || (!el.type && el.style)) {
+                          const isVector = el.style?.variant === 'vector';
+                          const backgroundStyle: React.CSSProperties = isVector
+                            ? { backgroundColor: 'transparent' }
+                            : el.style?.useGradient
+                            ? {
+                                background: el.style.gradientType === 'radial'
+                                  ? `radial-gradient(circle, ${el.style.gradientColorStart || '#3b82f6'}, ${el.style.gradientColorEnd || '#ec4899'})`
+                                  : `linear-gradient(${el.style.gradientAngle ?? 135}deg, ${el.style.gradientColorStart || '#3b82f6'}, ${el.style.gradientColorEnd || '#ec4899'})`
+                              }
+                            : { backgroundColor: el.style?.backgroundColor || '#0284c7' };
+
+                          const borderRadius = isVector 
+                            ? '0px' 
+                            : el.style?.borderRadius !== undefined 
+                            ? `${el.style.borderRadius * 0.08}px` 
+                            : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? '9999px' : '1px');
+
+                          const clipPath = isVector
+                            ? undefined
+                            : el.style?.shapeVariant === 'triangle'
+                            ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                            : el.style?.shapeVariant === 'star'
+                            ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                            : el.style?.shapeVariant === 'arrow'
+                            ? 'polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)'
+                            : undefined;
+
+                          return (
+                            <div
+                              key={el.id}
+                              style={{
+                                ...commonStyle,
+                                ...backgroundStyle,
+                                borderRadius,
+                                clipPath,
+                                border: isVector ? 'none' : (el.style?.border || 'none'),
+                              }}
+                              className="overflow-hidden"
+                            >
+                              {isVector && (
+                                <svg
+                                  className="absolute inset-0 w-full h-full"
+                                  viewBox="0 0 100 100"
+                                  preserveAspectRatio="none"
+                                >
+                                  {el.style?.useGradient && (
+                                    <defs>
+                                      {el.style?.gradientType === 'radial' ? (
+                                        <radialGradient id={`grad-${el.id}`} cx="50%" cy="50%" r="50%">
+                                          <stop offset="0%" stopColor={el.style.gradientColorStart || '#3b82f6'} />
+                                          <stop offset="100%" stopColor={el.style.gradientColorEnd || '#ec4899'} />
+                                        </radialGradient>
+                                      ) : (
+                                        <linearGradient id={`grad-${el.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                                          <stop offset="0%" stopColor={el.style.gradientColorStart || '#3b82f6'} />
+                                          <stop offset="100%" stopColor={el.style.gradientColorEnd || '#ec4899'} />
+                                        </linearGradient>
+                                      )}
+                                    </defs>
+                                  )}
+                                  <path
+                                    d={el.content || 'M 0 0 L 100 0 L 100 100 L 0 100 Z'}
+                                    fill={el.style?.useGradient ? `url(#grad-${el.id})` : (el.style?.backgroundColor || '#0284c7')}
+                                    stroke={el.style?.borderColor || 'none'}
+                                    strokeWidth={el.style?.borderWidth !== undefined ? el.style.borderWidth : undefined}
+                                  />
+                                </svg>
+                              )}
+                              {slide.elements
+                                .filter((child: any) => child.maskedBy === el.id)
+                                .map((child: any) => {
+                                  const childLeft = `${((child.x - el.x) / el.width) * 100}%`;
+                                  const childTop = `${((child.y - el.y) / el.height) * 100}%`;
+                                  const childWidth = `${(child.width / el.width) * 100}%`;
+                                  const childHeight = `${(child.height / el.height) * 100}%`;
+                                  const childRotation = child.style?.rotation ? `rotate(${child.style.rotation}deg)` : 'none';
+
+                                  const childCommonStyle: React.CSSProperties = {
+                                    position: 'absolute',
+                                    left: childLeft,
+                                    top: childTop,
+                                    width: childWidth,
+                                    height: childHeight,
+                                    opacity: child.style?.opacity !== undefined ? child.style.opacity : 1,
+                                    transform: childRotation,
+                                    zIndex: child.zIndex || 1,
+                                  };
+
+                                  if (child.type === 'shape') {
+                                    const childBackgroundStyle: React.CSSProperties = child.style?.useGradient
+                                      ? {
+                                          background: child.style.gradientType === 'radial'
+                                            ? `radial-gradient(circle, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                            : `linear-gradient(${child.style.gradientAngle ?? 135}deg, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                        }
+                                      : { backgroundColor: child.style?.backgroundColor || '#0284c7' };
+
+                                    const childBorderRadius = child.style?.borderRadius !== undefined 
+                                      ? `${child.style.borderRadius * 0.08}px` 
+                                      : (child.id?.includes('circ') || child.style?.variant === 'sphere' ? '9999px' : '1px');
+
+                                    return (
+                                      <div
+                                        key={child.id}
+                                        style={{
+                                          ...childCommonStyle,
+                                          ...childBackgroundStyle,
+                                          borderRadius: childBorderRadius,
+                                        }}
+                                      />
+                                    );
+                                  }
+
+                                  if (child.type === 'text') {
+                                    const childFontSize = Math.max(1, (child.style?.fontSize || 14) * 0.08);
+                                    return (
+                                      <div
+                                        key={child.id}
+                                        style={{
+                                          ...childCommonStyle,
+                                          fontFamily: child.style?.fontFamily || 'Inter',
+                                          fontSize: `${childFontSize}px`,
+                                          color: child.style?.color || '#1e293b',
+                                          textAlign: child.style?.textAlign || 'left',
+                                          fontWeight: child.style?.fontWeight || 'normal',
+                                          lineHeight: 1,
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-all',
+                                          overflow: 'hidden',
+                                        }}
+                                      >
+                                        {child.content}
+                                      </div>
+                                    );
+                                  }
+
+                                  return null;
+                                })}
+                            </div>
+                          );
+                        }
+
+                        if (el.isFormField) {
+                          return (
+                            <div 
+                              key={el.id} 
+                              style={{ ...commonStyle, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }} 
+                              className="rounded-[1px] flex items-center justify-center overflow-hidden"
+                            >
+                              <span className="text-[4px] text-slate-400 scale-[0.8]">📝</span>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })}
                     </div>
                   </div>
 
@@ -7066,6 +8175,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setThumbnailMenuPosition({ x: rect.left, y: rect.top });
                           setActiveThumbnailMenuIndex(activeThumbnailMenuIndex === idx ? null : idx);
                         }}
                         className="w-5 h-5 rounded-full bg-slate-900/85 hover:bg-slate-950 text-white flex items-center justify-center transition-all cursor-pointer border border-white/20"
@@ -7073,82 +8184,6 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       >
                         <MoreHorizontal size={11} />
                       </button>
-
-                      {/* Dropdown options for thumbnail menu styling to match screenshot exactly */}
-                      {activeThumbnailMenuIndex === idx && (
-                        <div 
-                          className="absolute bottom-7 right-[-8px] bg-white border border-slate-200/90 rounded-2xl p-2 shadow-2xl z-[300] w-56 flex flex-col gap-1 text-[11px] text-slate-800"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {/* Header section with Page Type and exact dimensions */}
-                          <div className="px-3 py-1.5 border-b border-slate-100 flex flex-col text-left mb-1 select-none">
-                            <span className="text-[11px] font-black text-slate-900 leading-tight">
-                              {pageSizeType === 'CUSTOM' ? 'Personalizado' : pageSizeType === 'SLIDE_16_9' ? 'Slide (16:9)' : 'A4'}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-bold font-mono mt-0.5 leading-none">
-                              {docWidth} x {docHeight} px
-                            </span>
-                          </div>
-
-                          {/* "Inserir nova página" option - Light gray row highlight matching screenshot */}
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveThumbnailMenuIndex(null);
-                              addPage();
-                            }}
-                            className="flex items-center gap-2.5 p-2 px-3 bg-slate-100 hover:bg-slate-200/80 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-800"
-                          >
-                            <PlusSquare size={13} className="text-slate-700 shrink-0" />
-                            <span className="text-[11px] font-bold">Inserir nova página</span>
-                          </button>
-
-                          {/* "Duplicar" option */}
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveThumbnailMenuIndex(null);
-                              onSelectSlide(idx);
-                              duplicatePage();
-                            }}
-                            className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 hover:text-slate-950 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-700"
-                          >
-                            <Copy size={13} className="text-slate-500 shrink-0" />
-                            <span className="text-[11px] font-bold">Duplicar</span>
-                          </button>
-
-                          {/* "Excluir" option */}
-                          <button 
-                            disabled={slides.length === 1}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveThumbnailMenuIndex(null);
-                              onSelectSlide(idx);
-                              removePage();
-                            }}
-                            className="flex items-center gap-2.5 p-2 px-3 hover:bg-red-50 text-slate-700 hover:text-red-650 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-700 rounded-xl text-left cursor-pointer transition-colors w-full"
-                          >
-                            <Trash2 size={13} className="text-slate-500 hover:text-red-500 shrink-0" />
-                            <span className="text-[11px] font-bold">Excluir</span>
-                          </button>
-
-                          {/* "Editar linha do tempo" option */}
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveThumbnailMenuIndex(null);
-                              const seconds = prompt("Ajustar tempo de exibição do slide (em segundos):", "5.0");
-                              if (seconds) {
-                                toast.success(`Tempo de exibição ajustado para ${seconds}s na Linha do Tempo!`);
-                              }
-                            }}
-                            className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 hover:text-slate-950 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-700"
-                          >
-                            <Clock size={13} className="text-slate-500 shrink-0" />
-                            <span className="text-[11px] font-bold">Editar linha do tempo</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -7156,8 +8191,36 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             })}
           </div>
 
-          {/* "+ Página" clean gray action card aligned to the far right, matching the red rectangle exactly */}
-          <div className="shrink-0 flex items-center pl-2 ml-4">
+          {/* Page action shortcuts aligned to the far right next to Página button */}
+          <div className="shrink-0 flex items-center pl-2 ml-4 gap-2">
+            {/* Duplicate button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                duplicatePage();
+              }}
+              className="px-2.5 h-[64px] rounded-xl bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-850 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 flex flex-col items-center justify-center gap-1 font-sans transition-all cursor-pointer border border-[#b4c6fc]/5 shadow-sm min-w-[56px]"
+              title="Duplicar página atual"
+            >
+              <Copy size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
+              <span className="text-[9px] font-bold">Duplicar</span>
+            </button>
+
+            {/* Excluir button */}
+            <button
+              disabled={slides.length === 1}
+              onClick={(e) => {
+                e.stopPropagation();
+                removePage();
+              }}
+              className="px-2.5 h-[64px] rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/40 text-red-650 dark:text-red-350 disabled:opacity-30 disabled:hover:bg-red-50 flex flex-col items-center justify-center gap-1 font-sans transition-all cursor-pointer border border-red-200/10 shadow-sm min-w-[56px]"
+              title="Excluir página atual"
+            >
+              <Trash2 size={13} className="text-red-500 shrink-0" />
+              <span className="text-[9px] font-bold">Excluir</span>
+            </button>
+
+            {/* Add blank page button */}
             <button
               onClick={addPage}
               className="w-14 h-[64px] rounded-xl bg-[#cbd5e1] hover:bg-[#b5c7db] text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 flex flex-col items-center justify-center gap-1 font-sans transition-all cursor-pointer border border-[#b4c6fc]/10 shadow-sm"
@@ -7168,6 +8231,99 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             </button>
           </div>
         </div>
+
+        {/* FIXED POSITIONED OPTIONS DROPDOWN (AVOIDS CLIPPING BY OVERFLOW-X-AUTO) */}
+        {activeThumbnailMenuIndex !== null && thumbnailMenuPosition !== null && (
+          <>
+            {/* Backdrop to close click-away */}
+            <div 
+              className="fixed inset-0 z-[299] bg-transparent cursor-default" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveThumbnailMenuIndex(null);
+                setThumbnailMenuPosition(null);
+              }}
+            />
+            <div 
+              className="fixed bg-white dark:bg-[#181d28] border border-slate-200 dark:border-slate-800 rounded-2xl p-2 shadow-2xl z-[300] w-56 flex flex-col gap-1 text-[11px] text-slate-800 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
+              style={{
+                left: `${Math.max(12, Math.min(window.innerWidth - 240, thumbnailMenuPosition.x - 200))}px`,
+                top: `${Math.max(10, Math.min(window.innerHeight - 250, thumbnailMenuPosition.y - 195))}px` // Position cleanly and safely clamped within viewport
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header section with Page Type and exact dimensions */}
+              <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex flex-col text-left mb-1 select-none">
+                <span className="text-[11px] font-black text-slate-900 dark:text-white leading-tight">
+                  {pageSizeType === 'CUSTOM' ? 'Personalizado' : pageSizeType === 'SLIDE_16_9' ? 'Slide (16:9)' : 'A4'}
+                </span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold font-mono mt-0.5 leading-none">
+                  {docWidth} x {docHeight} px
+                </span>
+              </div>
+
+              {/* "Inserir nova página" option */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveThumbnailMenuIndex(null);
+                  setThumbnailMenuPosition(null);
+                  addPage();
+                }}
+                className="flex items-center gap-2.5 p-2 px-3 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-800 dark:text-slate-100"
+              >
+                <PlusSquare size={13} className="text-slate-600 dark:text-slate-400 shrink-0" />
+                <span className="text-[11px] font-bold">Inserir nova página</span>
+              </button>
+
+              {/* "Duplicar" option */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveThumbnailMenuIndex(null);
+                  setThumbnailMenuPosition(null);
+                  duplicatePage();
+                }}
+                className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-700 dark:text-slate-300"
+              >
+                <Copy size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="text-[11px] font-bold">Duplicar</span>
+              </button>
+
+              {/* "Excluir" option */}
+              <button 
+                disabled={slides.length === 1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveThumbnailMenuIndex(null);
+                  setThumbnailMenuPosition(null);
+                  removePage();
+                }}
+                className="flex items-center gap-2.5 p-2 px-3 hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-700 dark:text-slate-300 hover:text-red-650 dark:hover:text-red-400 disabled:opacity-30 disabled:hover:bg-transparent rounded-xl text-left cursor-pointer transition-colors w-full"
+              >
+                <Trash2 size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="text-[11px] font-bold">Excluir</span>
+              </button>
+
+              {/* "Editar linha do tempo" option */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveThumbnailMenuIndex(null);
+                  setThumbnailMenuPosition(null);
+                  const seconds = prompt("Ajustar tempo de exibição do slide (em segundos):", "5.0");
+                  if (seconds) {
+                    toast.success(`Tempo de exibição ajustado para ${seconds}s na Linha do Tempo!`);
+                  }
+                }}
+                className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-left cursor-pointer transition-colors w-full text-slate-700 dark:text-slate-300"
+              >
+                <Clock size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="text-[11px] font-bold">Editar linha do tempo</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* RIGHT CONTROLS PANEL: PROPERTIES ENGINE & SETTINGS - REMOVED AS REQUESTED */}
@@ -7316,7 +8472,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             max="180"
                             value={el.style?.rotation || 0}
                             onChange={(e) => updateElementProps(el.id, { style: { rotation: parseInt(e.target.value) } })}
-                            className="w-full accent-cyan-500"
+                            className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                           />
                         </div>
                       </div>
@@ -7334,10 +8490,13 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               onChange={(e) => updateElementProps(el.id, { style: { fontFamily: e.target.value } })}
                               className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-white outline-none focus:border-cyan-500"
                             >
-                              <option value="Inter">Inter (Padrão)</option>
-                              <option value="Space Grotesk">Space Grotesk (Display / Moderno)</option>
+                              <option value="Orkney">Orkney (Padrão Corporativo)</option>
+                              <option value="Inter">Inter (Padrão Clean)</option>
+                              <option value="Montserrat">Montserrat (Geométrico / Moderno)</option>
+                              <option value="Space Grotesk">Space Grotesk (Display / Digital)</option>
                               <option value="JetBrains Mono">JetBrains Mono (Técnico / Mono)</option>
                               <option value="Playfair Display">Playfair Display (Serif / Editorial)</option>
+                              <option value="Archivo Black">Archivo Black (Display Pesado)</option>
                             </select>
                           </div>
 
@@ -7503,7 +8662,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="0.1"
                                 value={el.style.lineHeight || 1.2}
                                 onChange={(e) => updateElementProps(el.id, { style: { lineHeight: parseFloat(e.target.value) } })}
-                                className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
 
@@ -7520,7 +8679,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="1"
                                 value={parseInt(el.style.letterSpacing) || 0}
                                 onChange={(e) => updateElementProps(el.id, { style: { letterSpacing: `${e.target.value}px` } })}
-                                className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
 
@@ -7537,7 +8696,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="5"
                                 value={el.style.indent || 0}
                                 onChange={(e) => updateElementProps(el.id, { style: { indent: parseInt(e.target.value) } })}
-                                className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
 
@@ -7554,7 +8713,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 step="0.05"
                                 value={el.style.opacity ?? 1}
                                 onChange={(e) => updateElementProps(el.id, { style: { opacity: parseFloat(e.target.value) } })}
-                                className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                               />
                             </div>
                           </div>
@@ -7737,7 +8896,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               step="0.05"
                               value={el.style?.opacity ?? 1}
                               onChange={(e) => updateElementProps(el.id, { style: { ...el.style, opacity: parseFloat(e.target.value) } })}
-                              className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                              className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                             />
                           </div>
 
@@ -7754,7 +8913,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               step="5"
                               value={el.style?.rotation || 0}
                               onChange={(e) => updateElementProps(el.id, { style: { ...el.style, rotation: parseInt(e.target.value) } })}
-                              className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                              className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                             />
                           </div>
 
@@ -7768,7 +8927,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                   <span className="text-cyan-400 font-bold">
                                     {el.style?.borderRadius !== undefined 
                                       ? `${el.style.borderRadius}px` 
-                                      : (el.id?.includes('circ') ? '100px (Círculo)' : '4px')}
+                                      : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? '100px (Círculo)' : '4px')}
                                   </span>
                                 </div>
                                 <input 
@@ -7776,9 +8935,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                   min="0"
                                   max="120"
                                   step="1"
-                                  value={el.style?.borderRadius !== undefined ? el.style.borderRadius : (el.id?.includes('circ') ? 100 : 4)}
+                                  value={el.style?.borderRadius !== undefined ? el.style.borderRadius : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? 100 : 4)}
                                   onChange={(e) => updateElementProps(el.id, { style: { ...el.style, borderRadius: parseInt(e.target.value) } })}
-                                  className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                  className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                                 />
                               </div>
 
@@ -7875,7 +9034,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                         step="15"
                                         value={el.style?.gradientAngle ?? 135}
                                         onChange={(e) => updateElementProps(el.id, { style: { ...el.style, gradientAngle: parseInt(e.target.value) } })}
-                                        className="w-full h-1 bg-slate-950 accent-cyan-400 rounded-lg cursor-pointer"
+                                        className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110"
                                       />
                                     </div>
                                   )}
@@ -8100,7 +9259,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     max="100"
                     value={compressionRatio}
                     onChange={(e) => setCompressionRatio(parseInt(e.target.value))}
-                    className="w-full accent-cyan-500 mt-2"
+                    className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-110 mt-2"
                   />
                   <span className="text-[9px] text-slate-500 block leading-tight mt-2">
                     Estimar tamanho final: <strong>{Math.round((slides.length * 1.5) * (compressionRatio / 100))} MB</strong>
@@ -8154,305 +9313,6 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           )}
         </div>
       </div>
-      )}
-
-      {/* --- INTEGRATED ADOBE ACROBAT VISUAL PAGE ORGANIZER MODAL --- */}
-      {pageOrganizerOpen && (
-        <div className="fixed inset-0 bg-[#0c1017]/98 backdrop-blur-md z-[120] flex flex-col font-sans animate-in fade-in duration-200">
-          {/* Header */}
-          <div className="p-5 border-b border-slate-800 bg-[#0c1017] flex justify-between items-center px-8 shrink-0">
-            <div className="flex items-center gap-3 font-sans">
-              <div className="p-2 bg-gradient-to-tr from-cyan-600 to-purple-600 rounded-xl text-white shadow-md shadow-cyan-900/30">
-                <Layers size={20} className="stroke-[2.5px]" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                  Organizador Visual de Páginas <span className="text-[10px] text-cyan-400 font-mono italic">Acrobat Pro v3.0</span>
-                </h2>
-                <p className="text-slate-400 text-[11px] font-bold mt-0.5">Visualize, reordene, duplique, rotacione e remova páginas em lote no layout grid dinâmico.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Add blank page */}
-              <button
-                onClick={() => {
-                  addPage();
-                  toast.success('Página em branco inserida no final do documento!');
-                }}
-                className="p-2 px-4 bg-slate-900 hover:bg-slate-850 border border-slate-700/60 text-xs font-extrabold text-cyan-400 rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus size={14} /> Inserir Página em Branco
-              </button>
-
-              <button
-                onClick={() => {
-                  setPageOrganizerOpen(false);
-                  toast.success('Alterações de páginas salvas com sucesso!');
-                }}
-                className="p-2 px-5 bg-cyan-600 hover:bg-cyan-550 text-[#0c1017] rounded-xl text-xs font-black shadow-lg shadow-cyan-950/40 uppercase tracking-widest transition-all duration-150 cursor-pointer"
-              >
-                Concluir Layout
-              </button>
-            </div>
-          </div>
-
-          {/* Grid Content */}
-          <div className="flex-1 overflow-y-auto p-12 bg-[#080b0f] custom-scrollbar">
-            <div className="max-w-6xl mx-auto space-y-6">
-              <div className="flex items-center justify-between text-slate-500 font-extrabold text-xs">
-                <span>Total de Páginas: <strong className="text-cyan-400">{slides.length}</strong></span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-600 select-none">Dica: Use os botões rápidos embaixo de cada miniatura</span>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
-                {slides.map((slide, idx) => {
-                  const isCurrent = idx === currentSlideIndex;
-                  return (
-                    <div
-                      key={slide.id}
-                      className={`group bg-slate-950/45 border-2 rounded-2xl p-3 flex flex-col space-y-3 relative hover:scale-[1.03] duration-200 transition-all shadow-xl hover:shadow-cyan-950/20 ${isCurrent ? 'border-cyan-500 ring-2 ring-cyan-500/10' : 'border-slate-850 hover:border-slate-705'}`}
-                    >
-                      {/* Miniature Representation of slide with elements indicators */}
-                      <button
-                        onClick={() => {
-                          onSelectSlide(idx);
-                          toast.success(`Selecionou Página ${idx + 1}`);
-                        }}
-                        className="w-full aspect-[1/1.41] bg-white border border-slate-250 rounded-xl relative flex flex-col items-center justify-center overflow-hidden hover:opacity-95 text-left shrink-0 shadow-inner group/prev"
-                      >
-                        {slide.elements.length === 0 ? (
-                          <div className="text-slate-400 text-[10px] font-bold text-center p-3 font-mono capitalize">Página em branco</div>
-                        ) : (
-                          <div className="absolute inset-0 p-2 scale-[0.98] origin-top flex flex-col justify-start pointer-events-none select-none">
-                            <div className="text-[7px] font-bold text-slate-400 mb-1 border-b pb-0.5 border-slate-100 uppercase tracking-wider flex items-center justify-between">
-                              <span>Acrobat Deck</span>
-                              <span className="text-cyan-600">{slide.elements.length} camadas</span>
-                            </div>
-                            <div className="space-y-1">
-                              {slide.elements.slice(0, 5).map(el => (
-                                <div key={el.id} className="text-[6px] p-0.5 border rounded bg-slate-50 border-slate-100 flex items-center justify-between">
-                                  <span className="truncate max-w-[45px] text-slate-700 capitalize font-mono text-[5.5px]">
-                                    ● {el.type === 'text' ? 'Texto' : el.type === 'image' ? 'Imagem' : el.type === 'redact' ? 'Censura' : 'Forma'}
-                                  </span>
-                                  <span className="text-[5px] text-slate-400 font-mono">z:{el.zIndex}</span>
-                                </div>
-                              ))}
-                              {slide.elements.length > 5 && (
-                                <div className="text-[5.5px] text-slate-400 font-bold font-mono pl-1">+{slide.elements.length - 5} elementos...</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Hover Overlay info */}
-                        <div className="absolute inset-0 bg-[#0c1017]/55 opacity-0 group-hover/prev:opacity-100 flex items-center justify-center transition-all duration-150">
-                          <span className="bg-cyan-500 text-slate-950 font-black px-3 py-1.5 rounded-lg text-[9px] uppercase tracking-wider shadow">Ativar</span>
-                        </div>
-                      </button>
-
-                      {/* Info and page numbering */}
-                      <div className="flex justify-between items-center text-slate-400 px-1 font-mono">
-                        <span className="font-extrabold text-[11px]">PÁG. {idx + 1}</span>
-                        {isCurrent && <span className="text-[8px] bg-cyan-950 border border-cyan-800 text-cyan-400 p-0.5 px-1.5 rounded-md font-bold select-none uppercase">Ativo</span>}
-                      </div>
-
-                      {/* Visual Actions Tray */}
-                      <div className="grid grid-cols-4 gap-1 pt-1 opacity-90 group-hover:opacity-100">
-                        {/* Move Left */}
-                        <button
-                          disabled={idx === 0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            reorderPageAtIndex(idx, 'up');
-                          }}
-                          className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 rounded transition-colors text-center flex items-center justify-center cursor-pointer"
-                          title="Recuar Página"
-                        >
-                          <ArrowLeft size={12} />
-                        </button>
-
-                        {/* Move Right */}
-                        <button
-                          disabled={idx === slides.length - 1}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            reorderPageAtIndex(idx, 'down');
-                          }}
-                          className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 rounded transition-colors text-center flex items-center justify-center cursor-pointer"
-                          title="Avançar Página"
-                        >
-                          <ArrowRight size={12} />
-                        </button>
-
-                        {/* Rotate page CW */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            rotatePageAtIndex(idx);
-                          }}
-                          className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition-colors text-center flex items-center justify-center cursor-pointer"
-                          title="Rotacionar Página 90°"
-                        >
-                          <RefreshCw size={11} className="stroke-[2.5px]" />
-                        </button>
-
-                        {/* Duplicate page index */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            duplicatePageAtIndex(idx);
-                          }}
-                          className="p-1 text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded transition-colors text-center flex items-center justify-center cursor-pointer"
-                          title="Duplicar Esta Página"
-                        >
-                          <PlusSquare size={12} />
-                        </button>
-                      </div>
-
-                      {/* Excluir button hovered corner */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removePageAtIndex(idx);
-                        }}
-                        className="absolute top-1 right-1 p-1.5 bg-red-950/80 hover:bg-red-900 border border-red-900/40 text-red-400 hover:text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-150 shadow cursor-pointer"
-                        title="Remover Página"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- INTEGRATED EXPORTS / CONVERSION POPUP MODAL --- */}
-      {conversionModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-[#0c1017] border border-slate-800 rounded-3xl p-6 shadow-2xl relative space-y-6">
-            <button 
-              onClick={() => setConversionModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white"
-            >
-              <X size={16}/>
-            </button>
-
-            <div>
-              <h3 className="text-sm font-black tracking-wider uppercase text-cyan-400 flex items-center gap-2">
-                <Sliders size={16}/> Conversor Integrado Acrobat 3.0
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1">Converta o documento A4 atual para diferentes formatos de mercado mantendo integridade de imagens, vetores de canetas e formatações.</p>
-            </div>
-
-            {/* SECURITY & QUALITY CONTROLS FOR ACROBAT UPGRADES */}
-            <div className="grid grid-cols-2 gap-5 p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-left">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black tracking-wider uppercase text-cyan-400 flex items-center gap-1.5 select-none">
-                  🛡️ Proteção por Senha (Password Lock)
-                </label>
-                <input
-                  type="password"
-                  placeholder="Introduza uma senha (opcional)..."
-                  value={pdfPassword}
-                  onChange={(e) => setPdfPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-500 h-9 transition-colors font-sans"
-                />
-                <span className="text-[9px] text-slate-500 block leading-tight select-none">Garante criptografia de metadados no arquivo exportado.</span>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-[10px] font-black tracking-wider uppercase text-cyan-400 flex items-center gap-1.5 select-none">
-                  📉 Otimizador de Compressão (Image DPI)
-                </label>
-                <div className="flex bg-slate-950 p-1 border border-slate-800 rounded-lg gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPdfCompressionQuality('LOW')}
-                    className={`flex-1 py-1 text-[10px] font-extrabold rounded cursor-pointer transition-all ${pdfCompressionQuality === 'LOW' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                    title="Baixo tamanho de arquivo (72 DPI)"
-                  >
-                    72 DPI
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPdfCompressionQuality('MEDIUM')}
-                    className={`flex-1 py-1 text-[10px] font-extrabold rounded cursor-pointer transition-all ${pdfCompressionQuality === 'MEDIUM' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                    title="Recomendado - Excelente balanço (150 DPI)"
-                  >
-                    150 DPI
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPdfCompressionQuality('HIGH')}
-                    className={`flex-1 py-1 text-[10px] font-extrabold rounded cursor-pointer transition-all ${pdfCompressionQuality === 'HIGH' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                    title="Qualidade HD Máxima (300 DPI)"
-                  >
-                    300 DPI
-                  </button>
-                </div>
-                <span className="text-[9px] text-slate-500 block leading-tight select-none">Escolha o nível de DPI para economizar armazenamento de arquivo.</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5 pt-2">
-              <button 
-                onClick={() => { setConversionModalOpen(false); executeConversion('pdf'); }}
-                className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-start gap-4 text-left transition-all"
-              >
-                <div className="p-3 bg-red-950 border border-red-800 text-red-400 rounded-xl">
-                  <FileText size={20}/>
-                </div>
-                <div>
-                  <span className="text-xs font-bold block text-white">Salvar PDF (.pdf)</span>
-                  <span className="text-[10px] text-slate-500 block mt-1">Exportação profissional Adobe Acrobat.</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => { setConversionModalOpen(false); executeConversion('docx'); }}
-                className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-start gap-4 text-left transition-all"
-              >
-                <div className="p-3 bg-blue-950 border border-blue-800 text-blue-400 rounded-xl">
-                  <FileText size={20}/>
-                </div>
-                <div>
-                  <span className="text-xs font-bold block text-white">Converter para Word (.doc)</span>
-                  <span className="text-[10px] text-slate-500 block mt-1">Converte os textos para fluxo contínuo.</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => { setConversionModalOpen(false); executeConversion('pptx'); }}
-                className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-start gap-4 text-left transition-all"
-              >
-                <div className="p-3 bg-orange-950 border border-orange-850 text-orange-400 rounded-xl">
-                  <FileText size={20}/>
-                </div>
-                <div>
-                  <span className="text-xs font-bold block text-white">Converter para Slides (.pptx)</span>
-                  <span className="text-[10px] text-slate-500 block mt-1">Gera apresentação PowerPoint nativa.</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => { setConversionModalOpen(false); executeConversion('xlsx'); }}
-                className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-start gap-4 text-left transition-all"
-              >
-                <div className="p-3 bg-green-950 border border-green-800 text-green-400 rounded-xl">
-                  <FileText size={20}/>
-                </div>
-                <div>
-                  <span className="text-xs font-bold block text-white">Converter para Excel (.xlsx)</span>
-                  <span className="text-[10px] text-slate-500 block mt-1">Extrai dados organizados em planilha.</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* --- LIVE DIGITAL SIGNATURE CANVAS MODAL --- */}
@@ -9067,6 +9927,503 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           </div>
         );
       })()}
+
+      {/* MODO DE APRESENTAÇÃO DE SLIDES ESTILO POWERPOINT */}
+      {isPresentationMode && (
+        <div 
+          className="fixed inset-0 bg-[#070a13] z-[99999] flex flex-col items-center justify-center overflow-hidden select-none animate-in fade-in duration-200"
+          style={{ 
+            cursor: presentationLaserActive 
+              ? 'none' 
+              : (presentationPenActive || presentationHighlighterActive ? 'crosshair' : 'default') 
+          }}
+        >
+          {/* CONTAINER DO SLIDE ESCALADO */}
+          {(() => {
+            const slide = slides[presentationSlideIndex];
+            if (!slide) return null;
+
+            // Calcula escala ideal para preencher a tela mantendo proporções do slide
+            const scaleX = (presentationDimensions.width - 100) / docWidth;
+            const scaleY = (presentationDimensions.height - 120) / docHeight;
+            const scale = Math.min(scaleX, scaleY, 1.5); // Limite de 1.5x de upscale
+
+            // Eventos de desenho com caneta e marca-texto
+            const handlePresentationMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+              if (!presentationPenActive && !presentationHighlighterActive) return;
+              
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = (e.clientX - rect.left) / scale;
+              const y = (e.clientY - rect.top) / scale;
+              
+              setIsPresentationDrawing(true);
+              setCurrentDrawingPoints([{ x, y }]);
+            };
+
+            const handleSlideClick = (e: React.MouseEvent) => {
+              // Se caneta, laser ou marca-texto ativos, o clique desenha e não avança slide
+              if (presentationPenActive || presentationHighlighterActive || presentationLaserActive) return;
+              
+              if (presentationSlideIndex < slides.length - 1) {
+                setPresentationSlideIndex(prev => prev + 1);
+                setCurrentDrawingPoints([]);
+              } else {
+                toast.info('Fim da apresentação de slides. Pressione ESC para sair.');
+              }
+            };
+
+            return (
+              <div 
+                className="relative flex items-center justify-center w-full h-full p-6"
+                onClick={handleSlideClick}
+              >
+                {/* O SLIDE COMPLETO */}
+                <div
+                  id="presentation-slide-canvas"
+                  onMouseDown={handlePresentationMouseDown}
+                  className="bg-white text-slate-950 relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden select-none rounded-xl border border-slate-800/20"
+                  style={{
+                    width: `${docWidth}px`,
+                    height: `${docHeight}px`,
+                    transform: `scale(${scale})`,
+                    background: slide.background || '#ffffff',
+                    flexShrink: 0
+                  }}
+                >
+                  {/* WATERMARK BACKGROUND LAYER */}
+                  {watermark && (
+                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none z-0">
+                      <span className="text-[100px] text-slate-200/40 font-black tracking-widest leading-none rotate-45 select-none font-sans uppercase">
+                        {watermark}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* RUNNING HEADER */}
+                  {pageSizeType !== 'SLIDE_16_9' && (
+                    <div className="absolute top-6 left-12 right-12 flex justify-between border-b border-slate-200 pb-2 text-[10px] text-slate-400 select-none">
+                      <span>{headerText.toUpperCase()}</span>
+                      <span>Acrobat Pro Presentation</span>
+                    </div>
+                  )}
+
+                  {/* ELEMENTOS DO SLIDE */}
+                  <div className="absolute inset-0 pt-20 pb-20 px-12 z-10">
+                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any) => {
+                      const left = `${el.x}px`;
+                      const top = `${el.y}px`;
+                      const width = `${el.width}px`;
+                      const height = `${el.height}px`;
+                      const opacity = el.style?.opacity ?? 1;
+                      const rotation = el.style?.rotation ? `rotate(${el.style.rotation}deg)` : 'none';
+
+                      const commonStyle: React.CSSProperties = {
+                        position: 'absolute',
+                        left,
+                        top,
+                        width,
+                        height,
+                        opacity,
+                        transform: rotation,
+                        zIndex: el.zIndex,
+                      };
+
+                      if (el.isRedacted || el.type === 'redact') {
+                        return (
+                          <div 
+                            key={el.id} 
+                            style={{ ...commonStyle, backgroundColor: '#000000' }} 
+                            className="rounded-[1px]"
+                          />
+                        );
+                      }
+
+                      if (el.type === 'text') {
+                        return (
+                          <div
+                            key={el.id}
+                            style={{
+                              ...commonStyle,
+                              fontFamily: el.style?.fontFamily || 'Inter',
+                              fontSize: `${el.style?.fontSize || 14}px`,
+                              color: el.style?.color || '#1e293b',
+                              textAlign: el.style?.textAlign || 'left',
+                              fontWeight: el.style?.fontWeight || 'normal',
+                              lineHeight: el.style?.lineHeight || 1.3,
+                              letterSpacing: 'normal',
+                              fontStyle: el.style?.fontStyle || 'normal',
+                              textDecoration: el.style?.textDecoration || 'none',
+                              textTransform: el.style?.textTransform || 'none',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-all',
+                              overflow: 'hidden',
+                              paddingLeft: el.style?.indent ? `${el.style.indent}px` : undefined,
+                            }}
+                          >
+                            {el.content}
+                          </div>
+                        );
+                      }
+
+                      if (el.type === 'image') {
+                        const crop = el.style?.crop || { left: 0, top: 0, right: 0, bottom: 0 };
+                        const scaleX = 100 / (100 - crop.left - crop.right);
+                        const scaleY = 100 / (100 - crop.top - crop.bottom);
+                        const posX = -crop.left * scaleX;
+                        const posY = -crop.top * scaleY;
+
+                        return (
+                          <div key={el.id} style={commonStyle} className="overflow-hidden">
+                            <img 
+                              src={el.content} 
+                              alt="" 
+                              className="absolute select-none pointer-events-none max-w-none w-full h-full"
+                              referrerPolicy="no-referrer"
+                              style={{
+                                width: `${scaleX * 100}%`,
+                                height: `${scaleY * 100}%`,
+                                left: `${posX}%`,
+                                top: `${posY}%`,
+                              }}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (el.type === 'shape' || (!el.type && el.style)) {
+                        const isVector = el.style?.variant === 'vector';
+                        const backgroundStyle: React.CSSProperties = isVector
+                          ? { backgroundColor: 'transparent' }
+                          : el.style?.useGradient
+                          ? {
+                              background: el.style.gradientType === 'radial'
+                                ? `radial-gradient(circle, ${el.style.gradientColorStart || '#3b82f6'}, ${el.style.gradientColorEnd || '#ec4899'})`
+                                : `linear-gradient(${el.style.gradientAngle ?? 135}deg, ${el.style.gradientColorStart || '#3b82f6'}, ${el.style.gradientColorEnd || '#ec4899'})`
+                            }
+                          : { backgroundColor: el.style?.backgroundColor || '#0284c7' };
+
+                        const borderRadius = isVector
+                          ? '0px'
+                          : el.style?.borderRadius !== undefined 
+                          ? `${el.style.borderRadius}px` 
+                          : (el.id?.includes('circ') || el.style?.variant === 'sphere' ? '9999px' : '1px');
+
+                        const clipPath = isVector
+                          ? undefined
+                          : el.style?.shapeVariant === 'triangle'
+                          ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                          : el.style?.shapeVariant === 'star'
+                          ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                          : el.style?.shapeVariant === 'arrow'
+                          ? 'polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)'
+                          : undefined;
+
+                        return (
+                          <div
+                            key={el.id}
+                            style={{
+                              ...commonStyle,
+                              ...backgroundStyle,
+                              borderRadius,
+                              clipPath,
+                              border: isVector ? 'none' : (el.style?.border || 'none'),
+                            }}
+                            className="overflow-hidden"
+                          >
+                            {isVector && (
+                              <svg
+                                className="absolute inset-0 w-full h-full"
+                                viewBox="0 0 100 100"
+                                preserveAspectRatio="none"
+                              >
+                                {el.style?.useGradient && (
+                                  <defs>
+                                    {el.style?.gradientType === 'radial' ? (
+                                      <radialGradient id={`pres-grad-${el.id}`} cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stopColor={el.style.gradientColorStart || '#3b82f6'} />
+                                        <stop offset="100%" stopColor={el.style.gradientColorEnd || '#ec4899'} />
+                                      </radialGradient>
+                                    ) : (
+                                      <linearGradient id={`pres-grad-${el.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor={el.style.gradientColorStart || '#3b82f6'} />
+                                        <stop offset="100%" stopColor={el.style.gradientColorEnd || '#ec4899'} />
+                                      </linearGradient>
+                                    )}
+                                  </defs>
+                                )}
+                                <path
+                                  d={el.content || 'M 0 0 L 100 0 L 100 100 L 0 100 Z'}
+                                  fill={el.style?.useGradient ? `url(#pres-grad-${el.id})` : (el.style?.backgroundColor || '#0284c7')}
+                                  stroke={el.style?.borderColor || 'none'}
+                                  strokeWidth={el.style?.borderWidth !== undefined ? el.style.borderWidth : undefined}
+                                />
+                              </svg>
+                            )}
+                            {/* SUPORTE IMPECÁVEL A MÁSCARAS DE ELEMENTOS (CLIPPING DO PAI) */}
+                            {slide.elements
+                              .filter((child: any) => child.maskedBy === el.id)
+                              .map((child: any) => {
+                                const childLeft = `${((child.x - el.x) / el.width) * 100}%`;
+                                const childTop = `${((child.y - el.y) / el.height) * 100}%`;
+                                const childWidth = `${(child.width / el.width) * 100}%`;
+                                const childHeight = `${(child.height / el.height) * 100}%`;
+                                const childRotation = child.style?.rotation ? `rotate(${child.style.rotation}deg)` : 'none';
+
+                                const childCommonStyle: React.CSSProperties = {
+                                  position: 'absolute',
+                                  left: childLeft,
+                                  top: childTop,
+                                  width: childWidth,
+                                  height: childHeight,
+                                  opacity: child.style?.opacity !== undefined ? child.style.opacity : 1,
+                                  transform: childRotation,
+                                  zIndex: child.zIndex || 1,
+                                };
+
+                                if (child.type === 'shape') {
+                                  const childBackgroundStyle: React.CSSProperties = child.style?.useGradient
+                                    ? {
+                                        background: child.style.gradientType === 'radial'
+                                          ? `radial-gradient(circle, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                          : `linear-gradient(${child.style.gradientAngle ?? 135}deg, ${child.style.gradientColorStart || '#3b82f6'}, ${child.style.gradientColorEnd || '#ec4899'})`
+                                      }
+                                    : { backgroundColor: child.style?.backgroundColor || '#0284c7' };
+
+                                  const childBorderRadius = child.style?.borderRadius !== undefined 
+                                    ? `${child.style.borderRadius}px` 
+                                    : (child.id?.includes('circ') || child.style?.variant === 'sphere' ? '9999px' : '1px');
+
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      style={{
+                                        ...childCommonStyle,
+                                        ...childBackgroundStyle,
+                                        borderRadius: childBorderRadius,
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                if (child.type === 'text') {
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      style={{
+                                        ...childCommonStyle,
+                                        fontFamily: child.style?.fontFamily || 'Inter',
+                                        fontSize: `${child.style?.fontSize || 14}px`,
+                                        color: child.style?.color || '#1e293b',
+                                        textAlign: child.style?.textAlign || 'left',
+                                        fontWeight: child.style?.fontWeight || 'normal',
+                                        lineHeight: 1.3,
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-all',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {child.content}
+                                    </div>
+                                  );
+                                }
+
+                                return null;
+                              })}
+                          </div>
+                        );
+                      }
+
+                      if (el.isFormField) {
+                        return (
+                          <div 
+                            key={el.id} 
+                            style={{ ...commonStyle, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }} 
+                            className="rounded-[1px] flex items-center justify-center overflow-hidden"
+                          >
+                            <span className="text-xs text-slate-400">📝</span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })}
+                  </div>
+
+                  {/* SVG LAYER PARA DESENHOS LIVRES */}
+                  <svg className="absolute inset-0 pointer-events-none z-[120] w-full h-full">
+                    {presentationDrawings[presentationSlideIndex]?.map((drawing, dIdx) => (
+                      <polyline
+                        key={dIdx}
+                        fill="none"
+                        stroke={drawing.color}
+                        strokeWidth={drawing.width}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={drawing.points.map(p => `${p.x},${p.y}`).join(' ')}
+                      />
+                    ))}
+                    {currentDrawingPoints.length > 0 && (
+                      <polyline
+                        fill="none"
+                        stroke={presentationHighlighterActive ? 'rgba(234, 179, 8, 0.45)' : presentationPenColor}
+                        strokeWidth={presentationHighlighterActive ? 12 : 3}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={currentDrawingPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                      />
+                    )}
+                  </svg>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* REAL-TIME HIGH-TECH VIEWPORT-RELATIVE LASER POINTER */}
+          {presentationLaserActive && (
+            <div 
+              className="fixed pointer-events-none z-[200000] w-5 h-5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444,0_0_16px_#ef4444,0_0_32px_#ef4444,0_0_48px_#ef4444]"
+              style={{
+                left: `${presentationLaserPos.x}px`,
+                top: `${presentationLaserPos.y}px`,
+                transform: 'translate(-50%, -50%)',
+                transition: 'none'
+              }}
+            />
+          )}
+
+          {/* BARRA DE CONTROLE FLUTUANTE PREMIUM ESTILO POWERPOINT */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#0b0f19]/90 backdrop-blur-lg border border-slate-800/80 rounded-2xl px-5 py-3 flex items-center gap-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] z-[99999] opacity-25 hover:opacity-100 transition-opacity duration-300">
+            {/* Navegação Rápida */}
+            <div className="flex items-center gap-2 border-r border-slate-800/60 pr-4">
+              <button
+                disabled={presentationSlideIndex === 0}
+                onClick={() => {
+                  setPresentationSlideIndex(prev => Math.max(0, prev - 1));
+                  setCurrentDrawingPoints([]);
+                }}
+                className="p-2 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-white cursor-pointer disabled:opacity-20 disabled:hover:bg-transparent transition-all"
+                title="Slide Anterior (Seta Esquerda)"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <span className="text-xs font-black text-slate-300 select-none min-w-[80px] text-center font-mono uppercase tracking-wider">
+                {presentationSlideIndex + 1} / {slides.length}
+              </span>
+
+              <button
+                disabled={presentationSlideIndex === slides.length - 1}
+                onClick={() => {
+                  setPresentationSlideIndex(prev => Math.min(slides.length - 1, prev + 1));
+                  setCurrentDrawingPoints([]);
+                }}
+                className="p-2 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-white cursor-pointer disabled:opacity-20 disabled:hover:bg-transparent transition-all"
+                title="Próximo Slide (Seta Direita / Espaço)"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Ferramentas de Apresentação */}
+            <div className="flex items-center gap-2 border-r border-slate-800/60 pr-4">
+              {/* Laser button */}
+              <button
+                onClick={() => {
+                  setPresentationLaserActive(prev => !prev);
+                  setPresentationPenActive(false);
+                  setPresentationHighlighterActive(false);
+                }}
+                className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  presentationLaserActive ? 'bg-red-950/80 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                }`}
+                title="Apontador Laser (Atalho: L)"
+              >
+                <Circle size={10} className="fill-red-500 stroke-red-400" />
+                Laser
+              </button>
+
+              {/* Pen button */}
+              <button
+                onClick={() => {
+                  setPresentationPenActive(prev => !prev);
+                  setPresentationLaserActive(false);
+                  setPresentationHighlighterActive(false);
+                }}
+                className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  presentationPenActive ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                }`}
+                title="Caneta de Desenho (Atalho: P)"
+              >
+                <PenTool size={13} />
+                Caneta
+              </button>
+
+              {/* Highlighter button */}
+              <button
+                onClick={() => {
+                  setPresentationHighlighterActive(prev => !prev);
+                  setPresentationLaserActive(false);
+                  setPresentationPenActive(false);
+                }}
+                className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  presentationHighlighterActive ? 'bg-yellow-950/80 text-yellow-400 border border-yellow-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                }`}
+                title="Marca-texto"
+              >
+                <Highlighter size={13} />
+                Marca-texto
+              </button>
+
+              {/* Color selectors for Drawing tools */}
+              {(presentationPenActive || presentationHighlighterActive) && (
+                <div className="flex items-center gap-1.5 ml-1 bg-slate-950 border border-slate-900 p-1 rounded-lg animate-in fade-in duration-150">
+                  {['#ef4444', '#10b981', '#3b82f6', '#eab308', '#ffffff', '#000000'].map(col => (
+                    <button
+                      key={col}
+                      onClick={() => setPresentationPenColor(col)}
+                      className={`w-4 h-4 rounded-full cursor-pointer transition-transform ${presentationPenColor === col ? 'ring-2 ring-cyan-400 scale-110' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: col }}
+                      title={`Selecionar cor ${col}`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Eraser / Clear current slide drawings */}
+              <button
+                onClick={() => {
+                  setPresentationDrawings(prev => ({
+                    ...prev,
+                    [presentationSlideIndex]: []
+                  }));
+                  setCurrentDrawingPoints([]);
+                  toast.success('Anotações deste slide limpas com sucesso!');
+                }}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-xl cursor-pointer flex items-center gap-1 text-xs font-bold transition-colors"
+                title="Limpar anotações deste slide (Atalho: E)"
+              >
+                <Eraser size={13} />
+                Limpar
+              </button>
+            </div>
+
+            {/* Sair da Apresentação */}
+            <button
+              onClick={() => {
+                setIsPresentationMode(false);
+                setPresentationLaserActive(false);
+                setPresentationPenActive(false);
+                setPresentationHighlighterActive(false);
+              }}
+              className="p-2 px-3.5 bg-red-600/15 hover:bg-red-600 text-red-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Sair da apresentação (Atalho: ESC)"
+            >
+              <Minimize size={13} />
+              Sair
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
