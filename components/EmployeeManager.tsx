@@ -49,10 +49,24 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Derived Data
-  const uniqueRoles = Array.from(new Set(employees.filter(e => e.id !== 'hiring-generic').map(e => e.role).filter(Boolean))).sort();
+  const uniqueRoles = Array.from(new Set(employees.filter(e => 
+    e.id !== 'hiring-generic' && 
+    e.id !== 'baby-generic' && 
+    e.id !== 'gaming-generic' && 
+    e.name !== 'BABY' && 
+    e.name !== 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?' && 
+    e.name !== 'Generic Hiring'
+  ).map(e => e.role).filter(Boolean))).sort();
 
   const filteredEmployees = employees
-    .filter(emp => emp.id !== 'hiring-generic')
+    .filter(emp => 
+      emp.id !== 'hiring-generic' && 
+      emp.id !== 'baby-generic' && 
+      emp.id !== 'gaming-generic' && 
+      emp.name !== 'BABY' && 
+      emp.name !== 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?' && 
+      emp.name !== 'Generic Hiring'
+    )
     .filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             emp.role.toLowerCase().includes(searchQuery.toLowerCase());

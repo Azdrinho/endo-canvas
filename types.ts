@@ -159,3 +159,29 @@ export interface Slide {
   elements: SlideElement[];
   background: string; // Hex or Gradient
 }
+
+export interface PresentationFile {
+  id: string;
+  name: string;
+  slides: Slide[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VisualIdentity {
+  id: string;
+  name: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
+  };
+  logoUrl?: string;
+  description: string;
+  examples?: string[]; // learned references or slide structures
+}

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { jsonrepair } from "jsonrepair";
 
 const app = express();
 const PORT = 3000;
@@ -214,6 +215,92 @@ function cleanUserInput(input: string): string {
   cleaned = cleaned.replace(/!+$/, "");
 
   return cleaned.trim();
+}
+
+/**
+ * Robustly parses JSON from a string, extracting the matching balanced braces/brackets if there are leading or trailing characters.
+ */
+function robustParseJSON<T = any>(text: string): T {
+  let cleaned = text.trim();
+  
+  // Try direct parse first
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // If direct parse fails, try parsing with jsonrepair
+    try {
+      return JSON.parse(jsonrepair(cleaned));
+    } catch (err) {
+      // If that also fails, we try extracting the balanced JSON structure below
+    }
+  }
+
+  // Find first brace '{' or bracket '['
+  const startBrace = cleaned.indexOf('{');
+  const startBracket = cleaned.indexOf('[');
+  
+  let startIdx = -1;
+  let endChar = '';
+  
+  if (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) {
+    startIdx = startBrace;
+    endChar = '}';
+  } else if (startBracket !== -1) {
+    startIdx = startBracket;
+    endChar = ']';
+  }
+  
+  if (startIdx === -1) {
+    throw new Error("Não foi encontrado nenhum objeto ou array JSON válido na resposta.");
+  }
+  
+  let braceCount = 0;
+  let inString = false;
+  let escape = false;
+  
+  for (let i = startIdx; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{' || char === '[') {
+        braceCount++;
+      } else if (char === '}' || char === ']') {
+        braceCount--;
+        if (braceCount === 0) {
+          const jsonSubstring = cleaned.substring(startIdx, i + 1);
+          try {
+            return JSON.parse(jsonrepair(jsonSubstring));
+          } catch (err: any) {
+            console.error("[robustParseJSON] Failed to parse balanced substring:", err);
+            throw new Error(`Falha ao decodificar o sub-bloco JSON: ${err.message}`);
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback to substring from startIdx to end if brace parsing didn't find balanced closing
+  const remaining = cleaned.substring(startIdx);
+  try {
+    return JSON.parse(jsonrepair(remaining));
+  } catch (err: any) {
+    throw new Error(`Não foi possível extrair um JSON válido da resposta: ${err.message}`);
+  }
 }
 
 /**
@@ -684,7 +771,7 @@ Your response must be ONLY the final raw 11-paragraph prompt in English, with NO
 
     // Resilient call to Gemini with backoff and model fallbacks (handles temporary 503/high demand)
     // We try gemini-3.1-flash-lite FIRST because it has a 1,500 requests per day limit, whereas gemini-3.5-flash has only 20 requests per day limit on Free Tier.
-    const modelsToTry = ["gemini-3.1-flash-lite", "gemini-3.5-flash"];
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro-latest"];
     let refinedPrompt = null;
 
     for (const model of modelsToTry) {
@@ -887,7 +974,7 @@ Your output must be structured JSON strictly matching this schema:
 
 Do not include any preamble, explanations, markdown backticks, or other text outside of the JSON object. Output ONLY valid JSON.`;
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro-latest"];
     let response = null;
     let lastError = null;
 
@@ -944,7 +1031,7 @@ Do not include any preamble, explanations, markdown backticks, or other text out
       jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
     }
 
-    const slideData = JSON.parse(jsonText);
+    const slideData = robustParseJSON(jsonText);
     return res.json(slideData);
 
   } catch (err: any) {
@@ -1069,6 +1156,335 @@ app.post("/api/magnific/generate", async (req, res) => {
   } catch (err: any) {
     console.error("[Magnific Server] Server-side generation error:", err);
     return res.status(500).json({ error: `Erro interno no servidor: ${err.message}` });
+  }
+});
+
+// Route to analyze a reference slide layout to train the AI
+app.post("/api/gemini/analyze-reference", async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "A imagem de referência do slide não foi enviada." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Chave da API Gemini não configurada no servidor (.env)." });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    let mimeType = "image/png";
+    let base64Data = image;
+    
+    if (image.startsWith("data:")) {
+      const parts = image.split(";base64,");
+      if (parts.length === 2) {
+        mimeType = parts[0].replace("data:", "");
+        base64Data = parts[1];
+      }
+    }
+
+    const systemInstruction = `You are a world-class slide design analysis expert.
+Your goal is to inspect the user's slide image and output a highly descriptive textual "design rulebook" summary of its style.
+Analyze the layout structure (e.g. Bento grid, split panel, cards, asymmetric text columns, notched shapes, tickets), its background design, borders, use of glowing shapes/spheres, spacing density, and alignment choices.
+Describe how elements interact and what visual elements are prominent. Keep the summary under 150 words. Do not translate any text literally; describe the aesthetics, geometries, card borders, and composition patterns.`;
+
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro-latest"];
+    let response = null;
+    let lastError = null;
+
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    for (const model of modelsToTry) {
+      let attempts = 2;
+      let success = false;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          console.log(`[Analyze Reference Server] Trying model: ${model} (attempt ${attempt}/${attempts})`);
+          response = await ai.models.generateContent({
+            model,
+            contents: [
+              {
+                inlineData: {
+                  mimeType,
+                  data: base64Data
+                }
+              },
+              {
+                text: "Extract and describe the visual design language, layout patterns, and shape guidelines of this slide reference."
+              }
+            ],
+            config: {
+              systemInstruction,
+              temperature: 0.2
+            }
+          });
+          if (response) {
+            success = true;
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`[Analyze Reference Server] Model ${model} failed (attempt ${attempt}):`, err.message || err);
+          lastError = err;
+          if (attempt < attempts) {
+            await delay(attempt * 1500);
+          }
+        }
+      }
+      if (success && response) {
+        break;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("Todos os modelos Gemini falharam ou estão indisponíveis no momento.");
+    }
+
+    return res.json({ styleDescription: response.text?.trim() || "Clean modern slide layout with balanced typography." });
+
+  } catch (err: any) {
+    console.error("[Analyze Reference Server] Error analyzing style:", err);
+    return res.status(500).json({ error: `Erro ao analisar o slide de referência: ${err.message}` });
+  }
+});
+
+// Route to apply a Visual Identity and reformulate slide layouts
+app.post("/api/gemini/apply-identity", async (req, res) => {
+  try {
+    const { slides, identity, currentSlideIndex, applyToAll, diversify, width, height } = req.body;
+    if (!slides || !identity) {
+      return res.status(400).json({ error: "Parâmetros obrigatórios ausentes." });
+    }
+
+    const canvasWidth = width || 1050;
+    const canvasHeight = height || 590;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Chave da API Gemini não configurada no servidor (.env)." });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    // We process either the full list or just the current slide index
+    const slidesToProcess = applyToAll ? slides : [slides[currentSlideIndex]];
+
+    const identityName = identity.name || "Identidade Personalizada";
+    const primaryColor = identity.colors?.primary || "#30c3cd";
+    const secondaryColor = identity.colors?.secondary || "#5552b9";
+    const accentColor = identity.colors?.accent || "#30c3cd";
+    const backgroundColor = identity.colors?.background || "#1A1A1A";
+    const headingFont = identity.fonts?.heading || "Orkney";
+    const bodyFont = identity.fonts?.body || "Orkney";
+    const identityDesc = identity.description || "Premium visual identity";
+    const identityExamples = (identity.examples || []).map((ex: string, idx: number) => `${idx + 1}. ${ex}`).join("\n");
+
+    const systemInstruction = `You are a master presentation designer and creative art director.
+Your task is to take the content of input slides and completely reimagine their visual layout.
+Do NOT just place things in boring grids or "bento boxes". Read the content, understand its meaning, and invent a unique, beautiful, and highly creative layout that perfectly illustrates the information. 
+
+VISUAL IDENTITY PARAMETERS:
+- Name: ${identityName}
+- Fonts:
+  * Heading Font: '${headingFont}' (MUST be used for headers, titles, large numbers)
+  * Body Font: '${bodyFont}' (MUST be used for paragraphs, labels, secondary text)
+- Colors:
+  * Background Color: '${backgroundColor}' (Use as default slide background)
+  * Primary Accent: '${primaryColor}'
+  * Secondary Accent: '${secondaryColor}'
+  * Highlight Accent: '${accentColor}'
+  * General Text: '#FFFFFF' or light-gray for dark backgrounds (or dark-charcoal for light backgrounds).
+- Style Description: ${identityDesc}
+${identityExamples ? `- Specific Learned Style Guidelines (Learn from these past user designs!):\n${identityExamples}` : ''}
+
+CANVAS DIMENSIONS & SPACING:
+- Canvas width is ${canvasWidth}, height is ${canvasHeight}.
+- Scale and position all elements to perfectly fit inside this canvas.
+- Embrace generous negative space (whitespace). Do not clutter the slide.
+
+CREATIVE & HARMONIOUS DESIGN RULES:
+1. **Be Creative**: Use asymmetrical layouts, overlapping (but readable) elements, large typography for impact, and abstract shapes to illustrate concepts if appropriate. Avoid generic bullet lists.
+2. **Readability & Contrast**: This is an absolute rule. Text MUST always be readable.
+   - Never place bright glowing shapes behind text.
+   - If text sits on a colored background or shape, ensure the text color contrasts strongly. 
+3. **Z-Index Layering**: 
+   - Background decorative shapes: zIndex: 1 (keep opacity very low, e.g., 0.03 to 0.08).
+   - Content cards / visual lines / graphics: zIndex: 2 to 5.
+   - Text (Titles, Bodies): zIndex: 10 or higher.
+4. **Typography**: Use large font sizes (40px-70px) for key metrics or short impact statements. Use medium (18px-24px) for readability on bodies.
+5. **Shapes & Graphics**: Use shapes (spheres, boxes, lines, triangles) creatively as accents, dividers, or highlighters.
+
+COVER SLIDES (Index 0):
+- The first slide MUST be an elegant cover. Minimalist, large title, subtle background glow, logo shape, and date. Highly spacious.
+
+LOW-DENSITY SLIDES (Very little text):
+- If a slide is just a single title or quote, center it massively. Create an editorial, minimalist "Chapter Divider" look.
+
+Output ONLY valid JSON matching this schema:
+{
+  "slides": [
+    {
+      "id": "string",
+      "background": "string (CSS linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%) or hex '${backgroundColor}')",
+      "elements": [
+        {
+          "id": "string",
+          "maskedBy": "string",
+          "type": "text" | "shape" | "image",
+          "x": number,
+          "y": number,
+          "width": number,
+          "height": number,
+          "content": "string (text content or SVG path or placeholder)",
+          "zIndex": number,
+          "style": {
+            "fontFamily": "string (use '${headingFont}' or '${bodyFont}')",
+            "fontWeight": "300" | "400" | "600" | "700" | "900" | "normal" | "bold",
+            "fontSize": number,
+            "color": "string (hex code)",
+            "backgroundColor": "string (hex code or 'transparent')",
+            "useGradient": boolean,
+            "gradientType": "linear" | "radial",
+            "gradientColorStart": "string (hex code)",
+            "gradientColorEnd": "string (hex code)",
+            "gradientAngle": number,
+            "variant": "sphere" | "box" | "triangle" | "star" | "arrow_right" | "line" | "pie" | "vector",
+            "textAlign": "left" | "center" | "right",
+            "borderRadius": number,
+            "border": "string",
+            "opacity": number
+          }
+        }
+      ]
+    }
+  ]
+}
+
+Output ONLY valid JSON. No conversational text, no markdown backticks outside of the JSON.`;
+
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro-latest"];
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const redesignSlide = async (slide: any, idx: number, isCover: boolean) => {
+      let slideContextText = isCover
+        ? "Note: You are reformulating the VERY FIRST slide of the presentation. You MUST format this slide as an elegant Cover Slide with the elegant Title, Subtitle (if any), Update Date, and the brand Logo."
+        : `Note: You are reformulating slide index ${idx} of the presentation. This is a content/data slide.`;
+
+      const promptText = `Reformulate the following single slide into a beautifully redesigned layout matching our identity.
+${slideContextText}
+
+Input slide data to rebuild:
+${JSON.stringify([slide], null, 2)}`;
+
+      let response = null;
+      let lastError = null;
+
+      for (const model of modelsToTry) {
+        let attempts = 2;
+        let success = false;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+          try {
+            console.log(`[Apply Identity Server] Redesigning slide ${idx} using model: ${model} (attempt ${attempt}/${attempts})`);
+            response = await ai.models.generateContent({
+              model,
+              contents: [{ text: promptText }],
+              config: {
+                systemInstruction,
+                responseMimeType: "application/json"
+              }
+            });
+            if (response) {
+              success = true;
+              break;
+            }
+          } catch (err: any) {
+            console.warn(`[Apply Identity Server] Slide ${idx} with model ${model} failed (attempt ${attempt}):`, err.message || err);
+            lastError = err;
+            if (attempt < attempts) {
+              await delay(attempt * 1000);
+            }
+          }
+        }
+        if (success && response) {
+          break;
+        }
+      }
+
+      if (!response) {
+        console.warn(`[Apply Identity Server] All models failed for slide index ${idx}. Falling back to original slide.`);
+        return slide;
+      }
+
+      let jsonText = response.text || "";
+      if (jsonText.includes("```")) {
+        jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
+      }
+
+      try {
+        const parsedResult = robustParseJSON(jsonText);
+        if (parsedResult && parsedResult.slides && parsedResult.slides.length > 0) {
+          const newSlide = parsedResult.slides[0];
+          newSlide.id = slide.id || `reformatted-slide-${idx}-${Date.now()}`;
+          
+          // Ensure elements have unique IDs
+          if (newSlide.elements) {
+            newSlide.elements = newSlide.elements.map((el: any, elIdx: number) => ({
+              ...el,
+              id: el.id && !el.id.includes('reformatted') ? el.id : `el-${idx}-${elIdx}-${Date.now()}`
+            }));
+          }
+          
+          return newSlide;
+        }
+      } catch (err) {
+        console.error(`[Apply Identity Server] Error parsing JSON for slide index ${idx}:`, err);
+      }
+      return slide;
+    };
+
+    if (applyToAll) {
+      console.log(`[Apply Identity Server] Processing all ${slides.length} slides with a concurrency limit of 3`);
+      const redesignedSlides: any[] = Array(slides.length);
+      const limit = 3;
+      const queue = [...slides.map((slide: any, idx: number) => ({ slide, idx }))];
+
+      const workers = Array(Math.min(limit, queue.length)).fill(null).map(async () => {
+        while (queue.length > 0) {
+          const item = queue.shift();
+          if (!item) break;
+          const result = await redesignSlide(item.slide, item.idx, item.idx === 0);
+          redesignedSlides[item.idx] = result;
+        }
+      });
+      await Promise.all(workers);
+
+      return res.json({ slides: redesignedSlides });
+    } else {
+      console.log(`[Apply Identity Server] Processing single slide index ${currentSlideIndex}`);
+      const redesignedSlide = await redesignSlide(slides[currentSlideIndex], currentSlideIndex, currentSlideIndex === 0);
+      const updatedSlidesList = [...slides];
+      updatedSlidesList[currentSlideIndex] = redesignedSlide;
+      return res.json({ slides: updatedSlidesList });
+    }
+
+  } catch (err: any) {
+    console.error("[Apply Identity Server] Error reformulating slide layouts:", err);
+    return res.status(500).json({ error: `Erro interno ao reformular o slide com a identidade visual: ${err.message}` });
   }
 });
 

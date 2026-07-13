@@ -931,72 +931,35 @@ export default function App() {
         const genericBaby = INITIAL_EMPLOYEES.find(e => e.id === 'baby-generic');
         const genericGaming = INITIAL_EMPLOYEES.find(e => e.id === 'gaming-generic');
         
-        let finalData = data.map(e => {
-          if (e.id === 'gaming-generic') {
-            const isNameCorporate = e.name && (e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
-            if (isNameCorporate) {
-              const cleaned = {
-                ...e,
-                name: 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?',
-                role: '1',
-                photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
-                photoScale: 1,
-                photoPosition: { x: 0, y: 0 }
-              };
-              upsertEmployee(cleaned).catch(console.error);
-              return cleaned;
-            }
+        let remoteData = data.filter(e => {
+          if (e.id === 'gaming-generic' || e.id === 'baby-generic' || e.id === 'hiring-generic') {
+            deleteEmployee(e.id).catch(console.error);
+            return false;
           }
-          if (e.id === 'baby-generic') {
-            const isNameCorporate = e.name && (e.name.toUpperCase() === 'MARCIA' || e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
-            const isRoleCorporate = e.role && (e.role.toLowerCase().includes('manager') || e.role.toLowerCase().includes('ceo') || e.role.toLowerCase().includes('developer') || e.role.toLowerCase().includes('designer'));
-            if (isNameCorporate || isRoleCorporate) {
-              const cleaned = {
-                ...e,
-                name: 'BABY',
-                role: '',
-                photoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop',
-                photoScale: 1,
-                photoPosition: { x: 0, y: 0 }
-              };
-              upsertEmployee(cleaned).catch(console.error);
-              return cleaned;
-            }
-          }
-          if (e.id === 'hiring-generic') {
-            const isNameCorporate = e.name && (e.name === 'Peter Nolte' || e.name === 'Sarah Connor' || e.name === 'John Doe');
-            if (isNameCorporate) {
-              const cleaned = {
-                ...e,
-                name: 'Generic Hiring',
-                role: '',
-                photoUrl: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop',
-                photoScale: 1,
-                photoPosition: { x: 0, y: 0 }
-              };
-              upsertEmployee(cleaned).catch(console.error);
-              return cleaned;
-            }
-          }
-          return e;
+          return true;
         });
 
-        if (genericHiring && !finalData.find(e => e.id === 'hiring-generic')) {
-          finalData.push(genericHiring);
-        }
-        if (genericBaby && !finalData.find(e => e.id === 'baby-generic')) {
-          finalData.push(genericBaby);
-        }
-        if (genericGaming && !finalData.find(e => e.id === 'gaming-generic')) {
-          finalData.push(genericGaming);
-        }
-        setEmployees(finalData);
+        setEmployees(prev => {
+          const dbMap = new Map(remoteData.map(e => [e.id, e]));
+          
+          if (!dbMap.has('hiring-generic')) {
+            dbMap.set('hiring-generic', prev.find(e => e.id === 'hiring-generic') || genericHiring!);
+          }
+          if (!dbMap.has('baby-generic')) {
+            dbMap.set('baby-generic', prev.find(e => e.id === 'baby-generic') || genericBaby!);
+          }
+          if (!dbMap.has('gaming-generic')) {
+            dbMap.set('gaming-generic', prev.find(e => e.id === 'gaming-generic') || genericGaming!);
+          }
+          
+          return Array.from(dbMap.values());
+        });
 
-        const firstRealEmployee = finalData.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
+        const firstRealEmployee = remoteData.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
         if (firstRealEmployee) {
           setSelectedEmployeeId(firstRealEmployee.id);
-        } else {
-          setSelectedEmployeeId(finalData[0].id);
+        } else if (remoteData.length > 0) {
+          setSelectedEmployeeId(remoteData[0].id);
         }
       }
     });
@@ -1255,7 +1218,8 @@ export default function App() {
   const currentCanvasData = getCanvasData();
   
   const filteredEmployees = useMemo(() => employees.filter(emp => 
-     emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && emp.id !== 'gaming-generic' && (
+     emp.id !== 'hiring-generic' && emp.id !== 'baby-generic' && emp.id !== 'gaming-generic' &&
+     emp.name !== 'BABY' && emp.name !== 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?' && emp.name !== 'Generic Hiring' && (
        emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
        emp.role.toLowerCase().includes(searchQuery.toLowerCase())
      )
@@ -1748,23 +1712,7 @@ export default function App() {
         const clone = node.cloneNode(true) as HTMLElement;
         clone.style.transform = 'none'; // Reset scale for capture
         
-        // Remove rounded corners for export, keeping circular elements (e.g. avatar, slide index badge) intact
-        const innerCards = clone.querySelectorAll('div[style*="border-radius"]');
-        innerCards.forEach((card) => {
-            const htmlCard = card as HTMLElement;
-            const styleStr = htmlCard.getAttribute('style') || '';
-            const hasCircleRadius = 
-                styleStr.includes('50%') || 
-                styleStr.includes('9999') || 
-                styleStr.includes('1000') || 
-                htmlCard.style.borderRadius.includes('50%') || 
-                htmlCard.style.borderRadius.includes('9999') || 
-                htmlCard.style.borderRadius.includes('1000') || 
-                htmlCard.classList.contains('rounded-full');
-            if (!hasCircleRadius) {
-                htmlCard.style.borderRadius = '0';
-            }
-        });
+        // Only remove rounded corners for the main container to prevent clipping issues, leave inner elements intact
         clone.style.borderRadius = '0';
         
         // REMOVE SIGNATURE TEXT ONLY FOR EXPORT
@@ -1812,9 +1760,23 @@ export default function App() {
         });
 
         // 2. Process background-images (Crucial for New Provider template)
-        const divElements = Array.from(clone.querySelectorAll('div'));
-        const bgPromises = divElements.map(async (div) => {
-             const style = div.getAttribute('style') || '';
+        const allElements = Array.from(clone.querySelectorAll('*')) as HTMLElement[];
+        allElements.push(clone);
+        const bgPromises = allElements.map(async (el) => {
+             const style = el.getAttribute('style') || '';
+             
+             // Workaround for backdrop-filter bugs in html-to-image (blur bleeding out of radius)
+             if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
+                 el.style.backdropFilter = 'none';
+                 el.style.webkitBackdropFilter = 'none';
+                 if (el.style.background && el.style.background.includes('rgba')) {
+                     el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
+                         let op = parseFloat(a);
+                         return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
+                     });
+                 }
+             }
+
              // Look for url(...)
              const match = style.match(/url\(['"]?(http[^'"]+)['"]?\)/);
              if (match && match[1]) {
@@ -1827,7 +1789,7 @@ export default function App() {
                         reader.onloadend = () => {
                             const newDataUrl = reader.result as string;
                             // Replace only the specific URL found, preserving other style props
-                            div.style.backgroundImage = `url('${newDataUrl}')`;
+                            el.style.backgroundImage = `url('${newDataUrl}')`;
                             resolve(null);
                         };
                         reader.onerror = () => resolve(null);
@@ -1948,16 +1910,25 @@ export default function App() {
             const node = wrapper.firstElementChild as HTMLElement;
             if (!node) continue;
             
-            // Remove rounded corners for export, keeping circular elements (e.g. avatar, slide index badge) intact
-            const innerCards = node.querySelectorAll('div[style*="border-radius"]');
-            innerCards.forEach((card) => {
-                const htmlCard = card as HTMLElement;
-                const styleStr = htmlCard.getAttribute('style') || '';
-                if (!styleStr.includes('50%') && !htmlCard.style.borderRadius.includes('50%')) {
-                    htmlCard.style.borderRadius = '0';
+            // Only remove rounded corners for the main container to prevent clipping issues, leave inner elements intact
+            node.style.borderRadius = '0';
+            
+            // Workaround for backdrop-filter bugs in html-to-image
+            const allNodes = Array.from(node.querySelectorAll('*')) as HTMLElement[];
+            allNodes.push(node);
+            allNodes.forEach(el => {
+                const style = el.getAttribute('style') || '';
+                if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
+                    el.style.backdropFilter = 'none';
+                    el.style.webkitBackdropFilter = 'none';
+                    if (el.style.background && el.style.background.includes('rgba')) {
+                         el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
+                             let op = parseFloat(a);
+                             return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
+                         });
+                    }
                 }
             });
-            node.style.borderRadius = '0';
             
             container.innerHTML = '';
             container.appendChild(node);
@@ -2202,7 +2173,16 @@ export default function App() {
     
     let allHtml = '';
     
-    employees.forEach(emp => {
+    employees
+      .filter(e => 
+        e.id !== 'hiring-generic' && 
+        e.id !== 'baby-generic' && 
+        e.id !== 'gaming-generic' && 
+        e.name !== 'BABY' && 
+        e.name !== 'VOCÊ JÁ ATIVOU SEU JOGO FAVORITO HOJE?' && 
+        e.name !== 'Generic Hiring'
+      )
+      .forEach(emp => {
         const html = generateSignatureHtmlString(emp, hostedImageUrl, hideIconsForExport, includeInfoInHtml, fixedLinks, fixedActive);
         allHtml += `NOME: ${emp.name}\nCARGO: ${emp.role}\n--------------------------------------------------\n${html}\n\n==================================================\n\n`;
     });

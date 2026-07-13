@@ -6,8 +6,8 @@ import {
   Star, Minus, Search, Lock, Unlock, FileText, CheckSquare, RefreshCw, Layers as LayersIcon,
   Download, Sliders, Shield, Printer, Check, Circle, AlertCircle, PenTool, Highlighter,
   Underline, Upload, FolderOpen, Table, MessageSquare, MoreHorizontal, LayoutGrid, Scissors, Globe,
-  Smartphone, Instagram, Info, Link, Link2, Layers, Clock, PlusSquare, Eraser, Crop, Pin, Presentation, Play} from 'lucide-react';
-import { Slide, SlideElement } from '../types';
+  Smartphone, Instagram, Info, Link, Link2, Layers, Clock, PlusSquare, Eraser, Crop, Pin, Presentation, Play, Edit2, FileDown, FileUp} from 'lucide-react';
+import { Slide, SlideElement, PresentationFile, VisualIdentity } from '../types';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import * as XLSX from 'xlsx';
@@ -172,9 +172,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [isLockedByPass, setIsLockedByPass] = useState<boolean>(false);
   const [inputPass, setInputPass] = useState<string>('');
   const [watermark, setWatermark] = useState<string>('');
-  const [autoPageNumbers, setAutoPageNumbers] = useState<boolean>(true);
-  const [headerText, setHeaderText] = useState<string>('CONTRATO DE SERVIÇOS');
-  const [footerText, setFooterText] = useState<string>('Salsa Technology & Endocanvas');
+  const [autoPageNumbers, setAutoPageNumbers] = useState<boolean>(false);
+  const [headerText, setHeaderText] = useState<string>('');
+  const [footerText, setFooterText] = useState<string>('');
   const [compressionRatio, setCompressionRatio] = useState<number>(100); // 0-100%
   const [encryptionPolicy, setEncryptionPolicy] = useState<{ edit: boolean; print: boolean }>({ edit: true, print: true });
 
@@ -415,7 +415,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         };
 
         // 4. Update the current slide elements
-        const updatedElements = currentSlide.elements.map((el: any) => {
+        const updatedElements = currentSlide.elements.map((el: any, elIdx: number) => {
           if (el.id === bgEl.id) {
             return { ...el, content: newBgDataUrl };
           }
@@ -699,7 +699,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       if (idx === currentSlideIndex) {
         return {
           ...s,
-          elements: s.elements.map((el: any) => {
+          elements: s.elements.map((el: any, elIdx: number) => {
             if (selectedIds.has(el.id)) {
               let newX = el.x;
               let newY = el.y;
@@ -741,7 +741,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         if (idx === currentSlideIndex) {
           return {
             ...s,
-            elements: s.elements.map((el: any) => {
+            elements: s.elements.map((el: any, elIdx: number) => {
               const listIdx = selectedList.findIndex(item => item.id === el.id);
               if (listIdx === 0 || listIdx === selectedList.length - 1) {
                 return el; // Keep extremes steady
@@ -768,7 +768,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         if (idx === currentSlideIndex) {
           return {
             ...s,
-            elements: s.elements.map((el: any) => {
+            elements: s.elements.map((el: any, elIdx: number) => {
               const listIdx = selectedList.findIndex(item => item.id === el.id);
               if (listIdx === 0 || listIdx === selectedList.length - 1) {
                 return el;
@@ -2649,7 +2649,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             drawBackground(doc, p.background || '#ffffff', pdfWidth, pdfHeight);
 
             // Header Text
-            if (pageSizeType !== 'SLIDE_16_9') {
+            if (pageSizeType !== 'SLIDE_16_9' && headerText) {
               doc.setFontSize(10);
               doc.setTextColor('#64748b');
               doc.text(headerText, 30, 30);
@@ -2689,10 +2689,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             doc.restoreGraphicsState();
 
             // Footer Text
-            if (pageSizeType !== 'SLIDE_16_9') {
+            if (pageSizeType !== 'SLIDE_16_9' && (footerText || autoPageNumbers)) {
               doc.setFontSize(10);
               doc.setTextColor('#64748b');
-              doc.text(footerText, 30, pdfHeight - 32);
+              if (footerText) {
+                doc.text(footerText, 30, pdfHeight - 32);
+              }
               if (autoPageNumbers) {
                 doc.text(`Página ${i + 1} de ${slides.length}`, pdfWidth - 95, pdfHeight - 32);
               }
@@ -3288,24 +3290,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           importedSlidesObj.push(pdfSlide);
         }
 
-        // Display choice modal asking to replace or append slides
-        const choice = window.confirm(
-          `Sucesso! Extraídas ${numPages} páginas do seu PDF adaptado a ${pdfPageWidth}x${pdfPageHeight}px.\n\nDeseja SUBSTITUIR as páginas existentes do projeto (${slides.length}) por essas novas páginas?\n\n- Clique em [OK] para limpar e editar apenas o PDF.\n- Clique em [Cancelar] para ADICIONAR as páginas ao fim do seu slide deck atual.`
-        );
-
-        let nextSlides: Slide[];
-        let targetIndex: number;
-        if (choice) {
-          nextSlides = importedSlidesObj;
-          targetIndex = 0;
-        } else {
-          nextSlides = [...slides, ...importedSlidesObj];
-          targetIndex = slides.length;
-        }
-
-        triggerUpdate(nextSlides, `Importou PDF: ${file.name}`);
-        onSelectSlide(targetIndex);
-        toast.success(`PDF "${file.name}" importado com sucesso! ${numPages} página(s) convertida(s) pra ${pdfPageWidth}x${pdfPageHeight}px com textos 100% editáveis no slide deck.`, { id: loader, duration: 8000 });
+        // Set pending PDF import state to show custom modal and avoid native iframe blocking
+        setPendingPdfImport({
+          slides: importedSlidesObj,
+          numPages,
+          pdfPageWidth,
+          pdfPageHeight,
+          fileName: file.name,
+          loaderId: loader
+        });
       } catch (err) {
         console.error("PDF load/render error:", err);
         toast.error(`Falha ao ler o arquivo PDF: ${err instanceof Error ? err.message : String(err)}`, { id: loader });
@@ -3421,7 +3414,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               return { ...el, localId };
             });
 
-            const newElements = processedList.map((el: any) => {
+            const newElements = processedList.map((el: any, elIdx: number) => {
               const scaledWidth = scaleX(el.width || 200);
               const scaledHeight = scaleY(el.height || 100);
               const scaledX = scaleX(el.x || 100);
@@ -3500,7 +3493,491 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   };
 
   // --- NEW CUSTOM CANVA/FIGMA DARK MODE STATES ---
-  const [activeLeftTab, setActiveLeftTab] = useState<'pesquisar' | 'conteudo' | 'texto' | 'uploads' | 'arquivos' | 'imagens' | 'formas' | 'tabelas' | 'comentarios' | 'assinaturas' | 'configuracoes' | 'redimensionar' | null>('texto');
+  const [activeLeftTab, setActiveLeftTab] = useState<'pesquisar' | 'conteudo' | 'texto' | 'uploads' | 'arquivos' | 'imagens' | 'formas' | 'tabelas' | 'comentarios' | 'assinaturas' | 'configuracoes' | 'redimensionar' | 'apresentacoes' | null>('texto');
+
+  // --- MULTI-PRESENTATION ORGANIZER STATE & HANDLERS ---
+  const [presentationList, setPresentationList] = useState<PresentationFile[]>([]);
+  const [activePresentationId, setActivePresentationId] = useState<string>('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState<string>('');
+
+  // States to bypass native browser blocking prompt windows inside iframe
+  const [presentationToDelete, setPresentationToDelete] = useState<PresentationFile | null>(null);
+  const [pendingImportData, setPendingImportData] = useState<PresentationFile[] | null>(null);
+  const [pendingPdfImport, setPendingPdfImport] = useState<{
+    slides: Slide[];
+    numPages: number;
+    pdfPageWidth: number;
+    pdfPageHeight: number;
+    fileName: string;
+    loaderId: string;
+  } | null>(null);
+
+  const switchingToIdRef = useRef<string | null>(null);
+  const expectedSlidesStrRef = useRef<string | null>(null);
+
+  // --- AI BRAND IDENTITY ENGINE STATES ---
+  const [identities, setIdentities] = useState<VisualIdentity[]>([]);
+  const [activeIdentityId, setActiveIdentityId] = useState<string>('');
+  const [isApplyingIdentity, setIsApplyingIdentity] = useState<boolean>(false);
+  const [isLearningIdentity, setIsLearningIdentity] = useState<boolean>(false);
+  const [diversifyLayout, setDiversifyLayout] = useState<boolean>(true);
+
+  // States to build custom identities
+  const [isCreatingIdentity, setIsCreatingIdentity] = useState<boolean>(false);
+  const [newIdentityName, setNewIdentityName] = useState<string>('');
+  const [newIdentityDesc, setNewIdentityDesc] = useState<string>('');
+  const [newIdentityColors, setNewIdentityColors] = useState({
+    primary: '#0f172a',
+    secondary: '#1e293b',
+    accent: '#0ea5e9',
+    background: '#ffffff'
+  });
+  const [newIdentityFonts, setNewIdentityFonts] = useState({
+    heading: 'Space Grotesk',
+    body: 'Inter'
+  });
+
+  const [manualExample, setManualExample] = useState<string>('');
+
+  // Load identities from localStorage on mount - Enforce ONLY one identity (Orkney with Gradient)
+  useEffect(() => {
+    const singleIdentity: VisualIdentity = {
+      id: 'identity-orkney',
+      name: 'Identidade Orkney (Única)',
+      colors: {
+        primary: '#ffffff',
+        secondary: '#1A1A1A',
+        accent: '#30c3cd',
+        background: '#1A1A1A'
+      },
+      fonts: {
+        heading: 'Orkney',
+        body: 'Orkney'
+      },
+      description: 'Estilo exclusivo utilizando a fonte Orkney, degradê entre as cores #30c3cd (cyan) e #5552b9 (purple), com fundo escuro elegante #1A1A1A e destaque nos gráficos com as mesmas cores.',
+      examples: [
+        "Fundo predominantemente na cor #1A1A1A.",
+        "Degradê elegante entre as cores #30c3cd e #5552b9.",
+        "Destaques nos gráficos utilizando #30c3cd e #5552b9.",
+        "Slide inicial com Título, Subtítulo, Data de Atualização e Logo."
+      ]
+    };
+
+    const loadedIdentities = [singleIdentity];
+    setIdentities(loadedIdentities);
+    localStorage.setItem('end-visual-identities', JSON.stringify(loadedIdentities));
+    setActiveIdentityId('identity-orkney');
+    localStorage.setItem('end-current-identity-id', 'identity-orkney');
+  }, []);
+
+  const handleSelectIdentity = (id: string) => {
+    setActiveIdentityId('identity-orkney');
+    localStorage.setItem('end-current-identity-id', 'identity-orkney');
+  };
+
+  const handleCreateIdentity = () => {
+    if (!newIdentityName.trim()) {
+      toast.error("O nome da identidade é obrigatório.");
+      return;
+    }
+
+    const newId: VisualIdentity = {
+      id: `identity-${Date.now()}`,
+      name: newIdentityName,
+      colors: { ...newIdentityColors },
+      fonts: { ...newIdentityFonts },
+      description: newIdentityDesc || "Identidade visual personalizada criada pelo usuário.",
+      examples: []
+    };
+
+    const updated = [...identities, newId];
+    setIdentities(updated);
+    localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+    setActiveIdentityId(newId.id);
+    localStorage.setItem('end-current-identity-id', newId.id);
+
+    // Reset creation fields
+    setNewIdentityName('');
+    setNewIdentityDesc('');
+    setIsCreatingIdentity(false);
+
+    toast.success(`Identidade "${newId.name}" criada com sucesso!`);
+  };
+
+  const handleDeleteIdentity = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (id === 'identity-corporate' || id === 'identity-cosmic' || id === 'identity-creative') {
+      toast.error("Identidades padrões do sistema não podem ser removidas.");
+      return;
+    }
+
+    const updated = identities.filter(x => x.id !== id);
+    setIdentities(updated);
+    localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+
+    if (activeIdentityId === id && updated.length > 0) {
+      setActiveIdentityId(updated[0].id);
+      localStorage.setItem('end-current-identity-id', updated[0].id);
+    }
+
+    toast.success("Identidade removida com sucesso!");
+  };
+
+  const handleLearnFromImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLearningIdentity(true);
+    toast.info("A IA está analisando a composição e o estilo do slide de referência...");
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        
+        try {
+          const res = await fetch('/api/gemini/analyze-reference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 })
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Erro ao processar");
+          }
+
+          const { styleDescription } = await res.json();
+
+          setIdentities(prev => {
+            const updated = prev.map(id => {
+              if (id.id === activeIdentityId) {
+                const currentExamples = id.examples || [];
+                return {
+                  ...id,
+                  examples: [...currentExamples, styleDescription]
+                };
+              }
+              return id;
+            });
+            localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+            return updated;
+          });
+
+          toast.success("Referência de slide aprendida e integrada à identidade!");
+        } catch (err: any) {
+          toast.error(`Erro ao treinar IA: ${err.message}`);
+        } finally {
+          setIsLearningIdentity(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.error(`Erro ao carregar imagem: ${err.message}`);
+      setIsLearningIdentity(false);
+    }
+  };
+
+  const handleAddManualExample = () => {
+    if (!manualExample.trim()) return;
+    setIdentities(prev => {
+      const updated = prev.map(id => {
+        if (id.id === activeIdentityId) {
+          const currentExamples = id.examples || [];
+          return {
+            ...id,
+            examples: [...currentExamples, manualExample.trim()]
+          };
+        }
+        return id;
+      });
+      localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+      return updated;
+    });
+    setManualExample('');
+    toast.success("Diretriz de estilo registrada!");
+  };
+
+  const handleDeleteExample = (exampleIndex: number) => {
+    setIdentities(prev => {
+      const updated = prev.map(id => {
+        if (id.id === activeIdentityId) {
+          const currentExamples = id.examples || [];
+          return {
+            ...id,
+            examples: currentExamples.filter((_, idx) => idx !== exampleIndex)
+          };
+        }
+        return id;
+      });
+      localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+      return updated;
+    });
+    toast.success("Exemplo de estilo removido.");
+  };
+
+  const handleApplyIdentity = async (applyToAll: boolean) => {
+    const selectedIdentity = identities.find(id => id.id === activeIdentityId);
+    if (!selectedIdentity) return;
+
+    setIsApplyingIdentity(true);
+    toast.info(applyToAll ? "A IA está reformulando toda a apresentação..." : "A IA está reformulando o slide atual...");
+
+    try {
+      const { width: docWidth, height: docHeight } = getPageDimensions();
+      const res = await fetch('/api/gemini/apply-identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slides,
+          identity: selectedIdentity,
+          currentSlideIndex: currentSlide,
+          applyToAll,
+          diversify: diversifyLayout,
+          width: docWidth,
+          height: docHeight
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro no processamento do layout");
+      }
+
+      const { slides: updatedSlides } = await res.json();
+      onUpdateSlides(updatedSlides);
+      toast.success("Identidade Visual aplicada com sucesso!");
+    } catch (err: any) {
+      toast.error(`Erro ao aplicar identidade: ${err.message}`);
+    } finally {
+      setIsApplyingIdentity(false);
+    }
+  };
+
+  // Initialize presentations on mount
+  useEffect(() => {
+    const savedList = localStorage.getItem('end-presentation-files');
+    let loadedList: PresentationFile[] = [];
+    let activeId = '';
+
+    if (savedList) {
+      try {
+        loadedList = JSON.parse(savedList);
+      } catch (e) {
+        console.error("Failed to parse presentation files", e);
+      }
+    }
+
+    if (loadedList.length === 0) {
+      // Migrate existing localStorage slides if any, else use current slides prop
+      const savedSlides = localStorage.getItem('end-slides');
+      let initialSlides = slides;
+      if (savedSlides) {
+        try {
+          const parsed = JSON.parse(savedSlides);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            initialSlides = parsed;
+          }
+        } catch (e) {
+          console.error("Failed to parse end-slides in init", e);
+        }
+      }
+
+      const initialProj: PresentationFile = {
+        id: `pres-${Date.now()}`,
+        name: 'Apresentação sem título',
+        slides: initialSlides && initialSlides.length > 0 ? initialSlides : [{ id: `slide-0`, elements: [], background: '#ffffff' }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      loadedList = [initialProj];
+      activeId = initialProj.id;
+      localStorage.setItem('end-presentation-files', JSON.stringify(loadedList));
+      localStorage.setItem('end-current-presentation-id', activeId);
+    } else {
+      const savedActiveId = localStorage.getItem('end-current-presentation-id');
+      const found = loadedList.find(p => p.id === savedActiveId);
+      if (found) {
+        activeId = found.id;
+      } else {
+        activeId = loadedList[0].id;
+        localStorage.setItem('end-current-presentation-id', activeId);
+      }
+    }
+
+    setPresentationList(loadedList);
+    setActivePresentationId(activeId);
+
+    // Sync slides to parent state
+    const currentPres = loadedList.find(p => p.id === activeId);
+    if (currentPres) {
+      onUpdateSlides(currentPres.slides);
+      onSelectSlide(0);
+    }
+  }, []);
+
+  // Autosave current slides into active presentation
+  useEffect(() => {
+    if (!activePresentationId || !slides || slides.length === 0) return;
+
+    // Skip autosave if we are in transition (slides prop hasn't caught up to the switched presentation yet)
+    if (switchingToIdRef.current) {
+      const currentSlidesStr = JSON.stringify(slides);
+      if (currentSlidesStr === expectedSlidesStrRef.current) {
+        switchingToIdRef.current = null;
+        expectedSlidesStrRef.current = null;
+      } else {
+        return;
+      }
+    }
+
+    setPresentationList(prev => {
+      const idx = prev.findIndex(p => p.id === activePresentationId);
+      if (idx === -1) return prev;
+
+      const currentSlidesStr = JSON.stringify(prev[idx].slides);
+      const newSlidesStr = JSON.stringify(slides);
+      if (currentSlidesStr === newSlidesStr) return prev;
+
+      const updated = prev.map((p, i) => i === idx ? { ...p, slides, updatedAt: new Date().toISOString() } : p);
+      localStorage.setItem('end-presentation-files', JSON.stringify(updated));
+      return updated;
+    });
+  }, [slides, activePresentationId]);
+
+  const handleSelectPresentation = (id: string) => {
+    const found = presentationList.find(p => p.id === id);
+    if (!found) return;
+
+    expectedSlidesStrRef.current = JSON.stringify(found.slides);
+    switchingToIdRef.current = id;
+    setActivePresentationId(id);
+    localStorage.setItem('end-current-presentation-id', id);
+
+    setUndoStack([]);
+    setRedoStack([]);
+
+    onUpdateSlides(found.slides);
+    onSelectSlide(0);
+    toast.success(`Apresentação "${found.name}" carregada!`);
+  };
+
+  const handleCreateNewPresentation = (name: string = 'Apresentação sem título') => {
+    const newProj: PresentationFile = {
+      id: `pres-${Date.now()}`,
+      name: name,
+      slides: [{ id: `slide-${Date.now()}`, elements: [], background: '#ffffff' }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedList = [newProj, ...presentationList];
+    setPresentationList(updatedList);
+    localStorage.setItem('end-presentation-files', JSON.stringify(updatedList));
+
+    expectedSlidesStrRef.current = JSON.stringify(newProj.slides);
+    switchingToIdRef.current = newProj.id;
+    setActivePresentationId(newProj.id);
+    localStorage.setItem('end-current-presentation-id', newProj.id);
+
+    setUndoStack([]);
+    setRedoStack([]);
+
+    onUpdateSlides(newProj.slides);
+    onSelectSlide(0);
+    toast.success(`Nova apresentação "${name}" criada com sucesso!`);
+  };
+
+  const handleDeletePresentation = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (presentationList.length <= 1) {
+      toast.error('Você precisa manter pelo menos uma apresentação ativa.');
+      return;
+    }
+
+    const found = presentationList.find(p => p.id === id);
+    if (found) {
+      setPresentationToDelete(found);
+    }
+  };
+
+  const handleRenamePresentation = (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    setPresentationList(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, name: newName, updatedAt: new Date().toISOString() } : p);
+      localStorage.setItem('end-presentation-files', JSON.stringify(updated));
+      return updated;
+    });
+    setRenamingId(null);
+    toast.success('Nome da apresentação atualizado!');
+  };
+
+  const handleDuplicatePresentation = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const found = presentationList.find(p => p.id === id);
+    if (!found) return;
+
+    const duplicatedProj: PresentationFile = {
+      id: `pres-${Date.now()}`,
+      name: `${found.name} (Cópia)`,
+      slides: JSON.parse(JSON.stringify(found.slides)),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedList = [duplicatedProj, ...presentationList];
+    setPresentationList(updatedList);
+    localStorage.setItem('end-presentation-files', JSON.stringify(updatedList));
+
+    expectedSlidesStrRef.current = JSON.stringify(duplicatedProj.slides);
+    switchingToIdRef.current = duplicatedProj.id;
+    setActivePresentationId(duplicatedProj.id);
+    localStorage.setItem('end-current-presentation-id', duplicatedProj.id);
+
+    setUndoStack([]);
+    setRedoStack([]);
+
+    onUpdateSlides(duplicatedProj.slides);
+    onSelectSlide(0);
+    toast.success(`Cópia de "${found.name}" criada com sucesso!`);
+  };
+
+  const handleExportAllPresentations = () => {
+    try {
+      const dataStr = JSON.stringify(presentationList, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `backup-apresentacoes-${new Date().toISOString().slice(0, 10)}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      toast.success('Backup exportado com sucesso!');
+    } catch (e) {
+      toast.error('Erro ao exportar apresentações.');
+    }
+  };
+
+  const handleImportPresentations = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id && parsed[0].name && parsed[0].slides) {
+          setPendingImportData(parsed);
+        } else {
+          toast.error('Formato inválido. Certifique-se de que é um backup válido de apresentações.');
+        }
+      } catch (err) {
+        toast.error('Erro ao ler arquivo de backup.');
+      }
+    };
+    reader.readAsText(file);
+  };
   
   // --- GLOBAL FILE DRAG AND DROP HANDLERS ---
   const [isDraggingFileGlobal, setIsDraggingFileGlobal] = useState(false);
@@ -3821,7 +4298,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       if (idx === currentSlideIndex) {
         return {
           ...s,
-          elements: s.elements.map((el: any) => {
+          elements: s.elements.map((el: any, elIdx: number) => {
             if (idsToAlign.has(el.id)) {
               let newX = el.x;
               let newY = el.y;
@@ -4359,6 +4836,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               { key: 'texto', icon: <Type size={18}/>, name: 'Texto' },
               { key: 'arquivos', icon: <FolderOpen size={18}/>, name: 'Arquivos' },
               { key: 'formas', icon: <Box size={18}/>, name: 'Formas' },
+              { key: 'apresentacoes', icon: <Presentation size={18}/>, name: 'Documentos' },
+              { key: 'identidade', icon: <Sparkles size={18}/>, name: 'Identidade' },
               { key: 'configuracoes', icon: <Sliders size={18}/>, name: 'Ajustes' }
             ] as const).map(tab => {
               const isActive = activeLeftTab === tab.key;
@@ -5062,112 +5541,153 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
                 </div>
 
-                {/* Sub-Tab content region (showing Uploads directly) */}
-                <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4">
-                  <div className="space-y-4">
-                    <div className="border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/50 transition-all rounded-xl p-4 text-center cursor-pointer relative">
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (loadRes) => {
-                              if (loadRes.target?.result) {
-                                setUserUploadedImages(prev => [...prev, loadRes.target!.result as string]);
-                                toast.success('Imagem carregada com sucesso para uploads!');
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                      <Upload size={20} className="mx-auto text-slate-500 mb-2" />
-                      <span className="text-[11px] block text-slate-300 font-bold">Arraste uma Imagem</span>
-                      <span className="text-[9px] text-slate-600 block mt-0.5">JPEG, PNG • Max 5MB</span>
-                    </div>
+                {/* Sub-Tab Navigation inside Arquivos */}
+                <div className="flex border-b border-[#1e293b] px-2 bg-slate-950/20">
+                  <button 
+                    onClick={() => setArquivosSubTab('uploads')}
+                    className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-wider transition-all border-b-2 ${arquivosSubTab !== 'importacao' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/5' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                  >
+                    Mídia &amp; IA
+                  </button>
+                  <button 
+                    onClick={() => setArquivosSubTab('importacao')}
+                    className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-wider transition-all border-b-2 ${arquivosSubTab === 'importacao' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/5' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                  >
+                    Importar PDF / Doc
+                  </button>
+                </div>
 
-                    {/* RECRIAR SLIDE COM IA */}
-                    <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
-                      <span className="text-[10px] text-pink-400 uppercase tracking-widest block font-bold flex items-center gap-1">
-                        <Sparkles size={11} className="text-pink-400 animate-pulse" /> Recriação por IA
-                      </span>
-                      
-                      <div className={`relative border border-dashed ${isRecreatingSlide ? 'border-pink-500/50 bg-pink-950/10' : 'border-slate-800 hover:border-pink-500/30'} p-4 rounded-xl bg-slate-950/40 hover:scale-[1.01] transition-all text-center cursor-pointer`}>
+                {/* Sub-Tab content region */}
+                <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4">
+                  {arquivosSubTab !== 'importacao' ? (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <div className="border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/50 transition-all rounded-xl p-4 text-center cursor-pointer relative">
                         <input 
                           type="file" 
                           accept="image/*"
-                          onChange={async (e) => {
+                          onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              await handleRecreateSlideFromImage(file);
+                              const reader = new FileReader();
+                              reader.onload = (loadRes) => {
+                                if (loadRes.target?.result) {
+                                  setUserUploadedImages(prev => [...prev, loadRes.target!.result as string]);
+                                  toast.success('Imagem carregada com sucesso para uploads!');
+                                }
+                              };
+                              reader.readAsDataURL(file);
                             }
                           }}
-                          disabled={isRecreatingSlide}
-                          className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        {isRecreatingSlide ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-center gap-2">
-                              <RefreshCw size={14} className="text-pink-400 animate-spin" />
-                              <span className="text-xs text-pink-400 font-extrabold">IA analisando e recriando...</span>
-                            </div>
-                            <span className="text-[8px] text-slate-500 block">Identificando formas, textos, cores e posições no slide de origem</span>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <Upload size={16} className="mx-auto text-pink-400 mb-1" />
-                            <span className="text-xs text-pink-400 font-extrabold block">Recriar Slide a partir de Imagem</span>
-                            <span className="text-[9px] text-slate-500 block leading-normal text-slate-400">
-                              Envie uma imagem e a IA vai gerar formas, textos e layout idênticos na área de trabalho!
-                            </span>
-                          </div>
-                        )}
+                        <Upload size={20} className="mx-auto text-slate-500 mb-2" />
+                        <span className="text-[11px] block text-slate-300 font-bold">Arraste uma Imagem</span>
+                        <span className="text-[9px] text-slate-600 block mt-0.5">JPEG, PNG • Max 5MB</span>
                       </div>
-                    </div>
 
-                    <div className="space-y-2 pt-2">
-                      <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Mídia Enviada ({userUploadedImages.length})</span>
-                      <div className="grid grid-cols-2 gap-2 p-0.5">
-                        {userUploadedImages.map((img, i) => (
-                          <div key={i} className="relative group rounded-lg overflow-hidden border border-slate-800 bg-slate-950 aspect-video">
-                            <img src={img} className="w-full h-full object-cover" />
-                            <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => {
-                                  if (isLockedByPass) return;
-                                  const newEl: any = {
-                                    id: `img-${Date.now()}-${i}`,
-                                    type: 'image',
-                                    x: 100,
-                                    y: 100,
-                                    width: 300,
-                                    height: 200,
-                                    content: img,
-                                    zIndex: currentSlide.elements.length + 1,
-                                    style: { opacity: 1, rotation: 0 }
-                                  };
-                                  triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
-                                  setSelectedIds(new Set([newEl.id]));
-                                }}
-                                className="p-0.5 px-1 bg-cyan-700 rounded text-[8px] font-bold text-white hover:bg-cyan-600 font-mono"
-                              >
-                                Inserir
-                              </button>
-                              <button 
-                                onClick={() => setUserUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
-                                className="text-red-400 hover:text-red-350"
-                              >
-                                <Trash2 size={8}/>
-                              </button>
+                      {/* RECRIAR SLIDE COM IA */}
+                      <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                        <span className="text-[10px] text-pink-400 uppercase tracking-widest block font-bold flex items-center gap-1">
+                          <Sparkles size={11} className="text-pink-400 animate-pulse" /> Recriação por IA
+                        </span>
+                        
+                        <div className={`relative border border-dashed ${isRecreatingSlide ? 'border-pink-500/50 bg-pink-950/10' : 'border-slate-800 hover:border-pink-500/30'} p-4 rounded-xl bg-slate-950/40 hover:scale-[1.01] transition-all text-center cursor-pointer`}>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                await handleRecreateSlideFromImage(file);
+                              }
+                            }}
+                            disabled={isRecreatingSlide}
+                            className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          {isRecreatingSlide ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-center gap-2">
+                                <RefreshCw size={14} className="text-pink-400 animate-spin" />
+                                <span className="text-xs text-pink-400 font-extrabold">IA analisando e recriando...</span>
+                              </div>
+                              <span className="text-[8px] text-slate-500 block">Identificando formas, textos, cores e posições no slide de origem</span>
                             </div>
-                          </div>
-                        ))}
+                          ) : (
+                            <div className="space-y-1">
+                              <Upload size={16} className="mx-auto text-pink-400 mb-1" />
+                              <span className="text-xs text-pink-400 font-extrabold block">Recriar Slide a partir de Imagem</span>
+                              <span className="text-[9px] text-slate-500 block leading-normal text-slate-400">
+                                Envie uma imagem e a IA vai gerar formas, textos e layout idênticos na área de trabalho!
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Mídia Enviada ({userUploadedImages.length})</span>
+                        <div className="grid grid-cols-2 gap-2 p-0.5">
+                          {userUploadedImages.map((img, i) => (
+                            <div key={i} className="relative group rounded-lg overflow-hidden border border-slate-800 bg-slate-950 aspect-video">
+                              <img src={img} className="w-full h-full object-cover" />
+                              <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => {
+                                    if (isLockedByPass) return;
+                                    const newEl: any = {
+                                      id: `img-${Date.now()}-${i}`,
+                                      type: 'image',
+                                      x: 100,
+                                      y: 100,
+                                      width: 300,
+                                      height: 200,
+                                      content: img,
+                                      zIndex: currentSlide.elements.length + 1,
+                                      style: { opacity: 1, rotation: 0 }
+                                    };
+                                    triggerUpdate(slides.map((s, idx) => idx === currentSlideIndex ? { ...s, elements: [...s.elements, newEl] } : s));
+                                    setSelectedIds(new Set([newEl.id]));
+                                  }}
+                                  className="p-0.5 px-1 bg-cyan-700 rounded text-[8px] font-bold text-white hover:bg-cyan-600 font-mono"
+                                >
+                                  Inserir
+                                </button>
+                                <button 
+                                  onClick={() => setUserUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
+                                  className="text-red-400 hover:text-red-350"
+                                >
+                                  <Trash2 size={8}/>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <div className="border border-dashed border-cyan-500/50 bg-cyan-950/10 rounded-xl p-5 text-center cursor-pointer relative hover:border-cyan-400 transition-all">
+                        <input 
+                          type="file" 
+                          onChange={handleImportFile}
+                          accept=".pdf,.docx,.doc,.pptx,.xlsx,.png,.jpg,.jpeg,.webp,.svg"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                        <FileText size={24} className="mx-auto text-cyan-400 mb-2 animate-pulse" />
+                        <span className="text-xs block text-slate-200 font-bold">Selecione ou arraste um PDF/Documento</span>
+                        <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
+                          PDF, DOCX, PPTX, XLSX ou Imagens • Converta e edite instantaneamente como slides vetoriais!
+                        </span>
+                      </div>
+                      
+                      <div className="bg-slate-950/40 border border-slate-900 rounded-xl p-3.5 space-y-2">
+                        <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block">Como funciona?</span>
+                        <p className="text-[9px] text-slate-400 leading-normal">
+                          Ao enviar um arquivo PDF ou outro documento compatível, o nosso motor avançado de leitura de documentos irá extrair todas as páginas, vetores, textos e imagens do arquivo original e reconstruir o layout de forma 100% editável e estruturada em slides na sua área de trabalho.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -5680,6 +6200,395 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                     );
                   })()}
                 </div>
+              </div>
+            )}
+
+            {activeLeftTab === 'apresentacoes' && (
+              <div className="flex flex-col h-full bg-[#11141a] select-none font-sans">
+                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
+                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                    <Presentation size={14} className="text-cyan-400" />
+                    Documentos
+                  </span>
+                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                    <X size={14}/>
+                  </button>
+                </div>
+
+                <div className="px-4 py-2.5 bg-slate-900/60 border-b border-[#1e293b] flex items-center justify-between text-[11px] text-slate-350">
+                  <span className="font-semibold text-slate-350">Apresentações Salvas</span>
+                  <span className="text-[10px] bg-cyan-950 text-cyan-400 font-mono font-bold px-1.5 py-0.5 rounded border border-cyan-500/20">
+                    {presentationList.length} {presentationList.length === 1 ? 'arquivo' : 'arquivos'}
+                  </span>
+                </div>
+
+                <div className="p-3 border-b border-[#1e293b]/50">
+                  <button
+                    onClick={() => handleCreateNewPresentation(`Apresentação ${presentationList.length + 1}`)}
+                    className="w-full py-2 px-3 bg-cyan-950/20 hover:bg-cyan-950/40 border border-dashed border-cyan-500/40 hover:border-cyan-400 rounded-xl text-[11px] font-extrabold text-cyan-400 flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    Criar Nova Apresentação
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5">
+                  {presentationList.map(p => {
+                    const isActive = p.id === activePresentationId;
+                    const isRenaming = p.id === renamingId;
+                    
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          if (!isActive) handleSelectPresentation(p.id);
+                        }}
+                        className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? 'bg-[#181d28]/90 border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.1)]'
+                            : 'bg-[#11141a] border-slate-800/40 hover:bg-[#141822] hover:border-slate-800/80'
+                        }`}
+                      >
+                        {isRenaming ? (
+                          <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleRenamePresentation(p.id, renameValue);
+                                if (e.key === 'Escape') setRenamingId(null);
+                              }}
+                              className="w-full bg-[#090b10] border border-cyan-500/50 rounded-lg px-2 py-1 text-xs text-white font-medium focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                              autoFocus
+                            />
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => setRenamingId(null)}
+                                className="px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] font-bold text-slate-400 hover:text-white"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => handleRenamePresentation(p.id, renameValue)}
+                                className="px-2 py-0.5 bg-cyan-600 rounded text-[9px] font-bold text-white hover:bg-cyan-500"
+                              >
+                                Salvar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <div className="flex items-start justify-between gap-1">
+                              <span className={`text-[11px] font-black tracking-tight leading-snug break-all truncate max-w-[150px] ${isActive ? 'text-cyan-400' : 'text-slate-200 group-hover:text-white'}`}>
+                                {p.name}
+                              </span>
+                              
+                              {isActive && (
+                                <span className="text-[8px] font-bold bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-1 py-0.2 rounded shrink-0 select-none">
+                                  ATIVO
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-[9px] text-slate-500 font-mono">
+                              <span>
+                                {p.slides.length} {p.slides.length === 1 ? 'slide' : 'slides'}
+                              </span>
+                              <span>
+                                {new Date(p.updatedAt).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+
+                            {/* Action buttons drawer shown on hover or if active */}
+                            <div className="flex items-center gap-1.5 pt-2 mt-2 border-t border-slate-800/60 opacity-60 group-hover:opacity-100 transition-opacity justify-end" onClick={e => e.stopPropagation()}>
+                              <button
+                                title="Renomear"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setRenamingId(p.id);
+                                  setRenameValue(p.name);
+                                }}
+                                className="p-1.5 rounded-lg bg-[#0e1117] hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 transition-all cursor-pointer"
+                              >
+                                <Edit2 size={10} />
+                              </button>
+                              <button
+                                title="Duplicar"
+                                onClick={e => handleDuplicatePresentation(p.id, e)}
+                                className="p-1.5 rounded-lg bg-[#0e1117] hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 transition-all cursor-pointer"
+                              >
+                                <Copy size={10} />
+                              </button>
+                              <button
+                                title="Excluir"
+                                onClick={e => handleDeletePresentation(p.id, e)}
+                                className="p-1.5 rounded-lg bg-[#0e1117] hover:bg-slate-800 text-slate-400 hover:text-red-400 border border-slate-800 transition-all cursor-pointer"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-3 bg-slate-900/40 border-t border-[#1e293b]/85 space-y-2">
+                  <span className="text-[9px] text-slate-500 uppercase font-mono tracking-widest block text-center font-bold">
+                    Opções de Backup
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleExportAllPresentations}
+                      className="py-1.5 px-2 bg-[#0e1117] border border-slate-800 hover:border-slate-700 rounded-lg text-[9px] font-bold text-slate-350 flex items-center justify-center gap-1 shadow cursor-pointer transition-all active:scale-95"
+                      title="Exportar todas as apresentações como backup JSON"
+                    >
+                      <FileDown size={11} className="text-cyan-400" />
+                      Exportar
+                    </button>
+                    
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportPresentations}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        title="Importar backup de apresentações do JSON"
+                      />
+                      <button
+                        className="w-full py-1.5 px-2 bg-[#0e1117] border border-slate-800 hover:border-slate-700 rounded-lg text-[9px] font-bold text-slate-350 flex items-center justify-center gap-1 shadow cursor-pointer transition-all active:scale-95"
+                      >
+                        <FileUp size={11} className="text-purple-400" />
+                        Importar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeLeftTab === 'identidade' && (
+              <div className="flex flex-col h-full bg-[#11141a] select-none font-sans overflow-hidden">
+                {/* Header */}
+                <div className="p-4 border-b border-[#1e293b] flex justify-between items-center bg-[#11141a]">
+                  <span className="text-xs font-black tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-cyan-400 animate-pulse" />
+                    Identidade Visual Única
+                  </span>
+                  <button onClick={() => setActiveLeftTab(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                    <X size={14}/>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 max-h-[calc(100vh-120px)] pb-10">
+                  
+                  {/* Unified Identity card */}
+                  {(() => {
+                    const currentId = identities[0] || {
+                      name: 'Identidade Orkney com Degradê',
+                      description: 'Estilo exclusivo utilizando a fonte Orkney, degradê entre as cores #30c3cd (cyan) e #5552b9 (purple), com fundo escuro elegante #1A1A1A e destaque nos gráficos com as mesmas cores.',
+                      colors: { primary: '#ffffff', secondary: '#1A1A1A', accent: '#30c3cd', background: '#1A1A1A' },
+                      fonts: { heading: 'Orkney', body: 'Orkney' }
+                    };
+                    return (
+                      <div className="p-4 bg-slate-900/60 border border-slate-800/60 rounded-2xl space-y-4 animate-in fade-in duration-200">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-200 tracking-wide uppercase flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#30c3cd] to-[#5552b9] animate-pulse" />
+                            {currentId.name}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">{currentId.description}</p>
+                        </div>
+
+                        {/* Interactive Gradient Ribbon */}
+                        <div className="space-y-1">
+                          <span className="text-[8px] uppercase font-bold text-slate-500 tracking-wider">Degradê de Identidade</span>
+                          <div className="h-6 w-full rounded-lg bg-gradient-to-r from-[#30c3cd] to-[#5552b9] border border-white/10 relative overflow-hidden flex items-center justify-between px-3">
+                            <span className="text-[8px] font-mono text-white font-bold drop-shadow-sm">#30c3cd</span>
+                            <span className="text-[8px] font-mono text-white font-bold drop-shadow-sm">#5552b9</span>
+                          </div>
+                        </div>
+
+                        {/* Palette colors */}
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          <div className="text-center bg-[#1A1A1A] p-1.5 border border-slate-800 rounded-xl">
+                            <div className="w-5 h-5 rounded-full mx-auto border border-white/10 shadow-sm bg-[#1A1A1A]" />
+                            <span className="text-[7px] text-slate-300 font-bold block mt-1">#1A1A1A</span>
+                            <span className="text-[6px] text-slate-500 uppercase block">Fundo</span>
+                          </div>
+                          <div className="text-center bg-[#1A1A1A] p-1.5 border border-slate-800 rounded-xl">
+                            <div className="w-5 h-5 rounded-full mx-auto border border-white/10 shadow-sm bg-[#30c3cd]" />
+                            <span className="text-[7px] text-slate-300 font-bold block mt-1">#30c3cd</span>
+                            <span className="text-[6px] text-slate-500 uppercase block">Destaque 1</span>
+                          </div>
+                          <div className="text-center bg-[#1A1A1A] p-1.5 border border-slate-800 rounded-xl">
+                            <div className="w-5 h-5 rounded-full mx-auto border border-white/10 shadow-sm bg-[#5552b9]" />
+                            <span className="text-[7px] text-slate-300 font-bold block mt-1">#5552b9</span>
+                            <span className="text-[6px] text-slate-500 uppercase block">Destaque 2</span>
+                          </div>
+                        </div>
+
+                        {/* Fonts preview */}
+                        <div className="p-2.5 rounded-xl border border-slate-800/60 bg-slate-950/40 space-y-1">
+                          <span className="text-[8px] uppercase font-bold text-slate-500 block">Tipografia Exclusiva</span>
+                          <span className="text-xs font-semibold text-slate-100 block tracking-tight truncate" style={{ fontFamily: 'Orkney' }}>
+                            Orkney Regular / Bold
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Teach / Feed references */}
+                  <div className="p-3 bg-slate-900/40 border border-slate-800/40 rounded-2xl space-y-3">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles size={11} className="animate-pulse" />
+                      Treinar IA / Alimentar Referências
+                    </span>
+                    <p className="text-[9px] text-slate-400 leading-relaxed">
+                      Alimente a IA com imagens de slides ou diretrizes adicionais para ensiná-la a reorganizar o layout sob medida.
+                    </p>
+
+                    {/* Image reference uploader */}
+                    <div className="relative border border-dashed border-[#1e293b] hover:border-indigo-500/50 rounded-xl p-3 bg-slate-950/20 hover:bg-indigo-950/10 transition-all text-center group cursor-pointer">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleLearnFromImage}
+                        disabled={isLearningIdentity}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        {isLearningIdentity ? (
+                           <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+                        ) : (
+                          <Upload size={14} className="text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                        )}
+                        <span className="text-[10px] font-semibold text-slate-300 block">
+                          {isLearningIdentity ? 'Analisando Referência...' : 'Carregar Imagem de Slide'}
+                        </span>
+                        <span className="text-[8px] text-slate-500">PNG, JPG, WebP</span>
+                      </div>
+                    </div>
+
+                    {/* Manual textual rule input */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[8px] text-slate-400 uppercase block font-bold">Diretriz de estilo manual:</span>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Ex: Títulos em caixa alta no topo..."
+                          value={manualExample}
+                          onChange={(e) => setManualExample(e.target.value)}
+                          className="flex-1 bg-slate-950/40 border border-slate-800 rounded-xl p-1.5 text-[10px] text-slate-200 outline-none"
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddManualExample()}
+                        />
+                        <button 
+                          onClick={handleAddManualExample}
+                          className="px-2.5 bg-indigo-900/50 hover:bg-indigo-900 text-indigo-300 text-[9px] rounded-xl font-bold border border-indigo-950 transition-colors cursor-pointer"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Learned references list */}
+                    {(() => {
+                      const currentId = identities[0];
+                      if (!currentId || !currentId.examples || currentId.examples.length === 0) return null;
+                      return (
+                        <div className="space-y-1.5 pt-2">
+                          <span className="text-[8px] text-slate-400 uppercase block font-bold">Estilos Aprendidos ({currentId.examples.length}):</span>
+                          <div className="space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                            {currentId.examples.map((ex, idx) => (
+                              <div key={idx} className="bg-slate-950/40 p-1.5 border border-slate-800/40 rounded-lg flex justify-between items-center text-[8px] leading-normal text-slate-300">
+                                <span className="truncate flex-1 pr-1">{idx+1}. {ex}</span>
+                                <button 
+                                  onClick={() => handleDeleteExample(idx)}
+                                  className="text-slate-500 hover:text-red-400 p-0.5 cursor-pointer"
+                                  title="Remover diretriz"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Apply visual layout actions */}
+                  <div className="p-3 bg-indigo-950/10 border border-indigo-900/20 rounded-2xl space-y-3 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={11} className="text-cyan-400" />
+                        Reorganizar Layout
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[8px] text-slate-400 uppercase font-bold">Diversificar</span>
+                        <button
+                          onClick={() => setDiversifyLayout(!diversifyLayout)}
+                          className={`w-7 h-4 rounded-full transition-colors relative p-0.5 cursor-pointer ${diversifyLayout ? 'bg-cyan-500' : 'bg-slate-800'}`}
+                        >
+                          <div className={`w-3 h-3 rounded-full bg-white transition-transform ${diversifyLayout ? 'translate-x-3' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-slate-400 leading-relaxed font-sans">
+                      Aplique esta identidade. As informações dos seus slides serão totalmente redesenhadas e diagramadas sem perder nenhuma informação.
+                    </p>
+
+                    <div className="space-y-2 pt-1 font-sans">
+                      <button
+                        onClick={() => handleApplyIdentity(false)}
+                        disabled={isApplyingIdentity || isLearningIdentity}
+                        className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        {isApplyingIdentity ? (
+                          <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        ) : (
+                          <Sparkles size={11} />
+                        )}
+                        Redesenhar Slide Atual
+                      </button>
+
+                      <button
+                        onClick={() => handleApplyIdentity(true)}
+                        disabled={isApplyingIdentity || isLearningIdentity}
+                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        {isApplyingIdentity ? (
+                          <div className="w-3 h-3 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+                        ) : (
+                          <Presentation size={11} className="text-indigo-400" />
+                        )}
+                        Redesenhar Toda Apresentação
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Loading overlay */}
+                {isApplyingIdentity && (
+                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-300 font-sans">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+                      <Sparkles size={24} className="text-cyan-400 absolute animate-pulse" />
+                    </div>
+                    <h4 className="text-xs font-black text-cyan-400 uppercase tracking-widest mt-6 animate-pulse">
+                      Reformulando Layout...
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-2 max-w-[200px] leading-relaxed">
+                      Utilizando inteligência artificial para reconstruir os slides baseados no seu estilo aprendido.
+                    </p>
+                    <div className="mt-4 bg-slate-900/80 border border-slate-800 p-2 rounded-xl text-[8px] font-mono text-slate-500 w-full max-w-[180px] truncate">
+                      [INFO] REDESENHANDO COMPOSIÇÃO...
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -6381,7 +7290,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             const isSlideActive = idx === currentSlideIndex;
             return (
               <div
-                key={slide.id || `slide-${idx}`}
+                key={`${slide.id || "slide"}-${idx}`}
                 id={`page-sheet-${idx}`}
                 onMouseDownCapture={() => {
                   if (currentSlideIndex !== idx) {
@@ -6516,7 +7425,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   }}
                 >
                   {/* RUNNING HEADER LAYER */}
-                  {pageSizeType !== 'SLIDE_16_9' && (
+                  {pageSizeType !== 'SLIDE_16_9' && headerText && (
                     <div className="absolute top-6 left-12 right-12 flex justify-between border-b border-slate-200 pb-2 text-[10px] text-slate-400 select-none">
                       <span>{headerText.toUpperCase()}</span>
                       <span>Acrobat Pro Document</span>
@@ -6674,11 +7583,11 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                   {/* CANVAS INTERACTIVE PLAYGROUND ELEMENTS */}
                   <div className="absolute inset-0 pt-20 pb-20 px-12 z-10">
-                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any) => {
+                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any, elIdx: number) => {
                       const isSelected = selectedIds.has(el.id);
                       
                       return (
-                        <React.Fragment key={el.id}>
+                        <React.Fragment key={`${el.id}-${elIdx}`}>
                           <div
                           onMouseDown={(e) => {
                             if (editMode === 'LIVE_FILL' || isLockedByPass) return;
@@ -7178,11 +8087,11 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             >
                               {slide.elements
                                 .filter((child: any) => child.maskedBy === el.id)
-                                .map((child: any) => {
+                                .map((child: any, cIdx: number) => {
                                   const isChildSelected = selectedIds.has(child.id);
                                   return (
                                     <div
-                                      key={child.id}
+                                      key={`${child.id}-${cIdx}`}
                                       onMouseDown={(e) => {
                                         if (editMode === 'LIVE_FILL' || isLockedByPass) return;
                                         e.stopPropagation();
@@ -7839,9 +8748,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   />
 
                   {/* RUNNING FOOTER LAYER */}
-                  {pageSizeType !== 'SLIDE_16_9' && (
+                  {pageSizeType !== 'SLIDE_16_9' && (footerText || autoPageNumbers) && (
                     <div className="absolute bottom-6 left-12 right-12 flex justify-between border-t border-slate-200 pt-2 text-[10px] text-slate-400 select-none">
-                      <span>{footerText.toUpperCase()}</span>
+                      <span>{footerText ? footerText.toUpperCase() : ''}</span>
                       {autoPageNumbers && <span>Página {idx + 1} de {slides.length}</span>}
                     </div>
                   )}
@@ -7878,7 +8787,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               const isActive = idx === currentSlideIndex;
               return (
                 <div 
-                  key={slide.id}
+                  key={`${slide.id}-${idx}`}
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', idx.toString());
@@ -7923,7 +8832,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   {/* Miniature canvas screen content preview */}
                   <div className="absolute inset-0 rounded-lg overflow-hidden" style={{ background: slide.background || '#ffffff' }}>
                     <div className="absolute inset-0 p-1 overflow-hidden">
-                      {slide.elements.filter((item: any) => !item.maskedBy).map(el => {
+                      {slide.elements.filter((item: any) => !item.maskedBy).map((el: any, elIdx: number) => {
                         const left = `${(el.x / docWidth) * 100}%`;
                         const top = `${(el.y / docHeight) * 100}%`;
                         const width = `${(el.width / docWidth) * 100}%`;
@@ -7945,7 +8854,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                         if (el.isRedacted || el.type === 'redact') {
                           return (
                             <div 
-                              key={el.id} 
+                              key={`${el.id}-${elIdx}`} 
                               style={{ ...commonStyle, backgroundColor: '#000000' }} 
                               className="rounded-[1px]"
                             />
@@ -7956,7 +8865,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                           const fontSize = Math.max(1, (el.style?.fontSize || 14) * 0.08);
                           return (
                             <div
-                              key={el.id}
+                              key={`${el.id}-${elIdx}`}
                               style={{
                                 ...commonStyle,
                                 fontFamily: el.style?.fontFamily || 'Inter',
@@ -7988,7 +8897,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                           const posY = -crop.top * scaleY;
 
                           return (
-                            <div key={el.id} style={commonStyle} className="overflow-hidden">
+                            <div key={`${el.id}-${elIdx}`} style={commonStyle} className="overflow-hidden">
                               <img 
                                 src={el.content} 
                                 alt="" 
@@ -8034,7 +8943,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                           return (
                             <div
-                              key={el.id}
+                              key={`${el.id}-${elIdx}`}
                               style={{
                                 ...commonStyle,
                                 ...backgroundStyle,
@@ -8075,7 +8984,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                               )}
                               {slide.elements
                                 .filter((child: any) => child.maskedBy === el.id)
-                                .map((child: any) => {
+                                .map((child: any, cIdx: number) => {
                                   const childLeft = `${((child.x - el.x) / el.width) * 100}%`;
                                   const childTop = `${((child.y - el.y) / el.height) * 100}%`;
                                   const childWidth = `${(child.width / el.width) * 100}%`;
@@ -8108,7 +9017,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                                     return (
                                       <div
-                                        key={child.id}
+                                        key={`${child.id}-${cIdx}`}
                                         style={{
                                           ...childCommonStyle,
                                           ...childBackgroundStyle,
@@ -8122,7 +9031,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                     const childFontSize = Math.max(1, (child.style?.fontSize || 14) * 0.08);
                                     return (
                                       <div
-                                        key={child.id}
+                                        key={`${child.id}-${cIdx}`}
                                         style={{
                                           ...childCommonStyle,
                                           fontFamily: child.style?.fontFamily || 'Inter',
@@ -8150,7 +9059,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                         if (el.isFormField) {
                           return (
                             <div 
-                              key={el.id} 
+                              key={`${el.id}-${elIdx}`} 
                               style={{ ...commonStyle, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }} 
                               className="rounded-[1px] flex items-center justify-center overflow-hidden"
                             >
@@ -10009,7 +10918,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                   {/* ELEMENTOS DO SLIDE */}
                   <div className="absolute inset-0 pt-20 pb-20 px-12 z-10">
-                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any) => {
+                    {slide.elements.filter((item: any) => !item.maskedBy).map((el: any, elIdx: number) => {
                       const left = `${el.x}px`;
                       const top = `${el.y}px`;
                       const width = `${el.width}px`;
@@ -10031,7 +10940,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       if (el.isRedacted || el.type === 'redact') {
                         return (
                           <div 
-                            key={el.id} 
+                            key={`${el.id}-${elIdx}`} 
                             style={{ ...commonStyle, backgroundColor: '#000000' }} 
                             className="rounded-[1px]"
                           />
@@ -10041,7 +10950,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       if (el.type === 'text') {
                         return (
                           <div
-                            key={el.id}
+                            key={`${el.id}-${elIdx}`}
                             style={{
                               ...commonStyle,
                               fontFamily: el.style?.fontFamily || 'Inter',
@@ -10073,7 +10982,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                         const posY = -crop.top * scaleY;
 
                         return (
-                          <div key={el.id} style={commonStyle} className="overflow-hidden">
+                          <div key={`${el.id}-${elIdx}`} style={commonStyle} className="overflow-hidden">
                             <img 
                               src={el.content} 
                               alt="" 
@@ -10120,7 +11029,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                         return (
                           <div
-                            key={el.id}
+                            key={`${el.id}-${elIdx}`}
                             style={{
                               ...commonStyle,
                               ...backgroundStyle,
@@ -10162,7 +11071,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             {/* SUPORTE IMPECÁVEL A MÁSCARAS DE ELEMENTOS (CLIPPING DO PAI) */}
                             {slide.elements
                               .filter((child: any) => child.maskedBy === el.id)
-                              .map((child: any) => {
+                              .map((child: any, cIdx: number) => {
                                 const childLeft = `${((child.x - el.x) / el.width) * 100}%`;
                                 const childTop = `${((child.y - el.y) / el.height) * 100}%`;
                                 const childWidth = `${(child.width / el.width) * 100}%`;
@@ -10195,7 +11104,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                                   return (
                                     <div
-                                      key={child.id}
+                                      key={`${child.id}-${cIdx}`}
                                       style={{
                                         ...childCommonStyle,
                                         ...childBackgroundStyle,
@@ -10208,7 +11117,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                                 if (child.type === 'text') {
                                   return (
                                     <div
-                                      key={child.id}
+                                      key={`${child.id}-${cIdx}`}
                                       style={{
                                         ...childCommonStyle,
                                         fontFamily: child.style?.fontFamily || 'Inter',
@@ -10236,7 +11145,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       if (el.isFormField) {
                         return (
                           <div 
-                            key={el.id} 
+                            key={`${el.id}-${elIdx}`} 
                             style={{ ...commonStyle, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }} 
                             className="rounded-[1px] flex items-center justify-center overflow-hidden"
                           >
@@ -10421,6 +11330,164 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               <Minimize size={13} />
               Sair
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* ========================================================================= */}
+      {/* CUSTOM CONFIRMATION DIALOGS TO BYPASS NATIVE IFRAME WINDOW.CONFIRM LIMITS */}
+      {/* ========================================================================= */}
+
+      {/* Delete Presentation Confirmation Modal */}
+      {presentationToDelete && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200001] flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
+          <div className="bg-[#11141a] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3 text-red-400">
+              <AlertCircle size={24} className="shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-200 font-sans">Excluir Apresentação</h3>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Tem certeza que deseja excluir permanentemente a apresentação <span className="text-red-400 font-bold">"{presentationToDelete.name}"</span>? Esta ação não poderá ser desfeita.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setPresentationToDelete(null)}
+                className="px-4 py-2 bg-slate-900 border border-slate-800/80 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const id = presentationToDelete.id;
+                  const filtered = presentationList.filter(p => p.id !== id);
+                  setPresentationList(filtered);
+                  localStorage.setItem('end-presentation-files', JSON.stringify(filtered));
+
+                  if (activePresentationId === id) {
+                    const nextActive = filtered[0];
+                    expectedSlidesStrRef.current = JSON.stringify(nextActive.slides);
+                    switchingToIdRef.current = nextActive.id;
+                    setActivePresentationId(nextActive.id);
+                    localStorage.setItem('end-current-presentation-id', nextActive.id);
+
+                    setUndoStack([]);
+                    setRedoStack([]);
+
+                    onUpdateSlides(nextActive.slides);
+                    onSelectSlide(0);
+                  }
+                  toast.success('Apresentação excluída com sucesso.');
+                  setPresentationToDelete(null);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+              >
+                Excluir Permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Backup Confirmation Modal */}
+      {pendingImportData && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200001] flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
+          <div className="bg-[#11141a] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3 text-cyan-400">
+              <FolderOpen size={24} className="shrink-0 mt-0.5 animate-bounce" />
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-200 font-sans">Importar Backup de Apresentações</h3>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Deseja substituir todas as suas apresentações atuais pelas <span className="text-cyan-400 font-bold">{pendingImportData.length} apresentações</span> do arquivo de backup? Isso apagará as apresentações locais.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setPendingImportData(null)}
+                className="px-4 py-2 bg-slate-900 border border-slate-800/80 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setPresentationList(pendingImportData);
+                  localStorage.setItem('end-presentation-files', JSON.stringify(pendingImportData));
+
+                  const first = pendingImportData[0];
+                  expectedSlidesStrRef.current = JSON.stringify(first.slides);
+                  switchingToIdRef.current = first.id;
+                  setActivePresentationId(first.id);
+                  localStorage.setItem('end-current-presentation-id', first.id);
+
+                  setUndoStack([]);
+                  setRedoStack([]);
+
+                  onUpdateSlides(first.slides);
+                  onSelectSlide(0);
+                  toast.success('Backup importado com sucesso!');
+                  setPendingImportData(null);
+                }}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+              >
+                Confirmar e Substituir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Import Choice Modal */}
+      {pendingPdfImport && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200001] flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
+          <div className="bg-[#11141a] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl col-span-1">
+            <div className="flex items-start gap-3 text-cyan-400">
+              <FileDown size={24} className="shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-200 font-sans">Importar PDF Vetorial</h3>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Sucesso! Extraídas <span className="text-cyan-400 font-extrabold">{pendingPdfImport.numPages} páginas</span> do PDF adaptado a {pendingPdfImport.pdfPageWidth}x{pendingPdfImport.pdfPageHeight}px.
+                </p>
+                <p className="text-xs text-slate-400 mt-2 font-sans leading-relaxed">
+                  Como você deseja organizar esses novos slides no seu projeto atual ({slides.length} slides existentes)?
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  toast.dismiss(pendingPdfImport.loaderId);
+                  setPendingPdfImport(null);
+                }}
+                className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                Cancelar Importação
+              </button>
+              <button
+                onClick={() => {
+                  const nextSlides = [...slides, ...pendingPdfImport.slides];
+                  triggerUpdate(nextSlides, `Importou PDF: ${pendingPdfImport.fileName}`);
+                  onSelectSlide(slides.length);
+                  toast.success(`PDF "${pendingPdfImport.fileName}" importado com sucesso no fim do projeto!`, { id: pendingPdfImport.loaderId });
+                  setPendingPdfImport(null);
+                }}
+                className="px-4 py-2 bg-slate-850 border border-slate-700/60 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Adicionar ao Fim
+              </button>
+              <button
+                onClick={() => {
+                  triggerUpdate(pendingPdfImport.slides, `Substituiu por PDF: ${pendingPdfImport.fileName}`);
+                  onSelectSlide(0);
+                  toast.success(`PDF "${pendingPdfImport.fileName}" importado. Todos os slides anteriores foram substituídos!`, { id: pendingPdfImport.loaderId });
+                  setPendingPdfImport(null);
+                }}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+              >
+                Substituir Slides Atuais
+              </button>
+            </div>
           </div>
         </div>
       )}

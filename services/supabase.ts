@@ -66,6 +66,10 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
 };
 
 export const upsertEmployee = async (employee: Employee) => {
+  if (employee.id === 'hiring-generic' || employee.id === 'baby-generic' || employee.id === 'gaming-generic') {
+    return [employee];
+  }
+
   const { data, error } = await supabase
     .from('employees')
     .upsert({
