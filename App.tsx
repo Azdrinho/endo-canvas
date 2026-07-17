@@ -395,7 +395,11 @@ export default function App() {
   // 3. Silent Auto Backup Synchronization to LocalStorage
   useEffect(() => {
     if (employees && employees.length > 0 && employees !== INITIAL_EMPLOYEES) {
-      localStorage.setItem('end-employees', JSON.stringify(employees));
+      try {
+        localStorage.setItem('end-employees', JSON.stringify(employees));
+      } catch (err) {
+        console.warn('Failed to save end-employees to localStorage:', err);
+      }
     }
   }, [employees]);
 
@@ -986,19 +990,31 @@ export default function App() {
   // Automatic state backups for Slides, Provider Data, and Config
   useEffect(() => {
     if (slides && slides.length > 0 && slides !== INITIAL_SLIDES) {
-      localStorage.setItem('end-slides', JSON.stringify(slides));
+      try {
+        localStorage.setItem('end-slides', JSON.stringify(slides));
+      } catch (err) {
+        console.warn("Failed to save end-slides to localStorage:", err);
+      }
     }
   }, [slides]);
 
   useEffect(() => {
     if (providerData && providerData.name) {
-      localStorage.setItem('end-provider-data', JSON.stringify(providerData));
+      try {
+        localStorage.setItem('end-provider-data', JSON.stringify(providerData));
+      } catch (err) {
+        console.warn("Failed to save end-provider-data to localStorage:", err);
+      }
     }
   }, [providerData]);
 
   useEffect(() => {
     if (config && config !== INITIAL_CONFIG) {
-      localStorage.setItem('end-config', JSON.stringify(config));
+      try {
+        localStorage.setItem('end-config', JSON.stringify(config));
+      } catch (err) {
+        console.warn("Failed to save end-config to localStorage:", err);
+      }
     }
   }, [config]);
 

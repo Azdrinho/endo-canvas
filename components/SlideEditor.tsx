@@ -3566,14 +3566,14 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
     const loadedIdentities = [singleIdentity];
     setIdentities(loadedIdentities);
-    localStorage.setItem('end-visual-identities', JSON.stringify(loadedIdentities));
+    try { localStorage.setItem('end-visual-identities', JSON.stringify(loadedIdentities)); } catch (e) { console.warn('Storage error:', e); }
     setActiveIdentityId('identity-orkney');
-    localStorage.setItem('end-current-identity-id', 'identity-orkney');
+    try { try { localStorage.setItem('end-current-identity-id', 'identity-orkney'); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
   }, []);
 
   const handleSelectIdentity = (id: string) => {
     setActiveIdentityId('identity-orkney');
-    localStorage.setItem('end-current-identity-id', 'identity-orkney');
+    try { try { localStorage.setItem('end-current-identity-id', 'identity-orkney'); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
   };
 
   const handleCreateIdentity = () => {
@@ -3593,9 +3593,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
     const updated = [...identities, newId];
     setIdentities(updated);
-    localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+    try { localStorage.setItem('end-visual-identities', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
     setActiveIdentityId(newId.id);
-    localStorage.setItem('end-current-identity-id', newId.id);
+    try { try { localStorage.setItem('end-current-identity-id', newId.id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
     // Reset creation fields
     setNewIdentityName('');
@@ -3614,11 +3614,11 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
     const updated = identities.filter(x => x.id !== id);
     setIdentities(updated);
-    localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+    try { localStorage.setItem('end-visual-identities', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
 
     if (activeIdentityId === id && updated.length > 0) {
       setActiveIdentityId(updated[0].id);
-      localStorage.setItem('end-current-identity-id', updated[0].id);
+      try { try { localStorage.setItem('end-current-identity-id', updated[0].id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
     }
 
     toast.success("Identidade removida com sucesso!");
@@ -3661,7 +3661,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               }
               return id;
             });
-            localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+            try { localStorage.setItem('end-visual-identities', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
             return updated;
           });
 
@@ -3692,7 +3692,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         }
         return id;
       });
-      localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+      try { localStorage.setItem('end-visual-identities', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
       return updated;
     });
     setManualExample('');
@@ -3711,7 +3711,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         }
         return id;
       });
-      localStorage.setItem('end-visual-identities', JSON.stringify(updated));
+      try { localStorage.setItem('end-visual-identities', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
       return updated;
     });
     toast.success("Exemplo de estilo removido.");
@@ -3793,8 +3793,8 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       };
       loadedList = [initialProj];
       activeId = initialProj.id;
-      localStorage.setItem('end-presentation-files', JSON.stringify(loadedList));
-      localStorage.setItem('end-current-presentation-id', activeId);
+      try { localStorage.setItem('end-presentation-files', JSON.stringify(loadedList)); } catch (e) { console.warn('Storage error:', e); }
+      try { try { localStorage.setItem('end-current-presentation-id', activeId); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
     } else {
       const savedActiveId = localStorage.getItem('end-current-presentation-id');
       const found = loadedList.find(p => p.id === savedActiveId);
@@ -3802,7 +3802,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         activeId = found.id;
       } else {
         activeId = loadedList[0].id;
-        localStorage.setItem('end-current-presentation-id', activeId);
+        try { try { localStorage.setItem('end-current-presentation-id', activeId); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
       }
     }
 
@@ -3841,7 +3841,11 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       if (currentSlidesStr === newSlidesStr) return prev;
 
       const updated = prev.map((p, i) => i === idx ? { ...p, slides, updatedAt: new Date().toISOString() } : p);
-      localStorage.setItem('end-presentation-files', JSON.stringify(updated));
+      try {
+        try { localStorage.setItem('end-presentation-files', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
+      } catch (err) {
+        console.warn("Failed to save end-presentation-files:", err);
+      }
       return updated;
     });
   }, [slides, activePresentationId]);
@@ -3853,7 +3857,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     expectedSlidesStrRef.current = JSON.stringify(found.slides);
     switchingToIdRef.current = id;
     setActivePresentationId(id);
-    localStorage.setItem('end-current-presentation-id', id);
+    try { try { localStorage.setItem('end-current-presentation-id', id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
     setUndoStack([]);
     setRedoStack([]);
@@ -3874,12 +3878,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
     const updatedList = [newProj, ...presentationList];
     setPresentationList(updatedList);
-    localStorage.setItem('end-presentation-files', JSON.stringify(updatedList));
+    try { localStorage.setItem('end-presentation-files', JSON.stringify(updatedList)); } catch (e) { console.warn('Storage error:', e); }
 
     expectedSlidesStrRef.current = JSON.stringify(newProj.slides);
     switchingToIdRef.current = newProj.id;
     setActivePresentationId(newProj.id);
-    localStorage.setItem('end-current-presentation-id', newProj.id);
+    try { try { localStorage.setItem('end-current-presentation-id', newProj.id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
     setUndoStack([]);
     setRedoStack([]);
@@ -3906,7 +3910,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     if (!newName.trim()) return;
     setPresentationList(prev => {
       const updated = prev.map(p => p.id === id ? { ...p, name: newName, updatedAt: new Date().toISOString() } : p);
-      localStorage.setItem('end-presentation-files', JSON.stringify(updated));
+      try { localStorage.setItem('end-presentation-files', JSON.stringify(updated)); } catch (e) { console.warn('Storage error:', e); }
       return updated;
     });
     setRenamingId(null);
@@ -3928,12 +3932,12 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
     const updatedList = [duplicatedProj, ...presentationList];
     setPresentationList(updatedList);
-    localStorage.setItem('end-presentation-files', JSON.stringify(updatedList));
+    try { localStorage.setItem('end-presentation-files', JSON.stringify(updatedList)); } catch (e) { console.warn('Storage error:', e); }
 
     expectedSlidesStrRef.current = JSON.stringify(duplicatedProj.slides);
     switchingToIdRef.current = duplicatedProj.id;
     setActivePresentationId(duplicatedProj.id);
-    localStorage.setItem('end-current-presentation-id', duplicatedProj.id);
+    try { try { localStorage.setItem('end-current-presentation-id', duplicatedProj.id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
     setUndoStack([]);
     setRedoStack([]);
@@ -11363,14 +11367,14 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                   const id = presentationToDelete.id;
                   const filtered = presentationList.filter(p => p.id !== id);
                   setPresentationList(filtered);
-                  localStorage.setItem('end-presentation-files', JSON.stringify(filtered));
+                  try { localStorage.setItem('end-presentation-files', JSON.stringify(filtered)); } catch (e) { console.warn('Storage error:', e); }
 
                   if (activePresentationId === id) {
                     const nextActive = filtered[0];
                     expectedSlidesStrRef.current = JSON.stringify(nextActive.slides);
                     switchingToIdRef.current = nextActive.id;
                     setActivePresentationId(nextActive.id);
-                    localStorage.setItem('end-current-presentation-id', nextActive.id);
+                    try { try { localStorage.setItem('end-current-presentation-id', nextActive.id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
                     setUndoStack([]);
                     setRedoStack([]);
@@ -11413,13 +11417,13 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               <button
                 onClick={() => {
                   setPresentationList(pendingImportData);
-                  localStorage.setItem('end-presentation-files', JSON.stringify(pendingImportData));
+                  try { localStorage.setItem('end-presentation-files', JSON.stringify(pendingImportData)); } catch (e) { console.warn('Storage error:', e); }
 
                   const first = pendingImportData[0];
                   expectedSlidesStrRef.current = JSON.stringify(first.slides);
                   switchingToIdRef.current = first.id;
                   setActivePresentationId(first.id);
-                  localStorage.setItem('end-current-presentation-id', first.id);
+                  try { try { localStorage.setItem('end-current-presentation-id', first.id); } catch (e) { console.warn('Storage error:', e); } } catch (e) { console.warn('Storage error:', e); }
 
                   setUndoStack([]);
                   setRedoStack([]);
