@@ -574,7 +574,7 @@ const TEXTS = {
   },
   WELCOME: {
     en: 'WELCOME',
-    pt: 'BEM-VINDO',
+    pt: 'BEM-VINDO(A)',
     es: 'BIENVENIDO'
   },
   FAREWELL: {
@@ -594,7 +594,7 @@ const TEXTS = {
   },
   BABY_TITLE: {
     en: 'WELCOME',
-    pt: 'SEJA BEM-VINDO',
+    pt: 'SEJA BEM-VINDO(A)',
     es: 'BIENVENIDO'
   }
 };
@@ -1715,7 +1715,7 @@ export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, l
   `;
   const logo = getPepperLogoHtml('position: absolute; top: 15px; left: 15px; width: 20px; height: 28px; z-index: 60;');
 
-  const welcomeText = employee.role || TEXTS.BABY_TITLE[language] || 'SEJA BEM-VINDO';
+  const welcomeText = employee.role || TEXTS.BABY_TITLE[language] || 'SEJA BEM-VINDO(A)';
   const babyName = employee.name ? employee.name.split(' ')[0].toUpperCase() : 'NOME';
   
   const defaultDesc = language === 'pt' 
