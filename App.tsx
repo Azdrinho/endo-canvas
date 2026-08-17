@@ -391,7 +391,7 @@ const TEMPLATE_LIST = [
   { id: TemplateType.JOB_CHANGE, label: 'Job Change', desc: 'New Role / Promotion', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d7.png' },
   { id: TemplateType.BABY, label: 'Baby Birth', desc: 'Welcome Baby', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69d5122206cc717826a7543b.jpg' },
   { id: TemplateType.NEWSLETTER, label: 'Email Signature', desc: 'Professional signature', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1bf95d83f4c272549.png' },
-  { id: TemplateType.ACTIVATION, label: 'General Disclosure', desc: "General announcements and company\nupdates template", image: 'https://img.mailinblue.com/2600492/images/content_library/original/6a3d7e9f295b587ca6a4bd4c.png' },
+  { id: TemplateType.ACTIVATION, label: 'HR Feedback', desc: "Feedback and updates\nfrom HR to the team", image: 'https://img.mailinblue.com/2600492/images/content_library/original/6a3d7e9f295b587ca6a4bd4c.png' },
   { id: TemplateType.FAREWELL, label: 'See You Soon', desc: 'Farewell card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e7625f6fc09c7fb545a11.png' },
   { id: TemplateType.NEW_PROVIDER, label: 'New Provider', desc: 'Casino Game Launch', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1318a761a56ead72c.png' },
 ];
@@ -1530,6 +1530,23 @@ export default function App() {
     document.addEventListener('focusout', handleBlur);
     return () => document.removeEventListener('focusout', handleBlur);
   }, [selectedEmployee.id, updateEmployee, isRichTextField]);
+
+  // Clicking the title or paragraph directly on the card (General Disclosure /
+  // HR Feedback) jumps the sidebar to the Texto tab — the same one with the
+  // font size/line-height/alignment controls — instead of leaving the user on
+  // whatever tab they happened to be on (e.g. Images).
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      if (selectedTemplate !== TemplateType.ACTIVATION) return;
+      const target = e.target as HTMLElement;
+      const field = target.getAttribute('data-field');
+      if (target.hasAttribute('contenteditable') && (field === 'name' || field === 'activationParagraph')) {
+        setActiveTab('DATA');
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, [selectedTemplate]);
 
   // Floating Bold/Italic toolbar for the rich-text fields above: shows near the
   // current selection while it's non-collapsed and inside an eligible field,
