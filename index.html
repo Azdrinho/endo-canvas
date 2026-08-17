@@ -32,34 +32,46 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
     <style>
+      /* Every previous source for these (jsdelivr, fontlibrary.org, and a couple
+         of the old db.onlinewebfonts.com hashes) turned out to be dead or CORS-
+         blocked, which both slowed down first paint (the browser stalls on each
+         failing source before trying the next) and caused inconsistent glyph
+         rendering (some letters briefly using a fallback font mid-load while
+         others already had the real face). These 4 hashes are the current,
+         verified-working ones from onlinewebfonts.com's own catalog (confirmed
+         200 + Access-Control-Allow-Origin: *) — one real weight per face, no
+         dead fallback URLs left in the list to stall on. */
       @font-face {
         font-family: 'Orkney';
-        src: url('https://db.onlinewebfonts.com/t/6ac09869bcd949ed727771cfba1ea124.ttf') format('truetype'),
-             url('https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/e312fbe98717cc43f339cfdfc63e2714/OrkneyLight.otf') format('opentype');
+        src: url('https://db.onlinewebfonts.com/t/5c4f936f2dfe6a0c4ff6c2bac09ee3bc.woff2') format('woff2'),
+             url('https://db.onlinewebfonts.com/t/5c4f936f2dfe6a0c4ff6c2bac09ee3bc.ttf') format('truetype');
         font-weight: 300;
         font-style: normal;
+        font-display: swap;
       }
       @font-face {
         font-family: 'Orkney';
-        src: url('https://cdn.jsdelivr.net/gh/brazil-gringo/ponto-de-partida@master/app/assets/fonts/Orkney-Regular.ttf') format('truetype'),
-             url('https://db.onlinewebfonts.com/t/1aab5ed24c6a9f95b69de27350a83559.ttf') format('truetype'),
-             url('https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/79dfef230a8a6bebc2db8416d80dff80/OrkneyRegular.otf') format('opentype');
+        src: url('https://db.onlinewebfonts.com/t/1aab5ed24c6a9f95b69de27350a83559.woff2') format('woff2'),
+             url('https://db.onlinewebfonts.com/t/1aab5ed24c6a9f95b69de27350a83559.ttf') format('truetype');
         font-weight: normal; /* 400 */
         font-style: normal;
+        font-display: swap;
       }
       @font-face {
         font-family: 'Orkney';
-        src: url('https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/844781ca8c8cbebc2db8416d80dff80/OrkneyMedium.otf') format('opentype');
-        font-weight: 600; /* Medium weight matching the select list */
+        src: url('https://db.onlinewebfonts.com/t/03b490987dd0b510b4c52d7f34412eae.woff2') format('woff2'),
+             url('https://db.onlinewebfonts.com/t/03b490987dd0b510b4c52d7f34412eae.ttf') format('truetype');
+        font-weight: 600;
         font-style: normal;
+        font-display: swap;
       }
       @font-face {
         font-family: 'Orkney';
-        src: url('https://cdn.jsdelivr.net/gh/brazil-gringo/ponto-de-partida@master/app/assets/fonts/Orkney-Bold.ttf') format('truetype'),
-             url('https://db.onlinewebfonts.com/t/393278564a51e60f06a099a531631e7c.ttf') format('truetype'),
-             url('https://fontlibrary.org/assets/fonts/orkney/e352bbf977e20ec4221a716c527f0ef7/f311fbe94717cc43f339cfdfc63e2714/OrkneyBold.otf') format('opentype');
+        src: url('https://db.onlinewebfonts.com/t/575518fd5bf34166a0ab1de79e997d1a.woff2') format('woff2'),
+             url('https://db.onlinewebfonts.com/t/575518fd5bf34166a0ab1de79e997d1a.ttf') format('truetype');
         font-weight: bold; /* 700 */
         font-style: normal;
+        font-display: swap;
       }
 
       body {
