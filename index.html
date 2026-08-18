@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- This app is always dark by design (see App.tsx's hardcoded `dark` class
+         and slate-900/black theme.bg) — it never adapts to the OS light/dark
+         preference. Without declaring that explicitly, some browsers (Chrome's
+         "Force dark mode for web content" flag/setting, some Android WebViews,
+         certain accessibility color-inversion tools) apply their own automatic
+         color-inversion heuristic on top of the page — which reads as exactly
+         a dark UI getting flipped to a washed-out light background with dark
+         text, and any inline color a user picks (e.g. the paragraph font
+         color) getting silently re-inverted back over. Declaring color-scheme
+         tells the browser this page already handles its own dark styling, so
+         it leaves the colors alone. -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#020617" />
     <title>Endo Canvas</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -74,8 +87,17 @@
         font-display: swap;
       }
 
+      html {
+        color-scheme: dark;
+      }
+
       body {
         font-family: "Orkney", 'Inter', sans-serif;
+        /* Explicit dark background, matching theme.bg's slate-900/black — this
+           is what's visible for the brief moment before React mounts (and a
+           backup if a browser's own dark-mode heuristic ever ignores the
+           color-scheme meta above). */
+        background-color: #020617;
       }
       
       /* Custom Scrollbar */
