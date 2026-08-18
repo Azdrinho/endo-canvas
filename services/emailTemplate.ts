@@ -2668,6 +2668,11 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   const visibleAreaHeight = cardHeight - footerHeight - headerHeight;
   const baseOffset = (isPortrait ? -110 * ((cardHeight - baseFooterHeight) / 480) : -110) + headerHeight / 2;
   const posY = (employee.photoPosition?.y || 0) + baseOffset;
+  // The circle badge is its own small, self-contained box (not the tall
+  // full-bleed band the baseOffset above was tuned for), so it must use the
+  // user's raw joystick offset directly — applying baseOffset here shoved
+  // the image far outside the circle instead of centering it.
+  const circlePosY = employee.photoPosition?.y || 0;
 
   // Dynamically select brand gradient and logo content
   const brand = (employee.activationLogo || 'technology') as string;
@@ -2725,7 +2730,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   const circleImageHtml = imageMode === 'circle' ? `
     <div style="width: 100%; display: flex; justify-content: ${circleJustify}; margin-bottom: 18px;">
       <div class="upload-hover-zone" data-activation-circle style="position: relative; width: ${circleSize}px; height: ${circleSize}px; border-radius: 50%; overflow: hidden; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.35); background: #1a1a1a;">
-        ${employee.photoUrl ? `<img class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />` : ''}
+        ${employee.photoUrl ? `<img class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${circlePosY}px);" />` : ''}
         ${getUploadOverlayHtml(employee.id)}
       </div>
     </div>

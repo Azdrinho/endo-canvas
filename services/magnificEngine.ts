@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 // Shared Magnific/Gemini generation engine, used by both the local dev
 // server (server.ts, via Express) and the Vercel serverless function
 // (api/magnific/generate.ts) — extracted so the two entry points can't drift
@@ -470,6 +468,14 @@ async function generatePromptWithGemini(userInput: string, brand?: string): Prom
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
+    // Dynamic import, not a static one: @google/genai ships ESM-only, and
+    // Vercel's Node serverless bundler compiles .ts functions to CommonJS
+    // regardless of this project's package.json "type": "module" — a static
+    // import crashed every invocation at cold start with ERR_REQUIRE_ESM
+    // (surfaced to callers as an instant FUNCTION_INVOCATION_FAILED). A
+    // dynamic import works from CJS either way, and behaves identically here
+    // under tsx's real ESM runtime.
+    const { GoogleGenAI } = await import("@google/genai");
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
