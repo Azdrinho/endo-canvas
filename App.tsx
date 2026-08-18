@@ -1529,8 +1529,12 @@ export default function App() {
           finalUrl = fallbackUrl;
       }
 
-      // Update employee ID 'gaming-generic' which holds state for the template
+      // Update employee ID 'gaming-generic' which holds state for the template,
+      // resetting scale/position so the new image starts centered instead of
+      // inheriting whatever zoom/offset was left over from the previous one.
       updateEmployee('gaming-generic', 'photoUrl', finalUrl);
+      updateEmployee('gaming-generic', 'photoScale', 1);
+      updateEmployee('gaming-generic', 'photoPosition', { x: 0, y: 0 });
       toast.success("Plano de fundo 3:2 gerado e aplicado com sucesso!", { id: toastId });
     } catch (err: any) {
       console.error("[App] Background generation error:", err);
