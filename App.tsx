@@ -4451,31 +4451,51 @@ export default function App() {
                                         )}
                                     </div>
 
-                                    {/* A native color input clipped by an overflow-hidden parent and
-                                        offset outside its bounds (the previous approach here) fails
-                                        to open the OS color dialog in some browsers (notably Safari)
-                                        — its visibility/hit-testing heuristics skip inputs that look
-                                        effectively invisible. Sizing the input to exactly cover its
-                                        swatch (no clipping, no offset) and additionally forwarding a
-                                        click from the row onto the input via ref makes opening it
-                                        reliable everywhere. */}
-                                    <div
-                                        onClick={() => fontColorInputRef.current?.click()}
-                                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl border bg-white/5 border-white/10 hover:border-cyan-500/40 transition-colors cursor-pointer mb-2.5"
-                                    >
-                                        <div className="relative w-7 h-7 rounded-full border border-white/20 shrink-0" style={{ background: selectedEmployee.activationFontColor || 'linear-gradient(135deg, #22d3ee, #9333ea)' }}>
+                                    {/* Native color inputs (the swatch below) open the OS/browser color
+                                        dialog inconsistently across browsers and locked-down corporate
+                                        setups — some show nothing at all when clicked, with no error to
+                                        act on. The hex field and preset palette below don't depend on
+                                        that dialog ever appearing, so there's always a way to change the
+                                        color even where the native picker silently fails. */}
+                                    <input
+                                        type="text"
+                                        placeholder="#RRGGBB"
+                                        defaultValue={selectedEmployee.activationFontColor || ''}
+                                        key={selectedEmployee.activationFontColor || 'empty'}
+                                        onChange={(e) => {
+                                            const raw = e.target.value.trim();
+                                            const hex = raw.startsWith('#') ? raw : `#${raw}`;
+                                            if (/^#[0-9A-Fa-f]{6}$/.test(hex) || /^#[0-9A-Fa-f]{3}$/.test(hex)) {
+                                                applyActivationFontColor(hex);
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 mb-2.5 rounded-xl border bg-white/5 border-white/10 focus:border-cyan-500/50 outline-none text-xs text-slate-200 placeholder:text-slate-600 font-mono"
+                                    />
+
+                                    <div className="flex flex-wrap gap-2 mb-2.5">
+                                        {['#ffffff', '#22d3ee', '#a855f7', '#f472b6', '#fb923c', '#facc15', '#4ade80', '#1a1a1a'].map(color => (
+                                            <button
+                                                key={color}
+                                                onClick={() => applyActivationFontColor(color)}
+                                                title={color.toUpperCase()}
+                                                className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${selectedEmployee.activationFontColor?.toLowerCase() === color.toLowerCase() ? 'border-cyan-400' : 'border-white/20'}`}
+                                                style={{ background: color }}
+                                            />
+                                        ))}
+                                        {/* Native picker as a supplementary option, sized to exactly
+                                            cover its swatch (no clipping/offset) so it isn't silently
+                                            invisible to browsers that skip hit-testing on odd-shaped
+                                            inputs — but the controls above are the primary path now. */}
+                                        <div className="relative w-7 h-7 rounded-full border-2 border-dashed border-white/30 shrink-0" title="Cor personalizada (seletor do navegador)">
+                                            <Palette size={12} className="absolute inset-0 m-auto text-slate-400 pointer-events-none" />
                                             <input
                                                 ref={fontColorInputRef}
                                                 type="color"
                                                 value={selectedEmployee.activationFontColor || '#ffffff'}
                                                 onChange={(e) => applyActivationFontColor(e.target.value)}
-                                                onClick={(e) => e.stopPropagation()}
                                                 className="absolute inset-0 w-full h-full cursor-pointer opacity-0"
                                             />
                                         </div>
-                                        <span className="text-xs text-slate-300">
-                                            {selectedEmployee.activationFontColor ? selectedEmployee.activationFontColor.toUpperCase() : 'Escolher cor personalizada'}
-                                        </span>
                                     </div>
 
                                     {recentFontColors.length > 0 && (
