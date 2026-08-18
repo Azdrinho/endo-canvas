@@ -1,4 +1,8 @@
-import { runMagnificGeneration } from "../../services/magnificEngine";
+// Explicit ".js" extension is required: this project sets "type": "module",
+// and Vercel's Node ESM runtime (unlike tsx locally) refuses to resolve
+// extensionless relative imports, failing every invocation at cold start
+// with ERR_MODULE_NOT_FOUND.
+import { runMagnificGeneration } from "../../services/magnificEngine.js";
 
 // Vercel serverless function for /api/magnific/generate.
 //
