@@ -1671,6 +1671,7 @@ export default function App() {
     }
   });
   const fontColorPickerRef = useRef<HTMLDivElement | null>(null);
+  const fontColorInputRef = useRef<HTMLInputElement | null>(null);
 
   const applyActivationFontColor = useCallback((color: string) => {
     updateEmployee(selectedEmployee.id, 'activationFontColor', color);
@@ -4450,19 +4451,32 @@ export default function App() {
                                         )}
                                     </div>
 
-                                    <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl border bg-white/5 border-white/10 hover:border-cyan-500/40 transition-colors cursor-pointer mb-2.5">
-                                        <div className="relative w-7 h-7 rounded-full overflow-hidden border border-white/20 shrink-0" style={{ background: selectedEmployee.activationFontColor || 'linear-gradient(135deg, #22d3ee, #9333ea)' }}>
+                                    {/* A native color input clipped by an overflow-hidden parent and
+                                        offset outside its bounds (the previous approach here) fails
+                                        to open the OS color dialog in some browsers (notably Safari)
+                                        — its visibility/hit-testing heuristics skip inputs that look
+                                        effectively invisible. Sizing the input to exactly cover its
+                                        swatch (no clipping, no offset) and additionally forwarding a
+                                        click from the row onto the input via ref makes opening it
+                                        reliable everywhere. */}
+                                    <div
+                                        onClick={() => fontColorInputRef.current?.click()}
+                                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl border bg-white/5 border-white/10 hover:border-cyan-500/40 transition-colors cursor-pointer mb-2.5"
+                                    >
+                                        <div className="relative w-7 h-7 rounded-full border border-white/20 shrink-0" style={{ background: selectedEmployee.activationFontColor || 'linear-gradient(135deg, #22d3ee, #9333ea)' }}>
                                             <input
+                                                ref={fontColorInputRef}
                                                 type="color"
                                                 value={selectedEmployee.activationFontColor || '#ffffff'}
                                                 onChange={(e) => applyActivationFontColor(e.target.value)}
-                                                className="absolute -top-1 -left-1 w-9 h-9 cursor-pointer opacity-0"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="absolute inset-0 w-full h-full cursor-pointer opacity-0"
                                             />
                                         </div>
                                         <span className="text-xs text-slate-300">
                                             {selectedEmployee.activationFontColor ? selectedEmployee.activationFontColor.toUpperCase() : 'Escolher cor personalizada'}
                                         </span>
-                                    </label>
+                                    </div>
 
                                     {recentFontColors.length > 0 && (
                                         <>
