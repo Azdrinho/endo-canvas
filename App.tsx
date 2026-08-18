@@ -1657,6 +1657,44 @@ export default function App() {
     updateEmployee(selectedEmployee.id, scaleField as keyof Employee, next);
   }, [selectedEmployee, updateEmployee]);
 
+  // Font color swatch popover, lives inside the floating text toolbar (moved
+  // out of the sidebar so color changes happen right where you're editing).
+  // Recent colors persist across sessions like the other localStorage-backed
+  // preferences in this file (end-employees, end-config, etc.).
+  const [showFontColorPicker, setShowFontColorPicker] = useState(false);
+  const [recentFontColors, setRecentFontColors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('end-recent-font-colors');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const fontColorPickerRef = useRef<HTMLDivElement | null>(null);
+
+  const applyActivationFontColor = useCallback((color: string) => {
+    updateEmployee(selectedEmployee.id, 'activationFontColor', color);
+    setRecentFontColors(prev => {
+      const next = [color, ...prev.filter(c => c.toLowerCase() !== color.toLowerCase())].slice(0, 8);
+      try { localStorage.setItem('end-recent-font-colors', JSON.stringify(next)); } catch { /* ignore quota errors */ }
+      return next;
+    });
+  }, [selectedEmployee, updateEmployee]);
+
+  // Close the popover on any click outside it (it isn't wrapped by the
+  // toolbar's own onMouseDown-preventDefault guard, since it needs normal
+  // clicks/typing inside its own color input).
+  useEffect(() => {
+    if (!showFontColorPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fontColorPickerRef.current && !fontColorPickerRef.current.contains(e.target as Node)) {
+        setShowFontColorPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFontColorPicker]);
+
   const applyTextFormat = useCallback((command: 'bold' | 'italic') => {
     // Falls back to whichever eligible field is currently focused — the toolbar
     // ref is only set while there's a non-collapsed text selection (for
@@ -3222,23 +3260,9 @@ export default function App() {
                                       )}
                                   </div>
 
-                                  <div>
-                                      <div className="flex items-center justify-between mb-1">
-                                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cor da Fonte</div>
-                                          {selectedEmployee.activationFontColor && (
-                                              <button onClick={() => updateEmployee(selectedEmployee.id, 'activationFontColor', '')} className="text-[10px] text-slate-500 hover:text-white transition-colors">Redefinir (degradê)</button>
-                                          )}
-                                      </div>
-                                      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
-                                          <input
-                                              type="color"
-                                              value={selectedEmployee.activationFontColor || '#ffffff'}
-                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'activationFontColor', e.target.value)}
-                                              className="w-8 h-8 rounded-lg border border-white/10 bg-transparent cursor-pointer shrink-0"
-                                          />
-                                          <span className="text-xs text-slate-400">{selectedEmployee.activationFontColor ? selectedEmployee.activationFontColor.toUpperCase() : 'Padrão (título em degradê, parágrafo branco)'}</span>
-                                      </div>
-                                  </div>
+                                  {/* Font color now lives in the floating selection toolbar (select
+                                      title/paragraph text to see it), with recent colors, instead of
+                                      here — changing it now happens right where you're editing. */}
 
                                   {(selectedEmployee.activationTextMode || 'title') !== 'paragraph' && (
                                       <div>
@@ -4367,6 +4391,76 @@ export default function App() {
                         >
                             <Plus size={14} />
                         </button>
+
+                        <div className="w-px h-5 bg-white/15 mx-0.5" />
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowFontColorPicker(v => !v)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+                                title="Cor da fonte"
+                            >
+                                <div
+                                    className="rounded-full border border-white/40 shadow-sm"
+                                    style={{
+                                        width: 18, height: 18,
+                                        background: selectedEmployee.activationFontColor || 'conic-gradient(from 180deg, #22d3ee, #9333ea, #22d3ee)'
+                                    }}
+                                />
+                            </button>
+
+                            {showFontColorPicker && (
+                                <div
+                                    ref={fontColorPickerRef}
+                                    style={{ position: 'absolute', top: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)' }}
+                                    className="w-56 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-3 z-10"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cor da Fonte</span>
+                                        {selectedEmployee.activationFontColor && (
+                                            <button
+                                                onClick={() => updateEmployee(selectedEmployee.id, 'activationFontColor', '')}
+                                                className="text-[10px] text-slate-500 hover:text-white transition-colors"
+                                            >
+                                                Redefinir
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl border bg-white/5 border-white/10 hover:border-cyan-500/40 transition-colors cursor-pointer mb-2.5">
+                                        <div className="relative w-7 h-7 rounded-full overflow-hidden border border-white/20 shrink-0" style={{ background: selectedEmployee.activationFontColor || 'linear-gradient(135deg, #22d3ee, #9333ea)' }}>
+                                            <input
+                                                type="color"
+                                                value={selectedEmployee.activationFontColor || '#ffffff'}
+                                                onChange={(e) => applyActivationFontColor(e.target.value)}
+                                                className="absolute -top-1 -left-1 w-9 h-9 cursor-pointer opacity-0"
+                                            />
+                                        </div>
+                                        <span className="text-xs text-slate-300">
+                                            {selectedEmployee.activationFontColor ? selectedEmployee.activationFontColor.toUpperCase() : 'Escolher cor personalizada'}
+                                        </span>
+                                    </label>
+
+                                    {recentFontColors.length > 0 && (
+                                        <>
+                                            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Usadas recentemente</div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {recentFontColors.map((color, i) => (
+                                                    <button
+                                                        key={`${color}-${i}`}
+                                                        onClick={() => applyActivationFontColor(color)}
+                                                        title={color.toUpperCase()}
+                                                        className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${selectedEmployee.activationFontColor?.toLowerCase() === color.toLowerCase() ? 'border-cyan-400' : 'border-white/20'}`}
+                                                        style={{ background: color }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </>
                 )}
             </div>,
