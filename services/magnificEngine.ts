@@ -468,23 +468,6 @@ async function generatePromptWithGemini(userInput: string, brand?: string): Prom
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
-    // Dynamic import, not a static one: @google/genai ships ESM-only, and
-    // Vercel's Node serverless bundler compiles .ts functions to CommonJS
-    // regardless of this project's package.json "type": "module" — a static
-    // import crashed every invocation at cold start with ERR_REQUIRE_ESM
-    // (surfaced to callers as an instant FUNCTION_INVOCATION_FAILED). A
-    // dynamic import works from CJS either way, and behaves identically here
-    // under tsx's real ESM runtime.
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-
     let primaryColorName = "vibrant cyan";
     let primaryColorHex = "#56c3d3";
     let secondaryColorName = "rich purple";
@@ -697,17 +680,34 @@ Your response must be ONLY the final raw 11-paragraph prompt in English, with NO
       for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
           console.log(`[Magnific Server] Trying model: ${model} (attempt ${attempt}/${attempts})`);
-          const response = await ai.models.generateContent({
-            model,
-            contents: [{ role: "user", parts: [{ text: `Decompose this theme and generate the structured 11-paragraph prompt following the template rules: "${cleanedInput}"` }] }],
-            config: {
-              systemInstruction,
-              temperature: 0.4,
-              maxOutputTokens: 600,
+          // Plain REST call instead of the @google/genai SDK: the SDK is
+          // ESM-only, and Vercel's Node serverless bundler compiles .ts
+          // functions to CommonJS regardless of this project's package.json
+          // "type": "module" — importing it (even dynamically, since the
+          // bundler can downlevel that too) crashed every invocation at cold
+          // start with ERR_REQUIRE_ESM. A raw fetch has no such dependency.
+          const geminiResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: `Decompose this theme and generate the structured 11-paragraph prompt following the template rules: "${cleanedInput}"` }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                  temperature: 0.4,
+                  maxOutputTokens: 600,
+                }
+              })
             }
-          });
-          
-          const text = response.text?.trim();
+          );
+
+          if (!geminiResponse.ok) {
+            throw new Error(`Gemini API responded with ${geminiResponse.status}: ${await geminiResponse.text()}`);
+          }
+
+          const geminiData: any = await geminiResponse.json();
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
           if (text && text.length > 100) {
             refinedPrompt = text;
             break;
