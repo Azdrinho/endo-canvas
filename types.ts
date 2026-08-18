@@ -72,6 +72,11 @@ export interface Employee {
   // Optional solid override for the title/paragraph text color. When unset,
   // the title keeps its brand gradient and the paragraph stays white.
   activationFontColor?: string;
+  // Shrinks the visible photo band in 'background' image mode, 0.4–1 (1 =
+  // full default height). The band always stays glued to the header — only
+  // its bottom edge rises as this shrinks — with the footer expanding
+  // upward to reclaim the freed space, same as 'circle'/'none' modes do.
+  activationBackgroundHeightScale?: number;
 }
 
 export interface ChecklistItem {

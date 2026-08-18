@@ -3216,6 +3216,24 @@ export default function App() {
                                               );
                                           })}
                                       </div>
+                                      {(selectedEmployee.activationImageMode || 'background') === 'background' && (
+                                          <div className="mt-3 px-1">
+                                              <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                                                  <span>Altura da Imagem</span>
+                                                  <span>{Math.round((selectedEmployee.activationBackgroundHeightScale ?? 1) * 100)}%</span>
+                                              </div>
+                                              {/* Shrinks the visible photo band from the bottom only — it always
+                                                  stays glued to the header, with the footer expanding upward to
+                                                  cover the reclaimed space (mirrors the circle badge's own reclaim
+                                                  logic in emailTemplate.ts). */}
+                                              <input
+                                                  type="range" min="40" max="100" step="5"
+                                                  value={Math.round((selectedEmployee.activationBackgroundHeightScale ?? 1) * 100)}
+                                                  onChange={(e) => updateEmployee(selectedEmployee.id, 'activationBackgroundHeightScale', parseInt(e.target.value) / 100)}
+                                                  className="styled-slider w-full"
+                                              />
+                                          </div>
+                                      )}
                                       {(selectedEmployee.activationImageMode || 'background') === 'circle' && (
                                           <div className="mt-3 px-1 space-y-3">
                                               <div>

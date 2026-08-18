@@ -2654,7 +2654,18 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   // footer expands to reclaim that whole middle section instead of leaving it
   // empty, handing the extra room straight to the title/paragraph (and the
   // circle badge, which lives inside the footer too).
-  const footerHeight = imageMode === 'background' ? baseFooterHeight : cardHeight - headerHeight;
+  //
+  // Within 'background' mode, the user can also shrink the photo band itself
+  // (activationBackgroundHeightScale, 0.4–1). The band always stays glued to
+  // the header — the image element itself never moves or resizes, it's
+  // simply revealed through a shorter gap — so shrinking it just means the
+  // footer grows to cover more of the same full-height image from the
+  // bottom, exactly like the circle/none reclaim above.
+  const defaultVisibleAreaHeight = cardHeight - baseFooterHeight - headerHeight;
+  const backgroundHeightScale = Math.min(1, Math.max(0.4, employee.activationBackgroundHeightScale ?? 1));
+  const footerHeight = imageMode === 'background'
+    ? cardHeight - headerHeight - (defaultVisibleAreaHeight * backgroundHeightScale)
+    : cardHeight - headerHeight;
 
   // Support for joystick position and scale slider
   const scale = employee.photoScale || 1;
