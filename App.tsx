@@ -4410,6 +4410,10 @@ export default function App() {
                             <Plus size={14} />
                         </button>
 
+                        {/* Font color only applies to the paragraph — the title always keeps
+                            its brand gradient, so the swatch doesn't even appear there. */}
+                        {activeToolbarField === 'activationParagraph' && (
+                        <>
                         <div className="w-px h-5 bg-white/15 mx-0.5" />
 
                         <div className="relative">
@@ -4479,6 +4483,8 @@ export default function App() {
                                 </div>
                             )}
                         </div>
+                        </>
+                        )}
                     </>
                 )}
             </div>,

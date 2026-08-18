@@ -2786,7 +2786,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
           <div style="width: 100%; max-width: ${textMaxWidth}px; position: relative; z-index: 10;">
              <div data-autofit="activation-text" style="--fit-scale: 1; text-align: ${textAlign};">
                ${showTitle ? `
-               <div contenteditable="true" data-field="name" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${titleBaseSize}px * var(--fit-scale, 1)); letter-spacing: 1.5px; ${fontColor ? `background: none; -webkit-background-clip: unset; background-clip: unset; color: ${fontColor};` : `background: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); -webkit-background-clip: text; background-clip: text; color: transparent;`} caret-color: white; text-transform: uppercase; margin: 0 0 ${textMode === 'title_paragraph' ? '12px' : '0'} 0; padding-top: 0.2em; line-height: ${titleLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
+               <div contenteditable="true" data-field="name" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${titleBaseSize}px * var(--fit-scale, 1)); letter-spacing: 1.5px; background: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); -webkit-background-clip: text; background-clip: text; color: transparent; caret-color: white; text-transform: uppercase; margin: 0 0 ${textMode === 'title_paragraph' ? '12px' : '0'} 0; padding-top: 0.2em; line-height: ${titleLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
                  ${titleText}
                </div>` : ''}
                ${showParagraph ? `
