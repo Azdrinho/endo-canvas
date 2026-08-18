@@ -3,14 +3,29 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
+// Nothing else in this file ever loaded .env into process.env — every
+// server-side secret (MAGNIFIC_API_KEY, GEMINI_API_KEY,
+// SUPABASE_SERVICE_ROLE_KEY) was silently undefined regardless of what was in
+// the file. Node's native loader (20.6+) handles this without adding a
+// dotenv dependency. Wrapped in try/catch since production (Vercel) injects
+// env vars directly and has no .env file on disk — that's expected there.
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env file found — fine in production, where the platform injects env vars directly.
+}
+
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Standard Freepik Magnific API configuration
-const MAGNIFIC_API_URL = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro";
+// Standard Freepik Magnific API configuration.
+// Model slug must be "nano-banana-pro-flash" — plain "nano-banana-pro" 404s,
+// confirmed against Magnific's own docs (docs.magnific.com/api-reference/
+// text-to-image/nano-banana-pro-flash/generate).
+const MAGNIFIC_API_URL = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro-flash";
 
 // Local Portuguese to English translation & simplification dictionary as an offline/local fallback
 const LOCAL_TRANSLATION_DICT: Record<string, string> = {
@@ -815,7 +830,7 @@ app.post("/api/magnific/generate", async (req, res) => {
       console.log(`[Magnific Server] Polling status (Attempt ${pollAttempts}/${maxAttempts}) for taskId: ${taskId}`);
 
       try {
-        const pollResponse = await fetch(`https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro/${taskId}`, {
+        const pollResponse = await fetch(`https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro-flash/${taskId}`, {
           method: "GET",
           headers: {
             "x-magnific-api-key": apiKey

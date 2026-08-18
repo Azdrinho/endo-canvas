@@ -2594,8 +2594,13 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   const cardWidth = isPortrait ? 800 : 1200;
   const cardHeight = isPortrait ? 1200 : 800;
   // Footer keeps ~40% of the total height in both orientations so the gradient
-  // band/wordmark proportions read the same regardless of canvas shape.
-  const footerHeight = isPortrait ? 480 : 320;
+  // band/wordmark proportions read the same regardless of canvas shape — but
+  // only when the photo is a full-bleed background needing its own visible
+  // strip above the footer. In 'circle'/'none' image modes there's no photo
+  // strip to preserve, so the footer expands to reclaim that whole middle
+  // section instead of leaving it as dead space (see footerHeight below,
+  // computed once imageMode is known).
+  const baseFooterHeight = isPortrait ? 480 : 320;
 
   const textMode = employee.activationTextMode || 'title';
   const textAlign = employee.activationTextAlign || 'center';
@@ -2629,6 +2634,28 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   // fit the title/paragraph text).
   const headerHeight = isPortrait ? 160 : 130;
 
+  // How the photo displays: full-bleed background (default, unchanged),
+  // a small circular badge (crops far less aggressively — much more forgiving
+  // of landscape source photos — and frees up room for longer text), or
+  // hidden entirely.
+  const imageMode = employee.activationImageMode || 'background';
+  const circleSize = Math.min(280, Math.max(60, employee.activationCircleSize || 140));
+  // Where the circular badge sits horizontally — independent of the text's
+  // own alignment, so e.g. a centered title can still sit under a
+  // right-aligned photo badge.
+  const circlePosition = employee.activationCirclePosition || 'center';
+  const circleJustify = circlePosition === 'left' ? 'flex-start' : circlePosition === 'right' ? 'flex-end' : 'center';
+  // Optional solid override for the text color — when unset the title keeps
+  // its brand gradient and the paragraph stays white, same as before.
+  const fontColor = employee.activationFontColor || '';
+
+  // Only the 'background' mode needs its own visible photo strip between
+  // header and footer — 'circle'/'none' have nothing to show there, so the
+  // footer expands to reclaim that whole middle section instead of leaving it
+  // empty, handing the extra room straight to the title/paragraph (and the
+  // circle badge, which lives inside the footer too).
+  const footerHeight = imageMode === 'background' ? baseFooterHeight : cardHeight - headerHeight;
+
   // Support for joystick position and scale slider
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
@@ -2639,7 +2666,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   // keeps the default framing centered in the now-smaller visible band, scaled
   // the same way for portrait's larger canvas.
   const visibleAreaHeight = cardHeight - footerHeight - headerHeight;
-  const baseOffset = (isPortrait ? -110 * ((cardHeight - footerHeight) / 480) : -110) + headerHeight / 2;
+  const baseOffset = (isPortrait ? -110 * ((cardHeight - baseFooterHeight) / 480) : -110) + headerHeight / 2;
   const posY = (employee.photoPosition?.y || 0) + baseOffset;
 
   // Dynamically select brand gradient and logo content
@@ -2693,19 +2720,32 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   const headerSphereOffset = Math.round(-100 * headerSphereScale);
   const headerLogoWidth = Math.round(Math.min(280, headerHeight * 1.8));
 
+  // Wrapped in its own full-width flex row so the circle's horizontal position
+  // (circleJustify) is independent of the text's own alignment below it.
+  const circleImageHtml = imageMode === 'circle' ? `
+    <div style="width: 100%; display: flex; justify-content: ${circleJustify}; margin-bottom: 18px;">
+      <div class="upload-hover-zone" data-activation-circle style="position: relative; width: ${circleSize}px; height: ${circleSize}px; border-radius: 50%; overflow: hidden; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.35); background: #1a1a1a;">
+        ${employee.photoUrl ? `<img class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />` : ''}
+        ${getUploadOverlayHtml(employee.id)}
+      </div>
+    </div>
+  ` : '';
+
   return `
     <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: #121212; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; font-family: 'Orkney', sans-serif;">
-       
-       <!-- Background Image -->
-       ${employee.photoUrl ? `
-       <img class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1; pointer-events: none;" />
+
+       <!-- Background Image (only in 'background' display mode) -->
+       ${imageMode === 'background' && employee.photoUrl ? `
+       <img class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1; pointer-events: none;" />
        ` : ''}
 
+       ${imageMode === 'background' ? `
        <!-- Hover-to-upload zone covers just the visible photo strip between the
             opaque header/footer, since those already sit on top of it. -->
        <div class="upload-hover-zone" style="position: absolute; top: ${headerHeight}px; left: 0; right: 0; height: ${visibleAreaHeight}px; z-index: 2;">
           ${getUploadOverlayHtml(employee.id)}
        </div>
+       ` : ''}
 
        <!-- Top Section (Gradient header, mirrors the footer design 1:1) -->
        <div style="position: absolute; top: 0; left: 0; right: 0; height: ${headerHeight}px; background: ${gradientEnd}; background-image: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10;">
@@ -2724,15 +2764,17 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
        <!-- Bottom Section (solid panel, matching the other cards' dark background — the gradient+sphere treatment stays confined to the header) -->
        <div data-autofit-box="activation-footer" style="position: absolute; bottom: 0; left: 0; right: 0; height: ${footerHeight}px; background: #1a1a1a; overflow: hidden; display: flex; flex-direction: column; align-items: ${flexAlign}; justify-content: flex-start; box-sizing: border-box; padding: 40px 40px 30px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 10;">
 
+          ${circleImageHtml}
+
           <!-- Main Text (auto-fit: the fit-scale CSS variable is adjusted at runtime so this never overflows the footer) -->
           <div style="width: 100%; max-width: ${textMaxWidth}px; position: relative; z-index: 10;">
              <div data-autofit="activation-text" style="--fit-scale: 1; text-align: ${textAlign};">
                ${showTitle ? `
-               <div contenteditable="true" data-field="name" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${titleBaseSize}px * var(--fit-scale, 1)); letter-spacing: 1.5px; background: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); -webkit-background-clip: text; background-clip: text; color: transparent; caret-color: white; text-transform: uppercase; margin: 0 0 ${textMode === 'title_paragraph' ? '12px' : '0'} 0; padding-top: 0.2em; line-height: ${titleLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
+               <div contenteditable="true" data-field="name" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${titleBaseSize}px * var(--fit-scale, 1)); letter-spacing: 1.5px; ${fontColor ? `background: none; -webkit-background-clip: unset; background-clip: unset; color: ${fontColor};` : `background: linear-gradient(90deg, ${gradientStart} 0%, ${gradientEnd} 100%); -webkit-background-clip: text; background-clip: text; color: transparent;`} caret-color: white; text-transform: uppercase; margin: 0 0 ${textMode === 'title_paragraph' ? '12px' : '0'} 0; padding-top: 0.2em; line-height: ${titleLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
                  ${titleText}
                </div>` : ''}
                ${showParagraph ? `
-               <div contenteditable="true" data-field="activationParagraph" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${paragraphBaseSize}px * var(--fit-scale, 1)); color: white; text-transform: none; margin: 0; line-height: ${paragraphLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
+               <div contenteditable="true" data-field="activationParagraph" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${paragraphBaseSize}px * var(--fit-scale, 1)); color: ${fontColor || 'white'}; text-transform: none; margin: 0; line-height: ${paragraphLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
                  ${paragraphText}
                </div>` : ''}
              </div>
@@ -2761,7 +2803,14 @@ export const applyActivationTextFit = (root: ParentNode = document): void => {
   const STEP = 0.02;
   const VERTICAL_PADDING = 60; // matches the footer's 30px top + 30px bottom padding
 
-  const availableHeight = Math.max(0, boxEl.clientHeight - VERTICAL_PADDING);
+  // In 'circle' image mode, the photo badge sits above the text inside the
+  // same footer box (see data-activation-circle in generateActivationTemplate)
+  // and takes up real vertical space that the text has to share — account for
+  // it here so the fit calculation doesn't let the text overflow past it.
+  const circleEl = root.querySelector('[data-activation-circle]') as HTMLElement | null;
+  const circleSpace = circleEl ? circleEl.offsetHeight + 18 : 0;
+
+  const availableHeight = Math.max(0, boxEl.clientHeight - VERTICAL_PADDING - circleSpace);
 
   let scale = 1;
   wrapperEl.style.setProperty('--fit-scale', String(scale));

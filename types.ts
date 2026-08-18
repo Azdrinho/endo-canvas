@@ -57,6 +57,21 @@ export interface Employee {
   activationParagraphFontScale?: number;
   activationTitleLineHeight?: number;
   activationParagraphLineHeight?: number;
+  // How the photo is displayed: full-bleed background (original behavior),
+  // a small circular badge (crops far less aggressively, so it works better
+  // with landscape photos and leaves more room for longer text), or hidden
+  // entirely (just the brand header/footer and text).
+  activationImageMode?: 'background' | 'circle' | 'none';
+  // Diameter (px, at the template's native render size) of the circular photo
+  // badge when activationImageMode is 'circle' — user-adjustable so a longer
+  // paragraph can shrink the photo to make room.
+  activationCircleSize?: number;
+  // Horizontal position of the circular photo badge — independent of the
+  // text's own alignment (activationTextAlign).
+  activationCirclePosition?: 'left' | 'center' | 'right';
+  // Optional solid override for the title/paragraph text color. When unset,
+  // the title keeps its brand gradient and the paragraph stays white.
+  activationFontColor?: string;
 }
 
 export interface ChecklistItem {

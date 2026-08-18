@@ -14,6 +14,8 @@ import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from '.
 import { EmployeeManager } from './components/EmployeeManager';
 import { NetworkBackground } from './components/NetworkBackground';
 import { SalsaLogo } from './components/SalsaLogo';
+import { LoadingScreen } from './components/LoadingScreen';
+import { EndoCanvasLogo } from './components/EndoCanvasLogo';
 import * as XLSX from 'xlsx';
 import { toPng, toJpeg } from 'html-to-image';
 import { 
@@ -84,7 +86,13 @@ import {
   Heading2,
   Pilcrow,
   Bold,
-  Italic
+  Italic,
+  Circle,
+  ImageOff,
+  Minus,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd
 } from 'lucide-react';
 
 // --- DATA INITIALIZATION ---
@@ -400,6 +408,54 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [isManagementMode, setIsManagementMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Boot splash: stays up until the initial employee fetch resolves AND a
+  // minimum display time has passed (so it never just flickers if the fetch
+  // is fast), then the LoadingScreen animates itself away.
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplashElapsed(true), 2800);
+    return () => clearTimeout(t);
+  }, []);
+
+  // The sidebar as a whole is user-resizable — dragging its right edge scales
+  // the entire panel (text, icons, spacing, all of it) up or down together,
+  // like a zoom, rather than stretching its width and reflowing the content.
+  // Clamped so it can never get so small it's illegible or so large it
+  // swallows the canvas.
+  const SIDEBAR_MIN_SCALE = 0.8;
+  const SIDEBAR_MAX_SCALE = 1.3;
+  const [sidebarScale, setSidebarScale] = useState(1);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarResizeStartRef = useRef<{ startX: number, startScale: number } | null>(null);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const start = sidebarResizeStartRef.current;
+      if (!start) return;
+      // 260px of drag = a full +1.0 scale step, so the motion feels proportional.
+      const next = Math.min(SIDEBAR_MAX_SCALE, Math.max(SIDEBAR_MIN_SCALE, start.startScale + (e.clientX - start.startX) / 260));
+      setSidebarScale(next);
+    };
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      sidebarResizeStartRef.current = null;
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingSidebar]);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    sidebarResizeStartRef.current = { startX: e.clientX, startScale: sidebarScale };
+    setIsResizingSidebar(true);
+  }, [sidebarScale]);
 
   // 3. Silent Auto Backup Synchronization to LocalStorage
   useEffect(() => {
@@ -972,7 +1028,7 @@ export default function App() {
           setSelectedEmployeeId(remoteData[0].id);
         }
       }
-    });
+    }).finally(() => setIsDataLoading(false));
 
     fetchHiringImages().then(images => {
       if (images && images.length > 0) {
@@ -1554,6 +1610,10 @@ export default function App() {
   // a portal so it isn't affected by the canvas's zoom `transform` (which would
   // otherwise turn `position: fixed` into a transform-relative position).
   const [textToolbarPos, setTextToolbarPos] = useState<{ x: number; y: number } | null>(null);
+  // Which data-field the toolbar is currently floating over — tracked in state
+  // (not just the ref below) so the JSX can conditionally show field-specific
+  // controls (alignment, font size) alongside the always-available Bold/Italic.
+  const [activeToolbarField, setActiveToolbarField] = useState<string | null>(null);
   const activeEditableRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -1561,6 +1621,7 @@ export default function App() {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
         setTextToolbarPos(null);
+        setActiveToolbarField(null);
         activeEditableRef.current = null;
         return;
       }
@@ -1569,16 +1630,28 @@ export default function App() {
       const field = editable?.getAttribute('data-field');
       if (!editable || !field || !isRichTextField(field)) {
         setTextToolbarPos(null);
+        setActiveToolbarField(null);
         activeEditableRef.current = null;
         return;
       }
       activeEditableRef.current = editable;
+      setActiveToolbarField(field);
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       setTextToolbarPos({ x: rect.left + rect.width / 2, y: rect.top - 44 });
     };
     document.addEventListener('selectionchange', updateToolbar);
     return () => document.removeEventListener('selectionchange', updateToolbar);
   }, [isRichTextField]);
+
+  // Nudges the font-size scale for whichever ACTIVATION field the floating
+  // toolbar is currently over — mirrors the sidebar's Título/Parágrafo
+  // "Tamanho" sliders (same clamp range, same fields) so both stay consistent.
+  const adjustActivationFontScale = useCallback((field: string, delta: number) => {
+    const scaleField = field === 'name' ? 'activationTitleFontScale' : 'activationParagraphFontScale';
+    const current = (selectedEmployee as any)[scaleField] || 1;
+    const next = Math.min(1.8, Math.max(0.7, Math.round((current + delta) * 100) / 100));
+    updateEmployee(selectedEmployee.id, scaleField as keyof Employee, next);
+  }, [selectedEmployee, updateEmployee]);
 
   const applyTextFormat = useCallback((command: 'bold' | 'italic') => {
     // Falls back to whichever eligible field is currently focused — the toolbar
@@ -2470,23 +2543,7 @@ export default function App() {
            <div className="h-10 w-px bg-white/40 rounded-full shadow-sm"></div>
            
            <div className="pt-1">
-                          <svg viewBox="0 0 1100 180" className="h-8 w-auto fill-white overflow-visible" xmlns="http://www.w3.org/2000/svg">
-                <g id="Camada_1-2" data-name="Camada 1">
-                    <g>
-                      <path d="M370.78,171.49c-29.91,11.8-61.61-3.84-71.52-33.41-7.43-22.16,0-46.12,17.7-60.24,18.46-14.74,43.74-16.42,64.03-3.06l.19-53.12c0-2.62,3.21-5.16,5.41-5.65l14.45.23c2.86.04,5.84,3.38,5.83,6.38l-.32,97.83c-.07,22.67-14.69,42.73-35.76,51.04ZM379.84,120.35c0-15.71-12.74-28.45-28.45-28.45s-28.45,12.74-28.45,28.45,12.74,28.45,28.45,28.45,28.45-12.74,28.45-28.45Z" style={{ fill: '#fff' }}/>
-                      <path d="M164.62,149.81c7.19.08,11.08,6.53,11.29,12.54.32,9.06-6.06,14.94-14.86,14.68-10.62-.32-20.62.7-31.45-.32-18.22-1.7-37.41-9.89-47.93-25.78L2.57,31.43c-3.9-5.89-3-14.22.26-20.28C5.62,6,11.04,1.65,18.19.36c10.79-1.95,23.45,4.12,26.6,15.41l18.99,68.06c2.45,8.78,7.04,16.36,12.85,23.2,10.34,12.18,21.29,23.16,34.12,32.78,7.45,5.59,16.94,9.61,26.28,9.7l27.59.29Z" style={{ fill: '#fff' }}/>
-                      <path d="M713.28,172.63c-6.62.47-11.14-1.73-12.16-8.56-15.87,11.23-36.51,12.42-53.69,2.53-22.67-13.06-31.9-40.32-23.49-64.92,9.75-28.51,40.4-43.39,68.72-31.85,18.01,7.34,31.53,24.68,32.73,44.55l.45,47.12c.03,3.12-1.13,6.78-3.12,8.52-2.25,1.97-5.75,2.34-9.44,2.6ZM700.96,119.42c0-15.19-12.31-27.5-27.5-27.5s-27.5,12.31-27.5,27.5,12.31,27.5,27.5,27.5,27.5-12.31,27.5-27.5Z" style={{ fill: '#fff' }}/>
-                      <path d="M521.53,120.17c0,29.84-24.19,54.03-54.04,54.03s-54.04-24.19-54.04-54.03,24.19-54.03,54.04-54.03,54.04,24.19,54.04,54.03ZM495.74,120.04c0-15.5-12.57-28.07-28.07-28.07s-28.07,12.57-28.07,28.07,12.57,28.07,28.07,28.07,28.07-12.57,28.07-28.07Z" style={{ fill: '#fff' }}/>
-                      <path d="M1014.03,170.68c-6.26.33-10.55-1.31-11.76-7.89-22.11,15.28-51.69,10.08-67.42-11.82-16.74-23.31-12.21-55.79,10.2-73.86,18.81-15.16,45.25-14.61,63.36,1.51,10.19,9.07,17.63,21.93,17.64,35.86l.02,45.99c0,2.67-1.05,6.21-2.59,7.59-2.36,2.11-5.76,2.42-9.46,2.62ZM1002.56,118.76c0-14.83-12.03-26.86-26.86-26.86s-26.86,12.02-26.86,26.86,12.03,26.86,26.86,26.86,26.86-12.02,26.86-26.86Z" style={{ fill: '#fff' }}/>
-                      <path d="M259.97,115.86c-.02-13.46-11.75-22.59-23.45-22.47-13.19.13-22.93,10.75-22.96,24.08l-.11,48.36c-.02,7.63-7.69,10.79-14.38,10.62-6.18-.16-12.5-3.27-12.49-10.32.02-17.5-.78-34.62.28-52.19,1.56-25.73,22.33-46.62,48.18-47.61s49.99,20.41,51.31,47.25l.33,49.79c.05,8.04-6.12,12.48-13.66,12.42-7.01-.06-12.95-3.81-12.96-11.42l-.09-48.52Z" style={{ fill: '#fff' }}/>
-                      <path d="M102.63,75.55c5.41,4.57,12.61,6.84,19.51,6.92l43.7.51c7.2.08,10.65,8.18,10.27,13.97s-4.83,12.68-12.03,12.68h-44.92c-24.44-.01-48.38-17.82-49.37-42.58-1.25-30.98,28.38-51.85,58.34-51.71l36.97.18c7.25.04,11.51,7.53,11.34,14.01-.17,6.91-5.01,13.18-12.35,13.25l-37.06.37c-9.16.09-18.96,3.63-24.76,10.08-5.93,6.59-6.57,16.47.36,22.32Z" style={{ fill: '#fff' }}/>
-                      <path d="M800.87,112.89c-.05-11.77-10.62-20.02-20.77-20.27-10.76-.27-21.51,8.1-21.6,19.97l-.39,48.2c-.06,7.22-5.59,11.67-12.47,11.78s-12.52-3.87-12.45-11.08l.47-50.99c1.82-23.63,20.22-43.05,43.95-44.15,25.62-1.18,46.98,19.63,48.12,45.03l.19,50.03c.03,7.01-6.07,10.4-12.29,10.52-6.81.13-12.51-3.61-12.55-10.76l-.22-48.29Z" style={{ fill: '#fff' }}/>
-                      <path d="M553.33,113.44c-2.76,12.05,2.05,23.41,11.48,29.56,9.95,6.49,22.56,6.55,32.02-1.55,1.34-1.15,4.05-2.66,5.54-2.82,1.7-.18,4.66,1.72,5.87,3.08l6.85,7.61c1.1,1.22,2.93,4,2.74,5.51-.24,1.98-2.08,4.24-3.92,5.81-18.24,15.66-44.34,18.01-64.26,3.83-15.74-11.2-23.73-29.61-22.27-48.74,1.4-18.25,12.4-35.37,29.38-44.19,19.6-10.18,42.49-6.43,58.49,8.44,2.88,2.67,3.57,5.79.71,8.82l-8.23,8.74c-2.35,2.49-6.36,3.74-9.31,1.27-7.64-6.4-17.19-8.81-27.06-5.53-8.33,2.77-15.7,9.97-18.03,20.16Z" style={{ fill: '#fff' }}/>
-                      <path d="M1086.81,166.37c-16.69,9.04-36.49,5.95-50.18-5.98-6.47-5.64-8.03-14.41-1.75-20.4,4.35-4.15,10.51-3.95,14.66.36,6.35,6.6,15.38,9.47,24.29,6.56,3.24-1.06,5.79-4.05,6.03-6.99.27-3.24-1.7-7.79-5.2-8.78l-17.12-4.82c-9.71-2.74-19.26-7.98-23.09-17.57-7.03-17.61,3.21-36.11,21.14-40.98,15.86-4.31,32.29.22,42.8,12.63,3.14,3.71,3.55,6.85.99,11.27-1.92,3.32-4.75,6.3-8.28,7.12-4.24.98-8.09-.65-11.33-3.68-4.91-4.58-11.5-6.73-18.04-4.18-2.65,1.03-4.64,4.45-4.59,7.06.04,2.27,2.47,5.9,5.08,6.62l19.67,5.44c9.29,2.57,17.11,9.41,20.03,18.59,4.66,14.65-1.24,30.21-15.12,37.73Z" style={{ fill: '#fff' }}/>
-                      <path d="M906.23,72.73c3.28-6.67,11.78-7.31,16.71-4.18,5.21,3.3,8.36,10.44,5.17,16.7l-41.04,80.67c-1.8,3.54-5.99,5.62-9.08,5.83-3.81.25-8.88-1.12-10.85-5l-42.25-83.13c-3.45-6.78,3.38-14.92,8.36-16.41,7.52-2.26,12.98,1.86,16.21,8.49l23.13,47.54c.63,1.29,3.17,3.33,4.45,3.31s3.78-2.04,4.43-3.36l24.77-50.44Z" style={{ fill: '#fff' }}/>
-                    </g>
-                 </g>
-              </svg>
+              <EndoCanvasLogo className="h-8 w-auto fill-white overflow-visible" />
           </div>
         </div>
       </header>
@@ -2494,19 +2551,31 @@ export default function App() {
 
   // Redesigned Floating Sidebar
   const SidebarContent = useMemo(() => (
-    <motion.div 
+    <motion.div
       initial={false}
       animate={{
-        x: isSidebarOpen ? 0 : -370,
+        x: isSidebarOpen ? 0 : -520,
+        scale: sidebarScale,
       }}
-      transition={{
+      transition={isResizingSidebar ? { duration: 0 } : {
         type: "spring",
         stiffness: 240,
         damping: 25,
         mass: 0.8
       }}
-      className={`absolute top-24 left-6 w-[340px] bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible`}
+      style={{ width: 340, transformOrigin: 'top left' }}
+      className="absolute top-24 left-6 bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible"
     >
+       {/* Resize handle: the entire right edge (full height) is grabbable —
+           drag to scale the whole panel up or down, clamped between
+           SIDEBAR_MIN_SCALE and SIDEBAR_MAX_SCALE. Purely functional: no
+           visible element, just the cursor changing on hover. */}
+       <div
+          onMouseDown={handleSidebarResizeStart}
+          className="absolute top-0 -right-2 w-4 h-full cursor-ew-resize z-40"
+          title="Arraste para redimensionar"
+       />
+
        {/* Inner wrapper to enclose content neatly inside the custom-shaped card */}
        <div className="w-full h-full flex flex-col overflow-hidden rounded-[2.5rem] bg-[#121212]">
        
@@ -2634,12 +2703,12 @@ export default function App() {
        {/* 2. Middle Content (Scrollable) */}
        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar overflow-x-hidden">
           <AnimatePresence mode="wait">
-             <motion.div 
+             <motion.div
                  key={activeTab}
-                 initial={{ opacity: 0, x: 20 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 exit={{ opacity: 0, x: -20 }}
-                 transition={{ duration: 0.2 }}
+                 initial={{ opacity: 0, x: 16, scale: 0.99 }}
+                 animate={{ opacity: 1, x: 0, scale: 1 }}
+                 exit={{ opacity: 0, x: -16, scale: 0.99 }}
+                 transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
                  className="h-full"
              >
                 {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) && (
@@ -3083,6 +3152,90 @@ export default function App() {
                                       </div>
                                   </div>
 
+                                  <div>
+                                      <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Imagem</div>
+                                      <div className="grid grid-cols-3 gap-2">
+                                          {([
+                                              { id: 'background', label: 'Fundo', icon: ImageIcon },
+                                              { id: 'circle', label: 'Moldura', icon: Circle },
+                                              { id: 'none', label: 'Sem Imagem', icon: ImageOff },
+                                          ] as { id: 'background' | 'circle' | 'none', label: string, icon: any }[]).map(opt => {
+                                              const isActive = (selectedEmployee.activationImageMode || 'background') === opt.id;
+                                              const Icon = opt.icon;
+                                              return (
+                                                  <button
+                                                      key={opt.id}
+                                                      onClick={() => updateEmployee(selectedEmployee.id, 'activationImageMode', opt.id)}
+                                                      className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl border text-[10px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                                  >
+                                                      <Icon size={16} />
+                                                      <span className="text-center leading-tight">{opt.label}</span>
+                                                  </button>
+                                              );
+                                          })}
+                                      </div>
+                                      {(selectedEmployee.activationImageMode || 'background') === 'circle' && (
+                                          <div className="mt-3 px-1 space-y-3">
+                                              <div>
+                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                                                      <span>Tamanho da Moldura</span>
+                                                      <span>{selectedEmployee.activationCircleSize || 140}px</span>
+                                                  </div>
+                                                  {/* Bigger paragraph? Shrink the circle to make room — the auto-fit
+                                                      text safety net already accounts for whatever height this ends
+                                                      up rendering at (see applyActivationTextFit), so it never overlaps. */}
+                                                  <input
+                                                      type="range" min="60" max="280" step="5"
+                                                      value={selectedEmployee.activationCircleSize || 140}
+                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationCircleSize', parseInt(e.target.value))}
+                                                      className="styled-slider w-full"
+                                                  />
+                                              </div>
+                                              <div>
+                                                  <div className="text-[10px] text-slate-500 mb-1">Posição da Moldura</div>
+                                                  <div className="grid grid-cols-3 gap-2">
+                                                      {([
+                                                          { id: 'left', icon: AlignHorizontalJustifyStart, label: 'Esquerda' },
+                                                          { id: 'center', icon: AlignHorizontalJustifyCenter, label: 'Centro' },
+                                                          { id: 'right', icon: AlignHorizontalJustifyEnd, label: 'Direita' },
+                                                      ] as { id: 'left' | 'center' | 'right', icon: any, label: string }[]).map(opt => {
+                                                          const isActive = (selectedEmployee.activationCirclePosition || 'center') === opt.id;
+                                                          const Icon = opt.icon;
+                                                          return (
+                                                              <button
+                                                                  key={opt.id}
+                                                                  onClick={() => updateEmployee(selectedEmployee.id, 'activationCirclePosition', opt.id)}
+                                                                  title={opt.label}
+                                                                  className={`flex items-center justify-center py-2.5 rounded-2xl border transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                                              >
+                                                                  <Icon size={16} />
+                                                              </button>
+                                                          );
+                                                      })}
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )}
+                                  </div>
+
+                                  <div>
+                                      <div className="flex items-center justify-between mb-1">
+                                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cor da Fonte</div>
+                                          {selectedEmployee.activationFontColor && (
+                                              <button onClick={() => updateEmployee(selectedEmployee.id, 'activationFontColor', '')} className="text-[10px] text-slate-500 hover:text-white transition-colors">Redefinir (degradê)</button>
+                                          )}
+                                      </div>
+                                      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <input
+                                              type="color"
+                                              value={selectedEmployee.activationFontColor || '#ffffff'}
+                                              onChange={(e) => updateEmployee(selectedEmployee.id, 'activationFontColor', e.target.value)}
+                                              className="w-8 h-8 rounded-lg border border-white/10 bg-transparent cursor-pointer shrink-0"
+                                          />
+                                          <span className="text-xs text-slate-400">{selectedEmployee.activationFontColor ? selectedEmployee.activationFontColor.toUpperCase() : 'Padrão (título em degradê, parágrafo branco)'}</span>
+                                      </div>
+                                  </div>
+
                                   {(selectedEmployee.activationTextMode || 'title') !== 'paragraph' && (
                                       <div>
                                           <div className="flex items-center justify-between mb-1">
@@ -3463,7 +3616,7 @@ export default function App() {
                   whileHover={isDownloading ? undefined : { scale: 1.02 }}
                   whileTap={isDownloading ? undefined : { scale: 0.97 }}
                   transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                  className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-full shadow-lg transition-colors font-bold text-white text-base ${isDownloading ? 'bg-cyan-700 cursor-wait' : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-purple-500/20'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-full shadow-lg transition-colors font-medium uppercase tracking-wide text-white text-base ${isDownloading ? 'bg-cyan-700 cursor-wait' : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-purple-500/20'}`}
                   onClick={handleDownload}
                   disabled={isDownloading}
                >
@@ -3488,7 +3641,7 @@ export default function App() {
 
 
     </motion.div>
-  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, handleDownload, isSidebarOpen]);
+  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, handleDownload, isSidebarOpen, sidebarScale, isResizingSidebar, handleSidebarResizeStart]);
 
   // --- HIRING EDITOR OVERLAY ---
   const renderHiringOverlay = () => {
@@ -3497,8 +3650,10 @@ export default function App() {
 
   return (
     <div className={`w-full h-screen flex flex-col overflow-hidden ${theme.bg} dark text-slate-900 dark:text-white transition-colors duration-300`}>
+        {/* Temporarily disabled per request — LoadingScreen show={isDataLoading || !minSplashElapsed} */}
+
         {/* REMOVED ViewMode.IMPORT conditional rendering completely */}
-        
+
         {HeaderContent}
         
         <div className="flex-1 relative overflow-hidden">
@@ -4143,7 +4298,10 @@ export default function App() {
             className="hidden"
         />
 
-        {/* Floating Bold/Italic toolbar for rich-text canvas fields (e.g. General Disclosure's paragraph) */}
+        {/* Floating text toolbar for rich-text canvas fields: Bold/Italic always,
+            plus alignment and font-size controls for ACTIVATION's title/paragraph
+            (mirrors the same sidebar controls) so those don't require switching
+            over to the sidebar just to nudge them mid-edit. */}
         {textToolbarPos && createPortal(
             <div
                 style={{ position: 'fixed', left: textToolbarPos.x, top: textToolbarPos.y, transform: 'translateX(-50%)', zIndex: 9999 }}
@@ -4165,6 +4323,48 @@ export default function App() {
                 >
                     <Italic size={14} />
                 </button>
+
+                {selectedTemplate === TemplateType.ACTIVATION && (activeToolbarField === 'name' || activeToolbarField === 'activationParagraph') && (
+                    <>
+                        <div className="w-px h-5 bg-white/15 mx-0.5" />
+
+                        {([
+                            { id: 'left', icon: AlignLeft, label: 'Esquerda' },
+                            { id: 'center', icon: AlignCenter, label: 'Centro' },
+                            { id: 'right', icon: AlignRight, label: 'Direita' },
+                        ] as { id: 'left' | 'center' | 'right', icon: any, label: string }[]).map(opt => {
+                            const isActive = (selectedEmployee.activationTextAlign || 'center') === opt.id;
+                            const Icon = opt.icon;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => updateEmployee(selectedEmployee.id, 'activationTextAlign', opt.id)}
+                                    title={opt.label}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-white hover:bg-white/10'}`}
+                                >
+                                    <Icon size={14} />
+                                </button>
+                            );
+                        })}
+
+                        <div className="w-px h-5 bg-white/15 mx-0.5" />
+
+                        <button
+                            onClick={() => adjustActivationFontScale(activeToolbarField, -0.1)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                            title="Diminuir fonte"
+                        >
+                            <Minus size={14} />
+                        </button>
+                        <button
+                            onClick={() => adjustActivationFontScale(activeToolbarField, 0.1)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                            title="Aumentar fonte"
+                        >
+                            <Plus size={14} />
+                        </button>
+                    </>
+                )}
             </div>,
             document.body
         )}
