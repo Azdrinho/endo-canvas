@@ -419,44 +419,6 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
-  // The sidebar as a whole is user-resizable — dragging its right edge scales
-  // the entire panel (text, icons, spacing, all of it) up or down together,
-  // like a zoom, rather than stretching its width and reflowing the content.
-  // Clamped so it can never get so small it's illegible or so large it
-  // swallows the canvas.
-  const SIDEBAR_MIN_SCALE = 0.8;
-  const SIDEBAR_MAX_SCALE = 1.3;
-  const [sidebarScale, setSidebarScale] = useState(1);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const sidebarResizeStartRef = useRef<{ startX: number, startScale: number } | null>(null);
-
-  useEffect(() => {
-    if (!isResizingSidebar) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      const start = sidebarResizeStartRef.current;
-      if (!start) return;
-      // 260px of drag = a full +1.0 scale step, so the motion feels proportional.
-      const next = Math.min(SIDEBAR_MAX_SCALE, Math.max(SIDEBAR_MIN_SCALE, start.startScale + (e.clientX - start.startX) / 260));
-      setSidebarScale(next);
-    };
-    const handleMouseUp = () => {
-      setIsResizingSidebar(false);
-      sidebarResizeStartRef.current = null;
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizingSidebar]);
-
-  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    sidebarResizeStartRef.current = { startX: e.clientX, startScale: sidebarScale };
-    setIsResizingSidebar(true);
-  }, [sidebarScale]);
-
   // 3. Silent Auto Backup Synchronization to LocalStorage
   useEffect(() => {
     if (employees && employees.length > 0 && employees !== INITIAL_EMPLOYEES) {
@@ -2598,9 +2560,8 @@ export default function App() {
       initial={false}
       animate={{
         x: isSidebarOpen ? 0 : -520,
-        scale: sidebarScale,
       }}
-      transition={isResizingSidebar ? { duration: 0 } : {
+      transition={{
         type: "spring",
         stiffness: 240,
         damping: 25,
@@ -2609,16 +2570,6 @@ export default function App() {
       style={{ width: 340, transformOrigin: 'top left' }}
       className="absolute top-24 left-6 bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible"
     >
-       {/* Resize handle: the entire right edge (full height) is grabbable —
-           drag to scale the whole panel up or down, clamped between
-           SIDEBAR_MIN_SCALE and SIDEBAR_MAX_SCALE. Purely functional: no
-           visible element, just the cursor changing on hover. */}
-       <div
-          onMouseDown={handleSidebarResizeStart}
-          className="absolute top-0 -right-2 w-4 h-full cursor-ew-resize z-40"
-          title="Arraste para redimensionar"
-       />
-
        {/* Inner wrapper to enclose content neatly inside the custom-shaped card */}
        <div className="w-full h-full flex flex-col overflow-hidden rounded-[2.5rem] bg-[#121212]">
        
@@ -3688,7 +3639,7 @@ export default function App() {
 
 
     </motion.div>
-  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, handleDownload, isSidebarOpen, sidebarScale, isResizingSidebar, handleSidebarResizeStart]);
+  ), [activeTab, sidebarDataView, filteredEmployees, selectedEmployeeId, selectedTemplate, searchQuery, selectedEmployee, updateEmployee, removeEmployee, isSignature, hasCopied, handleCopyHtml, handleCopyAllHtml, isNewProvider, providerData, activeGridConfig, updateGridConfig, isDownloading, handleDownload, isSidebarOpen]);
 
   // --- HIRING EDITOR OVERLAY ---
   const renderHiringOverlay = () => {
