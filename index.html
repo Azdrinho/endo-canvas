@@ -21,6 +21,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        // App.tsx hardcodes a `dark` class on the root element and never
+        // toggles it — but Tailwind's default strategy activates `dark:`
+        // variants from the OS/browser's prefers-color-scheme instead of
+        // that class. On any machine whose system theme is light, every
+        // `dark:` utility got skipped and its light fallback (e.g.
+        // bg-slate-200/50) showed instead — reported as a washed-out
+        // background on some coworkers' PCs. 'class' strategy makes the
+        // class the sole source of truth, so it's dark everywhere.
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
