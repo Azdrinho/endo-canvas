@@ -2051,9 +2051,12 @@ const generateFarewellCardTemplate = (
   const sz2 = sharedSize;
 
   const gradLine = (text: string, sz: number, tight: boolean = false) => {
-    // Extra room (1.15x) so accented capitals (Á, É, ¡) aren't clipped, since
-    // accent marks sit above cap-height.
-    const lineH = Math.round(sz * 1.15);
+    // Extra room (1.35x) so accented capitals (Á, É, ¡) aren't clipped, since
+    // accent marks sit above cap-height. 1.15x still let the top of the
+    // accent poke outside the gradient's painted box on some letters (e.g.
+    // "ATÉ"), since -webkit-background-clip:text only paints within the
+    // line box.
+    const lineH = Math.round(sz * 1.35);
     const marginTop = tight ? `${-Math.round(sz * 0.2)}px` : '0';
     return `<div style="width: 100%; padding: 0 40px; box-sizing: border-box; overflow: visible; margin-top: ${marginTop};">
       <h1 class="akira-font" style="font-size: ${sz}px; line-height: ${lineH}px; margin: 0; text-align: left; letter-spacing: ${letterSpacingEm}em; white-space: nowrap; background: linear-gradient(90deg, #22d3ee 0%, ${purpleColor} 100%); -webkit-background-clip: text; background-clip: text; color: transparent;">${text}</h1>
@@ -2109,7 +2112,9 @@ const generateFarewellCardTemplate = (
       </div>
     `;
   } else {
-    const topH = Math.round(line2 ? sz1 * 2.1 : sz1 * 1.15) + 40;
+    // Matches gradLine's own box math: line1 is 1.35x, line2 (tight) adds
+    // another 1.35x minus its -0.2x pull-up, so two lines net ~2.5x.
+    const topH = Math.round(line2 ? sz1 * 2.5 : sz1 * 1.35) + 40;
     return `
       <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: ${cardBg}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
         <div style="height: ${topH}px; width: 100%; background: ${cardBg}; position: relative; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 0px; padding-bottom: 24px; box-sizing: border-box; overflow: hidden;">
