@@ -4114,8 +4114,8 @@ export default function App() {
                                 </div>
                             )}
 
-                            {/* FUNDO ESCURO TOGGLE (Welcome Aboard, Birthday, Anniversary, Job Change, Farewell) */}
-                            {(selectedTemplate === TemplateType.WELCOME || selectedTemplate === TemplateType.BIRTHDAY || selectedTemplate === TemplateType.ANNIVERSARY || selectedTemplate === TemplateType.JOB_CHANGE || selectedTemplate === TemplateType.FAREWELL) && (
+                            {/* FUNDO ESCURO TOGGLE (Welcome Aboard, Birthday, Anniversary, Job Change, Farewell, HR Feedback) */}
+                            {(selectedTemplate === TemplateType.WELCOME || selectedTemplate === TemplateType.BIRTHDAY || selectedTemplate === TemplateType.ANNIVERSARY || selectedTemplate === TemplateType.JOB_CHANGE || selectedTemplate === TemplateType.FAREWELL || selectedTemplate === TemplateType.ACTIVATION) && (
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                     <div className="flex flex-col items-end">
                                         <span className="text-[10px] font-bold text-white uppercase leading-none">Fundo Escuro</span>

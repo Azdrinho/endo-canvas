@@ -2587,7 +2587,8 @@ export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, l
   `;
 };
 
-export const generateActivationTemplate = (employee: Employee, orientation: Orientation = 'landscape'): string => {
+export const generateActivationTemplate = (employee: Employee, orientation: Orientation = 'landscape', variant: 'light' | 'dark' = 'dark'): string => {
+  const isDark = variant === 'dark';
   const isPortrait = orientation === 'portrait';
   // Portrait keeps the same 3:2 family ratio as the landscape design (1200x800),
   // just transposed to 800x1200 so it lines up with the other portrait templates in the app.
@@ -2748,7 +2749,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   ` : '';
 
   return `
-    <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: #121212; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; font-family: 'Orkney', sans-serif;">
+    <div id="capture-target" style="width: ${cardWidth}px; height: ${cardHeight}px; background: ${isDark ? '#121212' : '#f5f5f5'}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; font-family: 'Orkney', sans-serif;">
 
        <!-- Background Image (only in 'background' display mode) -->
        ${imageMode === 'background' && employee.photoUrl ? `
@@ -2777,8 +2778,8 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
           </div>
        </div>
 
-       <!-- Bottom Section (solid panel, matching the other cards' dark background — the gradient+sphere treatment stays confined to the header) -->
-       <div data-autofit-box="activation-footer" style="position: absolute; bottom: 0; left: 0; right: 0; height: ${footerHeight}px; background: #1a1a1a; overflow: hidden; display: flex; flex-direction: column; align-items: ${flexAlign}; justify-content: flex-start; box-sizing: border-box; padding: 40px 40px 30px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 10;">
+       <!-- Bottom Section (solid panel, matching the other cards' background — the gradient+sphere treatment stays confined to the header) -->
+       <div data-autofit-box="activation-footer" style="position: absolute; bottom: 0; left: 0; right: 0; height: ${footerHeight}px; background: ${isDark ? '#1a1a1a' : '#ffffff'}; overflow: hidden; display: flex; flex-direction: column; align-items: ${flexAlign}; justify-content: flex-start; box-sizing: border-box; padding: 40px 40px 30px; border-top: 1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}; z-index: 10;">
 
           ${circleImageHtml}
 
@@ -2790,7 +2791,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
                  ${titleText}
                </div>` : ''}
                ${showParagraph ? `
-               <div contenteditable="true" data-field="activationParagraph" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${paragraphBaseSize}px * var(--fit-scale, 1)); color: ${fontColor || 'white'}; text-transform: none; margin: 0; line-height: ${paragraphLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
+               <div contenteditable="true" data-field="activationParagraph" style="font-family: 'Orkney', sans-serif; font-weight: 400; font-size: calc(${paragraphBaseSize}px * var(--fit-scale, 1)); color: ${fontColor || (isDark ? 'white' : '#1a1a1a')}; text-transform: none; margin: 0; line-height: ${paragraphLineHeight}; outline: none; user-select: text; cursor: text; pointer-events: auto; word-break: break-word;">
                  ${paragraphText}
                </div>` : ''}
              </div>
@@ -2992,7 +2993,7 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
           break;
 
         case TemplateType.ACTIVATION:
-          cardHtml = generateActivationTemplate(employee, orientation);
+          cardHtml = generateActivationTemplate(employee, orientation, opts?.welcomeVariant || 'dark');
           break;
 
         default:
