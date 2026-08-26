@@ -2580,6 +2580,143 @@ export default function App() {
     }
   };
 
+  // Same render/CORS-sanitize pipeline as handleBatchExport above, but
+  // collects every card as a page in ONE PDF instead of individual PNGs in a
+  // ZIP — useful for printing or sharing the whole month as a single file
+  // (e.g. for an internal presentation) rather than juggling N images.
+  const handleBatchExportPDF = async () => {
+    const monthEmployees = Array.isArray(currentCanvasData) ? currentCanvasData : [];
+    if (!isMonthView || monthEmployees.length === 0) return;
+
+    setIsDownloading(true);
+    const preflightToastId = toast.loading("Executando pré-teste de CORS e validando imagens para exportação...");
+
+    try {
+        const checkImageCors = async (url: string): Promise<boolean> => {
+          if (!url) return true;
+          if (url.startsWith('data:')) return true;
+          if (!url.startsWith('http')) return true;
+          try {
+            const response = await fetch(url, { method: 'HEAD', mode: 'cors' });
+            return response.ok;
+          } catch (err) {
+            return false;
+          }
+        };
+
+        const sanitizedEmployees = await Promise.all(monthEmployees.map(async (emp) => {
+            if (emp.photoUrl) {
+                const isCorsPermissive = await checkImageCors(emp.photoUrl);
+                if (!isCorsPermissive) {
+                    return {
+                        ...emp,
+                        photoUrl: `https://images.weserv.nl/?url=${encodeURIComponent(emp.photoUrl)}`
+                    };
+                }
+            }
+            return emp;
+        }));
+
+        toast.success("Teste de compatibilidade de imagens concluído com sucesso!", { id: preflightToastId });
+        toast.info(`Gerando PDF com ${sanitizedEmployees.length} cartões...`);
+
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.zIndex = '-1';
+        document.body.appendChild(container);
+
+        // Phase 1: render every card to a PNG data URL first — nothing but
+        // this awaits per card. Interleaving jsPDF's addPage/addImage calls
+        // into this same loop (as the initial version did) intermittently
+        // corrupted the PDF's PNG decoder ("wrong PNG signature") on pages
+        // after the first, seemingly from jsPDF's internal image handling
+        // not being safe to call while adjacent async work is in flight.
+        const pages: { dataUrl: string; width: number; height: number }[] = [];
+
+        for (let i = 0; i < sanitizedEmployees.length; i++) {
+            const emp = sanitizedEmployees[i];
+            const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
+
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            const node = wrapper.firstElementChild as HTMLElement;
+            if (!node) continue;
+
+            node.style.borderRadius = '0';
+
+            const allNodes = Array.from(node.querySelectorAll('*')) as HTMLElement[];
+            allNodes.push(node);
+            allNodes.forEach(el => {
+                const style = el.getAttribute('style') || '';
+                if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
+                    el.style.backdropFilter = 'none';
+                    el.style.webkitBackdropFilter = 'none';
+                    if (el.style.background && el.style.background.includes('rgba')) {
+                         el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
+                             let op = parseFloat(a);
+                             return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
+                         });
+                    }
+                }
+            });
+
+            container.innerHTML = '';
+            container.appendChild(node);
+
+            const imgElements = Array.from(node.querySelectorAll('img'));
+            await Promise.all(imgElements.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                });
+            }));
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const dataUrl = await toPng(node, {
+                quality: 1.0,
+                pixelRatio: 2,
+                cacheBust: false,
+                skipAutoScale: true
+            });
+
+            pages.push({ dataUrl, width: node.offsetWidth, height: node.offsetHeight });
+            toast.info(`Gerando ${i + 1}/${sanitizedEmployees.length}...`);
+        }
+
+        document.body.removeChild(container);
+
+        // Phase 2: build the actual PDF, synchronously, from the already-
+        // rendered pages — no awaits between addPage/addImage calls.
+        let pdf: InstanceType<typeof jsPDF> | null = null;
+        for (const page of pages) {
+            if (!pdf) {
+                pdf = new jsPDF({
+                    orientation: page.width > page.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [page.width, page.height]
+                });
+            } else {
+                pdf.addPage([page.width, page.height], page.width > page.height ? 'landscape' : 'portrait');
+            }
+            pdf.addImage(page.dataUrl, 'PNG', 0, 0, page.width, page.height);
+        }
+
+        if (pdf) {
+            pdf.save(`Aniversariantes_${MONTHS[selectedMonthIndex]}.pdf`);
+            toast.success("PDF consolidado gerado com sucesso!");
+        }
+    } catch (err) {
+        console.error("Batch PDF export failed:", err);
+        toast.error("Falha na exportação em PDF.");
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
   const handleDownload = async () => {
      handleDownloadImage();
   };
@@ -4361,6 +4498,18 @@ export default function App() {
                                             >
                                                 <Download size={14} />
                                                 Exportar Lote (ZIP)
+                                            </motion.button>
+                                            <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                                onClick={handleBatchExportPDF}
+                                                disabled={isDownloading || filteredEmployees.length === 0}
+                                                title="Gera um único PDF com todos os cartões do mês, uma página cada — útil para imprimir ou compartilhar num arquivo só"
+                                                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs px-4 py-1 rounded-full shadow-xl flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Download size={14} />
+                                                Exportar Lote (PDF)
                                             </motion.button>
                                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                                 <div className="flex flex-col items-end">
