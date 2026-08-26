@@ -92,7 +92,10 @@ import {
   Minus,
   AlignHorizontalJustifyStart,
   AlignHorizontalJustifyCenter,
-  AlignHorizontalJustifyEnd
+  AlignHorizontalJustifyEnd,
+  History,
+  Save,
+  RotateCw
 } from 'lucide-react';
 
 // --- DATA INITIALIZATION ---
@@ -1062,6 +1065,66 @@ export default function App() {
           toast.info("Refeito");
       }
   }, [history, historyIndex]);
+
+  // Named versions per card — unlike the undo stack above (in-memory only,
+  // lost on reload, capped at 50 steps of the WHOLE roster), these are
+  // explicit named snapshots of a single card, persisted to localStorage, so
+  // you can save "logo azul" and "logo verde" as you iterate and jump back
+  // to either one later, even after closing the tab.
+  const [cardVersions, setCardVersions] = useState<Record<string, { id: string; name: string; timestamp: number; snapshot: Employee }[]>>(() => {
+    try {
+      const saved = localStorage.getItem('end-card-versions');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const updateCardVersions = useCallback((updater: (prev: Record<string, { id: string; name: string; timestamp: number; snapshot: Employee }[]>) => Record<string, { id: string; name: string; timestamp: number; snapshot: Employee }[]>) => {
+    setCardVersions(prev => {
+      const next = updater(prev);
+      try { localStorage.setItem('end-card-versions', JSON.stringify(next)); } catch { /* ignore quota errors */ }
+      return next;
+    });
+  }, []);
+  const saveCardVersion = useCallback((name: string) => {
+    if (!selectedEmployee) return;
+    const entry = { id: `v-${Date.now()}`, name: name.trim() || 'Sem nome', timestamp: Date.now(), snapshot: selectedEmployee };
+    // Capped at 20 per card — plenty for iterating on one card, without the
+    // list growing unbounded in localStorage over a long project lifetime.
+    updateCardVersions(prev => ({
+      ...prev,
+      [selectedEmployee.id]: [entry, ...(prev[selectedEmployee.id] || [])].slice(0, 20)
+    }));
+    toast.success('Versão salva');
+  }, [selectedEmployee, updateCardVersions]);
+  const restoreCardVersion = useCallback((entry: { id: string; name: string; timestamp: number; snapshot: Employee }) => {
+    setEmployees(prev => {
+      const next = prev.map(e => e.id === entry.snapshot.id ? { ...entry.snapshot } : e);
+      saveHistory(next);
+      return next;
+    });
+    upsertEmployee(entry.snapshot);
+    toast.success(`Versão "${entry.name}" restaurada`);
+  }, [saveHistory]);
+  const deleteCardVersion = useCallback((employeeId: string, versionId: string) => {
+    updateCardVersions(prev => ({
+      ...prev,
+      [employeeId]: (prev[employeeId] || []).filter(v => v.id !== versionId)
+    }));
+  }, [updateCardVersions]);
+  const [showVersionsPanel, setShowVersionsPanel] = useState(false);
+  const [versionNameDraft, setVersionNameDraft] = useState('');
+  const versionsPanelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showVersionsPanel) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (versionsPanelRef.current && !versionsPanelRef.current.contains(e.target as Node)) {
+        setShowVersionsPanel(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVersionsPanel]);
 
   // Wires up the Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) shortcuts the toolbar
   // buttons already advertise via their tooltips — until now those tooltips
@@ -3965,6 +4028,71 @@ export default function App() {
                     <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
                         <button onClick={undo} disabled={historyIndex === 0} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
                         <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
+
+                        {selectedEmployee && (
+                        <div className="relative" ref={versionsPanelRef}>
+                            <button
+                                onClick={() => setShowVersionsPanel(v => !v)}
+                                className={`p-3 rounded-full shadow-lg transition-all ${showVersionsPanel ? 'bg-cyan-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                title="Versões salvas deste card"
+                            >
+                                <History size={20}/>
+                            </button>
+
+                            {showVersionsPanel && (
+                                <div className="absolute bottom-0 right-full mr-3 w-72 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-3">
+                                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Versões deste card</div>
+
+                                    <div className="flex items-center gap-1.5 mb-3">
+                                        <input
+                                            value={versionNameDraft}
+                                            onChange={(e) => setVersionNameDraft(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && versionNameDraft.trim()) { saveCardVersion(versionNameDraft); setVersionNameDraft(''); } }}
+                                            placeholder="Nome da versão..."
+                                            className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none border bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-cyan-500/50"
+                                        />
+                                        <button
+                                            onClick={() => { if (versionNameDraft.trim()) { saveCardVersion(versionNameDraft); setVersionNameDraft(''); } }}
+                                            disabled={!versionNameDraft.trim()}
+                                            className="p-2 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                            title="Salvar versão atual"
+                                        >
+                                            <Save size={15} />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                                        {(cardVersions[selectedEmployee.id] || []).length === 0 && (
+                                            <div className="text-xs text-slate-600 text-center py-4">Nenhuma versão salva ainda</div>
+                                        )}
+                                        {(cardVersions[selectedEmployee.id] || []).map(entry => (
+                                            <div key={entry.id} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-medium text-slate-200 truncate">{entry.name}</div>
+                                                    <div className="text-[10px] text-slate-500">{new Date(entry.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => restoreCardVersion(entry)}
+                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-white/10 transition-colors shrink-0"
+                                                    title="Restaurar esta versão"
+                                                >
+                                                    <RotateCw size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteCardVersion(selectedEmployee.id, entry.id)}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                                                    title="Excluir versão"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        )}
+
                         <div className="h-px w-8 bg-white/20 mx-auto my-1"></div>
                         <motion.button
                             whileHover={{ scale: 1.08 }}
