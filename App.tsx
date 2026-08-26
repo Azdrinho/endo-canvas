@@ -429,6 +429,42 @@ const SidebarTabButton: React.FC<{
   </motion.button>
 );
 
+// A grid of mutually-exclusive option buttons (mode pickers, alignment,
+// position, brand logo, etc.) — this exact button (icon, optional label,
+// cyan-tinted active state) was hand-copied at 4+ call sites in the sidebar,
+// each risking drift from the others on any visual tweak. `iconOnly` covers
+// the compact alignment/position variants; the default variant stacks a
+// small uppercase label under the icon.
+function OptionToggleGroup<T extends string>({ options, value, onChange, columns = 3, iconOnly = false }: {
+  options: { id: T; label: string; icon: React.ComponentType<{ size?: number }> }[];
+  value: T;
+  onChange: (id: T) => void;
+  columns?: number;
+  iconOnly?: boolean;
+}) {
+  return (
+    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {options.map(opt => {
+        const isActive = value === opt.id;
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.id}
+            onClick={() => onChange(opt.id)}
+            title={opt.label}
+            className={iconOnly
+              ? `flex items-center justify-center py-2.5 rounded-2xl border transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`
+              : `flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl border text-[10px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+          >
+            <Icon size={16} />
+            {!iconOnly && <span className="text-center leading-tight">{opt.label}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const TEMPLATE_LIST = [
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
@@ -3121,74 +3157,42 @@ export default function App() {
                               <div className="space-y-4">
                                   <div>
                                       <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Formato do Texto</div>
-                                      <div className="grid grid-cols-3 gap-2">
-                                          {([
+                                      <OptionToggleGroup
+                                          options={[
                                               { id: 'title', label: 'Título', icon: Heading2 },
                                               { id: 'paragraph', label: 'Parágrafo', icon: Pilcrow },
                                               { id: 'title_paragraph', label: 'Título + Parágrafo', icon: Layers },
-                                          ] as { id: 'title' | 'paragraph' | 'title_paragraph', label: string, icon: any }[]).map(opt => {
-                                              const isActive = (selectedEmployee.activationTextMode || 'title') === opt.id;
-                                              const Icon = opt.icon;
-                                              return (
-                                                  <button
-                                                      key={opt.id}
-                                                      onClick={() => updateEmployee(selectedEmployee.id, 'activationTextMode', opt.id)}
-                                                      className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl border text-[10px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
-                                                  >
-                                                      <Icon size={16} />
-                                                      <span className="text-center leading-tight">{opt.label}</span>
-                                                  </button>
-                                              );
-                                          })}
-                                      </div>
+                                          ]}
+                                          value={selectedEmployee.activationTextMode || 'title'}
+                                          onChange={(id) => updateEmployee(selectedEmployee.id, 'activationTextMode', id)}
+                                      />
                                   </div>
 
                                   <div>
                                       <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Alinhamento do Texto</div>
-                                      <div className="grid grid-cols-3 gap-2">
-                                          {([
+                                      <OptionToggleGroup
+                                          iconOnly
+                                          options={[
                                               { id: 'left', icon: AlignLeft, label: 'Esquerda' },
                                               { id: 'center', icon: AlignCenter, label: 'Centro' },
                                               { id: 'right', icon: AlignRight, label: 'Direita' },
-                                          ] as { id: 'left' | 'center' | 'right', icon: any, label: string }[]).map(opt => {
-                                              const isActive = (selectedEmployee.activationTextAlign || 'center') === opt.id;
-                                              const Icon = opt.icon;
-                                              return (
-                                                  <button
-                                                      key={opt.id}
-                                                      onClick={() => updateEmployee(selectedEmployee.id, 'activationTextAlign', opt.id)}
-                                                      title={opt.label}
-                                                      className={`flex items-center justify-center py-3 rounded-2xl border transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
-                                                  >
-                                                      <Icon size={16} />
-                                                  </button>
-                                              );
-                                          })}
-                                      </div>
+                                          ]}
+                                          value={selectedEmployee.activationTextAlign || 'center'}
+                                          onChange={(id) => updateEmployee(selectedEmployee.id, 'activationTextAlign', id)}
+                                      />
                                   </div>
 
                                   <div>
                                       <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Imagem</div>
-                                      <div className="grid grid-cols-3 gap-2">
-                                          {([
+                                      <OptionToggleGroup
+                                          options={[
                                               { id: 'background', label: 'Fundo', icon: ImageIcon },
                                               { id: 'circle', label: 'Moldura', icon: Circle },
                                               { id: 'none', label: 'Sem Imagem', icon: ImageOff },
-                                          ] as { id: 'background' | 'circle' | 'none', label: string, icon: any }[]).map(opt => {
-                                              const isActive = (selectedEmployee.activationImageMode || 'background') === opt.id;
-                                              const Icon = opt.icon;
-                                              return (
-                                                  <button
-                                                      key={opt.id}
-                                                      onClick={() => updateEmployee(selectedEmployee.id, 'activationImageMode', opt.id)}
-                                                      className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl border text-[10px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
-                                                  >
-                                                      <Icon size={16} />
-                                                      <span className="text-center leading-tight">{opt.label}</span>
-                                                  </button>
-                                              );
-                                          })}
-                                      </div>
+                                          ]}
+                                          value={selectedEmployee.activationImageMode || 'background'}
+                                          onChange={(id) => updateEmployee(selectedEmployee.id, 'activationImageMode', id)}
+                                      />
                                       {(selectedEmployee.activationImageMode || 'background') === 'background' && (
                                           <div className="mt-3 px-1">
                                               <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
@@ -3226,26 +3230,16 @@ export default function App() {
                                               </div>
                                               <div>
                                                   <div className="text-[10px] text-slate-500 mb-1">Posição da Moldura</div>
-                                                  <div className="grid grid-cols-3 gap-2">
-                                                      {([
+                                                  <OptionToggleGroup
+                                                      iconOnly
+                                                      options={[
                                                           { id: 'left', icon: AlignHorizontalJustifyStart, label: 'Esquerda' },
                                                           { id: 'center', icon: AlignHorizontalJustifyCenter, label: 'Centro' },
                                                           { id: 'right', icon: AlignHorizontalJustifyEnd, label: 'Direita' },
-                                                      ] as { id: 'left' | 'center' | 'right', icon: any, label: string }[]).map(opt => {
-                                                          const isActive = (selectedEmployee.activationCirclePosition || 'center') === opt.id;
-                                                          const Icon = opt.icon;
-                                                          return (
-                                                              <button
-                                                                  key={opt.id}
-                                                                  onClick={() => updateEmployee(selectedEmployee.id, 'activationCirclePosition', opt.id)}
-                                                                  title={opt.label}
-                                                                  className={`flex items-center justify-center py-2.5 rounded-2xl border transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
-                                                              >
-                                                                  <Icon size={16} />
-                                                              </button>
-                                                          );
-                                                      })}
-                                                  </div>
+                                                      ]}
+                                                      value={selectedEmployee.activationCirclePosition || 'center'}
+                                                      onChange={(id) => updateEmployee(selectedEmployee.id, 'activationCirclePosition', id)}
+                                                  />
                                               </div>
                                           </div>
                                       )}
