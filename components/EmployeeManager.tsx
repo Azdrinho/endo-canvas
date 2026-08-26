@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Employee } from '../types';
 import { EmployeeEditor } from './EmployeeEditor';
-import { 
-  Search, 
-  Grid, 
-  List, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  X, 
+import {
+  Search,
+  Grid,
+  List,
+  Plus,
+  Trash2,
+  Edit2,
+  X,
   User,
   Briefcase,
   Calendar,
@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Sun,
   Moon,
-  ArrowLeft
+  ArrowLeft,
+  Copy
 } from 'lucide-react';
 
 interface EmployeeManagerProps {
@@ -29,6 +30,7 @@ interface EmployeeManagerProps {
   onUpdateEmployee: (id: string, updates: Partial<Employee>) => void;
   onDeleteEmployee: (id: string) => void;
   onAddEmployee: () => Promise<Employee> | Employee;
+  onDuplicateEmployee: (id: string) => Promise<Employee> | Employee | void;
 }
 
 export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
@@ -36,7 +38,8 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   onClose,
   onUpdateEmployee,
   onDeleteEmployee,
-  onAddEmployee
+  onAddEmployee,
+  onDuplicateEmployee
 }) => {
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
   const [searchQuery, setSearchQuery] = useState('');
@@ -390,14 +393,21 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     
                     {/* Overlay Actions inside the image wrapper */}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px] z-20">
-                      <button 
+                      <button
                         onClick={() => setEditingId(emp.id)}
                         className="p-2 bg-white rounded-full text-gray-900 hover:text-cyan-600 hover:scale-110 transition-all shadow-md"
                         title="Edit"
                       >
                         <Edit2 size={14} />
                       </button>
-                      <button 
+                      <button
+                        onClick={() => onDuplicateEmployee(emp.id)}
+                        className="p-2 bg-white rounded-full text-gray-900 hover:text-purple-600 hover:scale-110 transition-all shadow-md"
+                        title="Duplicate"
+                      >
+                        <Copy size={14} />
+                      </button>
+                      <button
                         onClick={() => onDeleteEmployee(emp.id)}
                         className="p-2 bg-white rounded-full text-red-500 hover:bg-red-50 hover:scale-110 transition-all shadow-md"
                         title="Delete"
@@ -482,6 +492,7 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => setEditingId(emp.id)} className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-cyan-500/20 text-cyan-400' : 'hover:bg-cyan-50 text-cyan-600'}`}><Edit2 size={16}/></button>
+                        <button onClick={() => onDuplicateEmployee(emp.id)} className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-purple-500/20 text-purple-400' : 'hover:bg-purple-50 text-purple-600'}`}><Copy size={16}/></button>
                         <button onClick={() => onDeleteEmployee(emp.id)} className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500'}`}><Trash2 size={16}/></button>
                       </div>
                     </td>

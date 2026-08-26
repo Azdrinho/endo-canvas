@@ -785,6 +785,29 @@ export default function App() {
       upsertEmployee(newEmp);
       return newEmp;
   };
+
+  // Clones every style/config field of an employee (photo framing, dates,
+  // description, socials, etc.) as a starting point for a similar card —
+  // avoids re-entering all of that by hand when producing several similar
+  // cards in a row.
+  const handleDuplicateEmployeeDB = async (id: string) => {
+      const source = employees.find(e => e.id === id);
+      if (!source) return;
+      const newEmp: Employee = {
+          ...source,
+          id: `emp-${Date.now()}`,
+          name: `${source.name} (Cópia)`,
+      };
+      setEmployees(prev => {
+          const sourceIndex = prev.findIndex(e => e.id === id);
+          const next = [...prev];
+          next.splice(sourceIndex + 1, 0, newEmp);
+          return next;
+      });
+      upsertEmployee(newEmp);
+      return newEmp;
+  };
+
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(TemplateType.WELCOME);
   const [activeTab, setActiveTab] = useState<EditorTab>('TEMPLATES');
   // Welcome Aboard's text panel color scheme: light (default) or dark.
@@ -847,6 +870,27 @@ export default function App() {
   const logoDropdownRef = useRef<HTMLDivElement>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Template picker search + "recently used", so switching between the same
+  // couple of templates repeatedly doesn't mean scrolling the full list of
+  // 10 every time. Recent ids persist like the other localStorage-backed
+  // preferences in this file (end-employees, end-config, etc.).
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [recentTemplateIds, setRecentTemplateIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('end-recent-templates');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const recordRecentTemplate = useCallback((id: string) => {
+    setRecentTemplateIds(prev => {
+      const next = [id, ...prev.filter(existingId => existingId !== id)].slice(0, 4);
+      try { localStorage.setItem('end-recent-templates', JSON.stringify(next)); } catch { /* ignore quota errors */ }
+      return next;
+    });
+  }, []);
 
   const [popupPosition, setPopupPosition] = useState({ x: 20, y: 20 });
   const popupRef = useRef<HTMLDivElement>(null);
@@ -3556,7 +3600,43 @@ export default function App() {
 
           {activeTab === 'TEMPLATES' && (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-3 pt-2">
-                {TEMPLATE_LIST.map((t, index) => {
+                <div className="relative flex items-center px-4 py-2.5 rounded-full border transition-all bg-white/5 border-white/10 focus-within:border-cyan-500/50">
+                    <Search size={16} className="opacity-50 mr-2.5 text-white shrink-0" />
+                    <input
+                        value={templateSearchQuery}
+                        onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                        placeholder="Buscar template..."
+                        className="bg-transparent outline-none w-full text-sm font-medium placeholder:text-white/30 text-white"
+                    />
+                    {templateSearchQuery && (
+                        <button onClick={() => setTemplateSearchQuery('')} className="text-white/40 hover:text-white transition-colors shrink-0">
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+
+                {!templateSearchQuery && recentTemplateIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {recentTemplateIds.map(id => {
+                            const t = TEMPLATE_LIST.find(item => item.id === id);
+                            if (!t) return null;
+                            return (
+                                <button
+                                    key={`recent-${id}`}
+                                    onClick={() => {
+                                        setSelectedTemplate(t.id as TemplateType);
+                                        recordRecentTemplate(t.id);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${selectedTemplate === t.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                >
+                                    {t.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {TEMPLATE_LIST.filter(t => t.label.toLowerCase().includes(templateSearchQuery.toLowerCase())).map((t, index) => {
                   return (
                     <motion.button
                        key={t.id}
@@ -3565,7 +3645,8 @@ export default function App() {
                        whileTap={{ scale: 0.98 }}
                        transition={{ type: "spring", stiffness: 350, damping: 24 }}
                        onClick={() => {
-                           setSelectedTemplate(t.id as TemplateType); 
+                           setSelectedTemplate(t.id as TemplateType);
+                           recordRecentTemplate(t.id);
                            if (t.id === TemplateType.HIRING) {
                                setSelectedEmployeeId('hiring-generic');
                                updateEmployee('hiring-generic', 'photoUrl', customHiringImages[0] || '');
@@ -3616,6 +3697,9 @@ export default function App() {
                     </motion.button>
                   );
                 })}
+                {templateSearchQuery && TEMPLATE_LIST.filter(t => t.label.toLowerCase().includes(templateSearchQuery.toLowerCase())).length === 0 && (
+                    <div className="text-center py-8 text-sm text-slate-500">Nenhum template encontrado para "{templateSearchQuery}"</div>
+                )}
             </div>
           )}
           </motion.div>
@@ -3709,6 +3793,7 @@ export default function App() {
                             onUpdateEmployee={handleUpdateEmployeeDB}
                             onDeleteEmployee={handleDeleteEmployeeDB}
                             onAddEmployee={handleAddEmployeeDB}
+                            onDuplicateEmployee={handleDuplicateEmployeeDB}
                         />
                     </motion.div>
                 )}
