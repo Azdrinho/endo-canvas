@@ -48,6 +48,18 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
+  // Bulk edit: select several employees, then apply one change to all of
+  // them at once instead of opening each one individually — the single
+  // biggest time-saver for anyone maintaining a large roster.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDepartment, setBulkDepartment] = useState('');
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+
   // Derived Data
   const uniqueRoles = Array.from(new Set(employees.filter(e => 
     e.id !== 'hiring-generic' && 
@@ -93,6 +105,26 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
       }
     });
+
+  const allFilteredSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id));
+  const toggleSelectAll = () => setSelectedIds(allFilteredSelected ? new Set() : new Set(filteredEmployees.map(e => e.id)));
+
+  const applyBulkDepartment = () => {
+    const value = bulkDepartment.trim();
+    if (!value) return;
+    selectedIds.forEach(id => onUpdateEmployee(id, { department: value }));
+    setBulkDepartment('');
+  };
+
+  const applyBulkStatus = (status: Employee['status']) => {
+    selectedIds.forEach(id => onUpdateEmployee(id, { status }));
+  };
+
+  const handleBulkDelete = () => {
+    if (!window.confirm(`Excluir ${selectedIds.size} funcionário(s) selecionado(s)? Essa ação não pode ser desfeita.`)) return;
+    selectedIds.forEach(id => onDeleteEmployee(id));
+    clearSelection();
+  };
 
   const handleExportCSV = () => {
       const headers = ['ID', 'Name', 'Role', 'Department', 'Status', 'Admission Date', 'Birth Date'];
@@ -252,6 +284,62 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
 
       </div>
 
+      {/* Bulk Actions Bar — appears once at least one employee is selected,
+          letting a change (department, status) or a delete apply to every
+          selected employee at once instead of opening each one individually. */}
+      {selectedIds.size > 0 && (
+        <div className={`px-8 py-3 flex flex-wrap gap-3 items-center border-b shrink-0 ${isDarkMode ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-cyan-50 border-cyan-100'}`}>
+          <span className={`text-sm font-bold ${isDarkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>{selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}</span>
+
+          <div className="flex items-center gap-1.5">
+            <input
+              value={bulkDepartment}
+              onChange={(e) => setBulkDepartment(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyBulkDepartment(); }}
+              placeholder="Definir departamento..."
+              className={`px-3 py-1.5 rounded-lg text-sm outline-none border w-48 ${isDarkMode ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-600 focus:border-cyan-500/50' : 'bg-white border-gray-200 text-gray-700 focus:border-cyan-400'}`}
+            />
+            <button
+              onClick={applyBulkDepartment}
+              disabled={!bulkDepartment.trim()}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}`}
+            >
+              Aplicar
+            </button>
+          </div>
+
+          <div className="relative">
+            <select
+              onChange={(e) => { if (e.target.value) applyBulkStatus(e.target.value as Employee['status']); e.target.value = ''; }}
+              defaultValue=""
+              className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-sm font-medium outline-none border cursor-pointer ${isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-700'}`}
+            >
+              <option value="" disabled className="text-black">Definir status...</option>
+              <option value="Active" className="text-black">Ativo</option>
+              <option value="Inactive" className="text-black">Inativo</option>
+              <option value="On Leave" className="text-black">Licença</option>
+            </select>
+            <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+          </div>
+
+          <div className="flex-1" />
+
+          <button
+            onClick={handleBulkDelete}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+          >
+            <Trash2 size={14} />
+            Excluir selecionados
+          </button>
+          <button
+            onClick={clearSelection}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
         {viewMode === 'GRID' ? (
@@ -273,8 +361,18 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
             </button>
 
             {filteredEmployees.map(emp => (
-              <div key={emp.id} className={`group rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col relative min-h-[290px] ${isDarkMode ? 'bg-[#1e1e1e] border-white/10 hover:border-cyan-500/50' : 'bg-white border-gray-200 hover:border-cyan-200'}`}>
-                
+              <div key={emp.id} className={`group rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col relative min-h-[290px] ${selectedIds.has(emp.id) ? 'ring-2 ring-cyan-400' : ''} ${isDarkMode ? 'bg-[#1e1e1e] border-white/10 hover:border-cyan-500/50' : 'bg-white border-gray-200 hover:border-cyan-200'}`}>
+
+                {/* Selection checkbox — always visible once anything is selected
+                    (so it's obvious what's part of the batch), otherwise only
+                    on hover to stay out of the way. */}
+                <label
+                  className={`absolute top-2 left-2 z-20 w-5 h-5 flex items-center justify-center transition-opacity ${selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => toggleSelect(emp.id)} className="w-4 h-4 rounded cursor-pointer accent-cyan-500" />
+                </label>
+
                 {/* Standardized circular avatar container to make any image crop display uniformly */}
                 <div className="pt-6 pb-2 px-4 flex justify-center relative">
                   <div className={`w-32 h-32 rounded-full overflow-hidden border-2 shadow-md relative transition-transform duration-500 group-hover:scale-105 ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
@@ -356,6 +454,9 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
             <table className={`w-full text-left text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
               <thead className={`border-b text-xs uppercase font-bold ${isDarkMode ? 'bg-white/5 border-white/10 text-gray-500' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
                 <tr>
+                  <th className="px-6 py-4 w-10">
+                    <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer accent-cyan-500" />
+                  </th>
                   <th className="px-6 py-4">Employee</th>
                   <th className="px-6 py-4">Role</th>
                   <th className="px-6 py-4">Birthday</th>
@@ -365,7 +466,10 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
               </thead>
               <tbody className={`divide-y ${isDarkMode ? 'divide-white/5' : 'divide-gray-100'}`}>
                 {filteredEmployees.map(emp => (
-                  <tr key={emp.id} className={`transition-colors group ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
+                  <tr key={emp.id} className={`transition-colors group ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'} ${selectedIds.has(emp.id) ? (isDarkMode ? 'bg-cyan-500/5' : 'bg-cyan-50/50') : ''}`}>
+                    <td className="px-6 py-4">
+                      <input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => toggleSelect(emp.id)} className="w-4 h-4 rounded cursor-pointer accent-cyan-500" />
+                    </td>
                     <td className="px-6 py-4 flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full overflow-hidden shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'}`}>
                         {emp.photoUrl && <img src={emp.photoUrl} className="w-full h-full object-cover" />}
