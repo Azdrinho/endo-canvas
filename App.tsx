@@ -465,6 +465,60 @@ function OptionToggleGroup<T extends string>({ options, value, onChange, columns
   );
 }
 
+// A labeled range slider with a numeric input mirrored next to the label —
+// dragging still works exactly as before, but typing an exact value (to
+// match another card precisely, or just to skip fiddly drag-to-target) is
+// now possible everywhere a slider is. Sliders in this file previously only
+// showed a static, read-only number next to the label; this replaces that
+// with an editable one wired to the same onChange as the slider itself, so
+// the two controls always agree.
+function SliderRow({ label, icon, value, min, max, step, onChange, suffix = '', decimals = 0, dense = true }: {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+  suffix?: string;
+  decimals?: number;
+  dense?: boolean;
+}) {
+  const displayValue = decimals > 0 ? value.toFixed(decimals) : String(Math.round(value));
+  const commit = (raw: string) => {
+    const v = parseFloat(raw);
+    if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+  };
+  return (
+    <div>
+      <div className={`flex items-center justify-between mb-1 ${dense ? 'text-[10px] text-slate-500' : 'text-xs text-slate-400'}`}>
+        <span className="flex items-center gap-1">{icon}{label}</span>
+        <span className="flex items-center gap-0.5 tabular-nums">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={displayValue}
+            onChange={(e) => commit(e.target.value)}
+            className="w-11 bg-transparent text-right outline-none focus:text-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="styled-slider w-full"
+      />
+    </div>
+  );
+}
+
 const TEMPLATE_LIST = [
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
@@ -2915,57 +2969,41 @@ export default function App() {
                         
                         {/* Logo Scale */}
                         <div className="px-1">
-                            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                                <span>Logo Size</span>
-                                <span>{Math.round((providerData.logoScale || 1) * 100)}%</span>
-                            </div>
-                            <input 
-                                type="range" min="0.2" max="2.0" step="0.1" 
-                                value={providerData.logoScale || 1} 
-                                onChange={(e) => setProviderData({...providerData, logoScale: parseFloat(e.target.value)})}
-                                className="styled-slider w-full"
+                            <SliderRow
+                                label="Logo Size" dense={false}
+                                min={20} max={200} step={10} suffix="%"
+                                value={Math.round((providerData.logoScale || 1) * 100)}
+                                onChange={(v) => setProviderData({...providerData, logoScale: v / 100})}
                             />
                         </div>
 
                         {/* TEXT & LAYOUT ADJUSTMENTS */}
                         <div className="mt-6 border-t border-white/10 pt-4">
                             <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Type size={16}/> Text & Layout</h3>
-                            
+
                             {/* Text Size */}
                             <div className="mb-4 px-1">
-                                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                                    <span>Text Size</span>
-                                    <span>{Math.round((activeGridConfig.textScale || 1) * 100)}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="0.5" max="3.0" step="0.1" 
-                                    value={activeGridConfig.textScale || 1} 
-                                    onChange={(e) => updateGridConfig('textScale', parseFloat(e.target.value))}
-                                    className="styled-slider w-full"
+                                <SliderRow
+                                    label="Text Size" dense={false}
+                                    min={50} max={300} step={10} suffix="%"
+                                    value={Math.round((activeGridConfig.textScale || 1) * 100)}
+                                    onChange={(v) => updateGridConfig('textScale', v / 100)}
                                 />
                             </div>
 
                             {/* Text Position */}
                             <div className="space-y-3 mb-4">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-slate-400 flex items-center gap-1"><Move size={12}/> Text X</label>
-                                    <span className="text-[10px] font-mono text-white/50">{activeGridConfig.textX}px</span>
-                                </div>
-                                <input 
-                                    type="range" min="-300" max="300" step="5"
+                                <SliderRow
+                                    label="Text X" dense={false} icon={<Move size={12}/>}
+                                    min={-300} max={300} step={5} suffix="px"
                                     value={activeGridConfig.textX || 0}
-                                    onChange={(e) => updateGridConfig('textX', parseInt(e.target.value))}
-                                    className="styled-slider w-full"
+                                    onChange={(v) => updateGridConfig('textX', v)}
                                 />
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-slate-400 flex items-center gap-1"><Move size={12} className="rotate-90"/> Text Y</label>
-                                    <span className="text-[10px] font-mono text-white/50">{activeGridConfig.textY}px</span>
-                                </div>
-                                <input 
-                                    type="range" min="-300" max="300" step="5"
+                                <SliderRow
+                                    label="Text Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-300} max={300} step={5} suffix="px"
                                     value={activeGridConfig.textY || 0}
-                                    onChange={(e) => updateGridConfig('textY', parseInt(e.target.value))}
-                                    className="styled-slider w-full"
+                                    onChange={(v) => updateGridConfig('textY', v)}
                                 />
                             </div>
                         </div>
@@ -2973,18 +3011,14 @@ export default function App() {
                         {/* GRID ADJUSTMENTS */}
                         <div className="mt-2 border-t border-white/10 pt-4">
                             <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Grid size={16}/> Grid Settings</h3>
-                            
+
                             {/* Grid Scale */}
                              <div className="mb-4 px-1">
-                                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                                    <span>Grid Scale</span>
-                                    <span>{Math.round((activeGridConfig.scale || 1) * 100)}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="0.5" max="2.0" step="0.05" 
-                                    value={activeGridConfig.scale || 1} 
-                                    onChange={(e) => updateGridConfig('scale', parseFloat(e.target.value))}
-                                    className="styled-slider w-full"
+                                <SliderRow
+                                    label="Grid Scale" dense={false}
+                                    min={50} max={200} step={5} suffix="%"
+                                    value={Math.round((activeGridConfig.scale || 1) * 100)}
+                                    onChange={(v) => updateGridConfig('scale', v / 100)}
                                 />
                             </div>
 
@@ -3006,25 +3040,17 @@ export default function App() {
 
                             {/* Position */}
                             <div className="space-y-3 mb-4">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-slate-400 flex items-center gap-1"><Move size={12}/> Position X</label>
-                                    <span className="text-[10px] font-mono text-white/50">{activeGridConfig.x}px</span>
-                                </div>
-                                <input 
-                                    type="range" min="-300" max="300" step="5"
+                                <SliderRow
+                                    label="Position X" dense={false} icon={<Move size={12}/>}
+                                    min={-300} max={300} step={5} suffix="px"
                                     value={activeGridConfig.x}
-                                    onChange={(e) => updateGridConfig('x', parseInt(e.target.value))}
-                                    className="styled-slider w-full"
+                                    onChange={(v) => updateGridConfig('x', v)}
                                 />
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-slate-400 flex items-center gap-1"><Move size={12} className="rotate-90"/> Position Y</label>
-                                    <span className="text-[10px] font-mono text-white/50">{activeGridConfig.y}px</span>
-                                </div>
-                                <input 
-                                    type="range" min="-300" max="300" step="5"
+                                <SliderRow
+                                    label="Position Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-300} max={300} step={5} suffix="px"
                                     value={activeGridConfig.y}
-                                    onChange={(e) => updateGridConfig('y', parseInt(e.target.value))}
-                                    className="styled-slider w-full"
+                                    onChange={(v) => updateGridConfig('y', v)}
                                 />
                             </div>
 
@@ -3239,37 +3265,29 @@ export default function App() {
                                       />
                                       {(selectedEmployee.activationImageMode || 'background') === 'background' && (
                                           <div className="mt-3 px-1">
-                                              <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                  <span>Altura da Imagem</span>
-                                                  <span>{Math.round((selectedEmployee.activationBackgroundHeightScale ?? 1) * 100)}%</span>
-                                              </div>
                                               {/* Shrinks the visible photo band from the bottom only — it always
                                                   stays glued to the header, with the footer expanding upward to
                                                   cover the reclaimed space (mirrors the circle badge's own reclaim
                                                   logic in emailTemplate.ts). */}
-                                              <input
-                                                  type="range" min="40" max="100" step="5"
+                                              <SliderRow
+                                                  label="Altura da Imagem"
+                                                  min={40} max={100} step={5} suffix="%"
                                                   value={Math.round((selectedEmployee.activationBackgroundHeightScale ?? 1) * 100)}
-                                                  onChange={(e) => updateEmployee(selectedEmployee.id, 'activationBackgroundHeightScale', parseInt(e.target.value) / 100)}
-                                                  className="styled-slider w-full"
+                                                  onChange={(v) => updateEmployee(selectedEmployee.id, 'activationBackgroundHeightScale', v / 100)}
                                               />
                                           </div>
                                       )}
                                       {(selectedEmployee.activationImageMode || 'background') === 'circle' && (
                                           <div className="mt-3 px-1 space-y-3">
                                               <div>
-                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                      <span>Tamanho da Moldura</span>
-                                                      <span>{selectedEmployee.activationCircleSize || 140}px</span>
-                                                  </div>
                                                   {/* Bigger paragraph? Shrink the circle to make room — the auto-fit
                                                       text safety net already accounts for whatever height this ends
                                                       up rendering at (see applyActivationTextFit), so it never overlaps. */}
-                                                  <input
-                                                      type="range" min="60" max="280" step="5"
+                                                  <SliderRow
+                                                      label="Tamanho da Moldura"
+                                                      min={60} max={280} step={5} suffix="px"
                                                       value={selectedEmployee.activationCircleSize || 140}
-                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationCircleSize', parseInt(e.target.value))}
-                                                      className="styled-slider w-full"
+                                                      onChange={(v) => updateEmployee(selectedEmployee.id, 'activationCircleSize', v)}
                                                   />
                                               </div>
                                               <div>
@@ -3315,30 +3333,18 @@ export default function App() {
                                               auto-fit script (applyActivationTextFit) shrinks down from if needed,
                                               so the layout always stays intact regardless of these values. */}
                                           <div className="grid grid-cols-2 gap-3 mt-2 px-1">
-                                              <div>
-                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                      <span>Tamanho</span>
-                                                      <span>{Math.round((selectedEmployee.activationTitleFontScale || 1) * 100)}%</span>
-                                                  </div>
-                                                  <input
-                                                      type="range" min="0.7" max="1.8" step="0.05"
-                                                      value={selectedEmployee.activationTitleFontScale || 1}
-                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationTitleFontScale', parseFloat(e.target.value))}
-                                                      className="styled-slider w-full"
-                                                  />
-                                              </div>
-                                              <div>
-                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                      <span>Espaçamento</span>
-                                                      <span>{(selectedEmployee.activationTitleLineHeight || 1.15).toFixed(2)}</span>
-                                                  </div>
-                                                  <input
-                                                      type="range" min="0.9" max="1.6" step="0.05"
-                                                      value={selectedEmployee.activationTitleLineHeight || 1.15}
-                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationTitleLineHeight', parseFloat(e.target.value))}
-                                                      className="styled-slider w-full"
-                                                  />
-                                              </div>
+                                              <SliderRow
+                                                  label="Tamanho"
+                                                  min={70} max={180} step={5} suffix="%"
+                                                  value={Math.round((selectedEmployee.activationTitleFontScale || 1) * 100)}
+                                                  onChange={(v) => updateEmployee(selectedEmployee.id, 'activationTitleFontScale', v / 100)}
+                                              />
+                                              <SliderRow
+                                                  label="Espaçamento"
+                                                  min={0.9} max={1.6} step={0.05} decimals={2}
+                                                  value={selectedEmployee.activationTitleLineHeight || 1.15}
+                                                  onChange={(v) => updateEmployee(selectedEmployee.id, 'activationTitleLineHeight', v)}
+                                              />
                                           </div>
                                       </div>
                                   )}
@@ -3364,30 +3370,18 @@ export default function App() {
                                           {/* Independent size/spacing for the paragraph — same auto-fit safety
                                               net as the title above applies here too. */}
                                           <div className="grid grid-cols-2 gap-3 mt-2 px-1">
-                                              <div>
-                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                      <span>Tamanho</span>
-                                                      <span>{Math.round((selectedEmployee.activationParagraphFontScale || 1) * 100)}%</span>
-                                                  </div>
-                                                  <input
-                                                      type="range" min="0.7" max="1.8" step="0.05"
-                                                      value={selectedEmployee.activationParagraphFontScale || 1}
-                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationParagraphFontScale', parseFloat(e.target.value))}
-                                                      className="styled-slider w-full"
-                                                  />
-                                              </div>
-                                              <div>
-                                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                                                      <span>Espaçamento</span>
-                                                      <span>{(selectedEmployee.activationParagraphLineHeight || 1.3).toFixed(2)}</span>
-                                                  </div>
-                                                  <input
-                                                      type="range" min="1.0" max="2.0" step="0.05"
-                                                      value={selectedEmployee.activationParagraphLineHeight || 1.3}
-                                                      onChange={(e) => updateEmployee(selectedEmployee.id, 'activationParagraphLineHeight', parseFloat(e.target.value))}
-                                                      className="styled-slider w-full"
-                                                  />
-                                              </div>
+                                              <SliderRow
+                                                  label="Tamanho"
+                                                  min={70} max={180} step={5} suffix="%"
+                                                  value={Math.round((selectedEmployee.activationParagraphFontScale || 1) * 100)}
+                                                  onChange={(v) => updateEmployee(selectedEmployee.id, 'activationParagraphFontScale', v / 100)}
+                                              />
+                                              <SliderRow
+                                                  label="Espaçamento"
+                                                  min={1.0} max={2.0} step={0.05} decimals={2}
+                                                  value={selectedEmployee.activationParagraphLineHeight || 1.3}
+                                                  onChange={(v) => updateEmployee(selectedEmployee.id, 'activationParagraphLineHeight', v)}
+                                              />
                                           </div>
                                       </div>
                                   )}
