@@ -918,6 +918,18 @@ export default function App() {
   const [showSignatureControls, setShowSignatureControls] = useState<boolean>(false); // Changed to false to hide on load
   const [showExportDropdown, setShowExportDropdown] = useState<boolean>(false);
   const [showLogoDropdown, setShowLogoDropdown] = useState<boolean>(false);
+
+  // Reusable brand kit: remembers the last Salsa sub-brand picked for the HR
+  // Feedback template, and applies it automatically the next time the field
+  // is unset — instead of always silently defaulting back to "technology"
+  // and making you re-pick the brand you actually use.
+  const [lastUsedBrand, setLastUsedBrand] = useState<string | null>(() => {
+    try { return localStorage.getItem('end-last-brand'); } catch { return null; }
+  });
+  const recordLastUsedBrand = useCallback((brand: string) => {
+    setLastUsedBrand(brand);
+    try { localStorage.setItem('end-last-brand', brand); } catch { /* ignore quota errors */ }
+  }, []);
   const [signaturePopupLeft, setSignaturePopupLeft] = useState<number>(0);
   const signatureButtonRef = useRef<HTMLButtonElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -1694,6 +1706,16 @@ export default function App() {
     }, 500));
   }, [saveHistory]);
 
+  // Reusable brand kit, part 2: the moment the HR Feedback template is open
+  // on a record that has never had a brand chosen, silently apply the
+  // remembered one instead of leaving it to fall back to the hardcoded
+  // "technology" default baked into the card renderer.
+  useEffect(() => {
+    if (selectedTemplate === TemplateType.ACTIVATION && lastUsedBrand && selectedEmployee && !selectedEmployee.activationLogo) {
+      updateEmployee(selectedEmployee.id, 'activationLogo', lastUsedBrand);
+    }
+  }, [selectedTemplate, selectedEmployee?.id, selectedEmployee?.activationLogo, lastUsedBrand, updateEmployee]);
+
   const handleGenerateBackground = async () => {
     if (!backgroundTheme || !backgroundTheme.trim()) {
       toast.error("Por favor, digite um tema para a imagem de fundo.");
@@ -1704,7 +1726,7 @@ export default function App() {
     const toastId = toast.loading("Processando tema e gerando imagem de fundo 3:2 via Freepik Magnific AI...");
     
     try {
-      const generatedUrl = await generateBackground(backgroundTheme, selectedEmployee?.activationLogo || 'technology');
+      const generatedUrl = await generateBackground(backgroundTheme, selectedEmployee?.activationLogo || lastUsedBrand || 'technology');
       
       // Save and optimize the generated image under activation_images/
       let finalUrl = generatedUrl;
@@ -4319,7 +4341,7 @@ export default function App() {
                                             className="px-3.5 py-2 w-[125px] justify-between h-full rounded-full flex items-center hover:bg-white/20 transition-all gap-2"
                                         >
                                             <div className="w-18 h-5 flex items-center justify-center shrink-0">
-                                                <SalsaLogo variant="light" brand={selectedEmployee?.activationLogo || 'technology'} className="w-full h-full object-contain" />
+                                                <SalsaLogo variant="light" brand={selectedEmployee?.activationLogo || lastUsedBrand || 'technology'} className="w-full h-full object-contain" />
                                             </div>
                                             <ChevronDown size={14} className={`text-white/70 shrink-0 transition-transform ${showLogoDropdown ? 'rotate-180' : ''}`} />
                                         </motion.button>
@@ -4341,9 +4363,10 @@ export default function App() {
                                                         transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                                         onClick={() => {
                                                             updateEmployee(selectedEmployee.id, 'activationLogo', brand);
+                                                            recordLastUsedBrand(brand);
                                                             setShowLogoDropdown(false);
                                                         }}
-                                                        className={`w-full rounded-xl transition-all flex items-center justify-center px-2 py-2 ${selectedEmployee?.activationLogo === brand || (brand === 'technology' && !selectedEmployee?.activationLogo) ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300'}`}
+                                                        className={`w-full rounded-xl transition-all flex items-center justify-center px-2 py-2 ${selectedEmployee?.activationLogo === brand || (!selectedEmployee?.activationLogo && brand === (lastUsedBrand || 'technology')) ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300'}`}
                                                     >
                                                         <div className="w-16 h-5 flex items-center justify-center shrink-0">
                                                             <SalsaLogo variant="light" brand={brand} className="w-full h-full object-contain" />
