@@ -879,6 +879,33 @@ export default function App() {
       }
   }, [history, historyIndex]);
 
+  // Wires up the Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) shortcuts the toolbar
+  // buttons already advertise via their tooltips — until now those tooltips
+  // promised keyboard shortcuts that didn't actually exist anywhere.
+  // Skipped while focus is inside a text field/contenteditable so the
+  // browser's own native undo for that field isn't hijacked mid-typing.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z';
+      const isRedo = (e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'));
+      if (!isUndo && !isRedo) return;
+
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      );
+      if (isEditableTarget) return;
+
+      e.preventDefault();
+      if (isUndo) undo();
+      else redo();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
