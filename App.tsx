@@ -391,6 +391,44 @@ const RichTextField = React.memo(function RichTextField({ field, html, className
   );
 }, (prev, next) => prev.field === next.field && prev.html === next.html && prev.className === next.className && prev.placeholder === next.placeholder);
 
+// The sidebar's 4 top tab buttons (Data/Templates/Settings/Images) were each
+// ~25 lines of near-identical hand-copied markup — the active-tab gradient,
+// radius, and animation were duplicated 4x, so a visual tweak meant touching
+// every site and risking drift between them. Centralized here as the single
+// source of truth for that styling.
+const SidebarTabButton: React.FC<{
+  isActive: boolean;
+  onClick: () => void;
+  title: string;
+  icon: React.ReactNode;
+  indicatorKey: string;
+}> = ({ isActive, onClick, title, icon, indicatorKey }) => (
+  <motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.92 }}
+    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+    onClick={onClick}
+    className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+    title={title}
+  >
+    {isActive && (
+      <motion.div
+        layoutId="activeTabIndicator"
+        className="absolute inset-0"
+        transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+      >
+        <motion.div
+          key={`indicator-${indicatorKey}`}
+          className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
+          animate={{ scaleX: [1, 1.1, 1] }}
+          transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
+        />
+      </motion.div>
+    )}
+    <span className="relative z-10">{icon}</span>
+  </motion.button>
+);
+
 const TEMPLATE_LIST = [
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
@@ -2636,10 +2674,11 @@ export default function App() {
        <div className="p-4 shrink-0">
           <div className="flex bg-white/10 rounded-full p-1 h-14 relative">
              {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
-                 <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                 <SidebarTabButton
+                    isActive={activeTab === 'DATA'}
+                    indicatorKey="DATA"
+                    title={selectedTemplate === TemplateType.ACTIVATION ? 'Texto' : 'Employee Data'}
+                    icon={selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : selectedTemplate === TemplateType.ACTIVATION ? <Type size={22} /> : <Users size={22} />}
                     onClick={() => {
                         setActiveTab('DATA');
                         if (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) {
@@ -2648,107 +2687,30 @@ export default function App() {
                             setSidebarDataView('LIST');
                         }
                     }}
-                    className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'DATA' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
-                    title={selectedTemplate === TemplateType.ACTIVATION ? 'Texto' : 'Employee Data'}
-                 >
-                    {activeTab === 'DATA' && (
-                      <motion.div
-                        layoutId="activeTabIndicator"
-                        className="absolute inset-0"
-                        transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
-                      >
-                         <motion.div 
-                            key="indicator-DATA"
-                            className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
-                            animate={{ scaleX: [1, 1.1, 1] }}
-                            transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
-                         />
-                      </motion.div>
-                    )}
-                    <span className="relative z-10">
-                      {selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : selectedTemplate === TemplateType.ACTIVATION ? <Type size={22} /> : <Users size={22} />}
-                    </span>
-                 </motion.button>
+                 />
              )}
-             <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.92 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                onClick={() => setActiveTab('TEMPLATES')}
-                className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'TEMPLATES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+             <SidebarTabButton
+                isActive={activeTab === 'TEMPLATES'}
+                indicatorKey="TEMPLATES"
                 title="Templates"
-             >
-                {activeTab === 'TEMPLATES' && (
-                  <motion.div
-                    layoutId="activeTabIndicator"
-                    className="absolute inset-0"
-                    transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
-                  >
-                     <motion.div 
-                        key="indicator-TEMPLATES"
-                        className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
-                        animate={{ scaleX: [1, 1.1, 1] }}
-                        transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
-                     />
-                  </motion.div>
-                )}
-                <span className="relative z-10">
-                  <Palette size={22} />
-                </span>
-             </motion.button>
-             <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.92 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                onClick={() => setActiveTab('SETTINGS')}
-                className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'SETTINGS' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+                icon={<Palette size={22} />}
+                onClick={() => setActiveTab('TEMPLATES')}
+             />
+             <SidebarTabButton
+                isActive={activeTab === 'SETTINGS'}
+                indicatorKey="SETTINGS"
                 title="Visual Identity"
-             >
-                {activeTab === 'SETTINGS' && (
-                  <motion.div
-                    layoutId="activeTabIndicator"
-                    className="absolute inset-0"
-                    transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
-                  >
-                     <motion.div 
-                        key="indicator-SETTINGS"
-                        className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
-                        animate={{ scaleX: [1, 1.1, 1] }}
-                        transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
-                     />
-                  </motion.div>
-                )}
-                <span className="relative z-10">
-                  <Settings size={22} />
-                </span>
-             </motion.button>
+                icon={<Settings size={22} />}
+                onClick={() => setActiveTab('SETTINGS')}
+             />
              {(selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) && (
-               <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                  onClick={() => setActiveTab('IMAGES')}
-                  className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${activeTab === 'IMAGES' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+               <SidebarTabButton
+                  isActive={activeTab === 'IMAGES'}
+                  indicatorKey="IMAGES"
                   title="Images"
-               >
-                  {activeTab === 'IMAGES' && (
-                    <motion.div
-                      layoutId="activeTabIndicator"
-                      className="absolute inset-0"
-                      transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
-                    >
-                       <motion.div 
-                          key="indicator-IMAGES"
-                          className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
-                          animate={{ scaleX: [1, 1.1, 1] }}
-                          transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
-                       />
-                    </motion.div>
-                  )}
-                  <span className="relative z-10">
-                    <ImageIcon size={22} />
-                  </span>
-               </motion.button>
+                  icon={<ImageIcon size={22} />}
+                  onClick={() => setActiveTab('IMAGES')}
+               />
              )}
           </div>
        </div>
