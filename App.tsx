@@ -1461,7 +1461,19 @@ export default function App() {
       });
   }, [saveHistory]);
 
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Keyed per employee id (not a single shared timer) — otherwise editing
+  // employee B while employee A's save was still debouncing would cancel
+  // A's pending write entirely, silently dropping it (only B ever reached
+  // Supabase). Each employee now debounces independently.
+  const debounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Visible save status ("Salvando..." / "Salvo" / "Erro ao salvar") next to
+  // the header — Supabase writes were previously fully fire-and-forget, so a
+  // failed write (network blip, RLS error, etc.) left the user's change only
+  // in localStorage with no indication anything was wrong.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const pendingSavesRef = useRef(0);
+  const saveStatusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateEmployee = useCallback((id: string, field: keyof Employee, value: any) => {
     let updatedEmp: Employee | null = null;
@@ -1483,11 +1495,31 @@ export default function App() {
         return nextState;
     });
 
-    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-    debounceTimeoutRef.current = setTimeout(() => {
+    const existingTimer = debounceTimersRef.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+    debounceTimersRef.current.set(id, setTimeout(async () => {
+        debounceTimersRef.current.delete(id);
         if (nextState.length > 0) saveHistory(nextState);
-        if (updatedEmp) upsertEmployee(updatedEmp);
-    }, 500);
+        if (!updatedEmp) return;
+
+        if (saveStatusResetTimerRef.current) clearTimeout(saveStatusResetTimerRef.current);
+        pendingSavesRef.current += 1;
+        setSaveStatus('saving');
+        try {
+            await upsertEmployee(updatedEmp);
+            pendingSavesRef.current -= 1;
+            if (pendingSavesRef.current === 0) {
+                setSaveStatus('saved');
+                saveStatusResetTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
+            }
+        } catch (err) {
+            console.error('Failed to save employee to Supabase:', err);
+            pendingSavesRef.current -= 1;
+            setSaveStatus('error');
+            toast.error('Não foi possível salvar as alterações no servidor. Suas mudanças continuam salvas neste dispositivo.');
+            saveStatusResetTimerRef.current = setTimeout(() => setSaveStatus('idle'), 4000);
+        }
+    }, 500));
   }, [saveHistory]);
 
   const handleGenerateBackground = async () => {
@@ -3680,6 +3712,29 @@ export default function App() {
         {/* REMOVED ViewMode.IMPORT conditional rendering completely */}
 
         {HeaderContent}
+
+        {/* Kept outside HeaderContent's own useMemo so this doesn't need to be
+            threaded through that memo's dependency array. */}
+        <AnimatePresence>
+          {saveStatus !== 'idle' && (
+            <motion.div
+              key={saveStatus}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className={`fixed top-4 right-6 z-[60] flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium shadow-lg border backdrop-blur-md ${
+                saveStatus === 'error'
+                  ? 'bg-red-950/80 border-red-500/30 text-red-300'
+                  : 'bg-slate-900/80 border-white/10 text-slate-300'
+              }`}
+            >
+              {saveStatus === 'saving' && <><Loader2 size={13} className="animate-spin" /> Salvando...</>}
+              {saveStatus === 'saved' && <><CheckCircle2 size={13} className="text-cyan-400" /> Salvo</>}
+              {saveStatus === 'error' && <><AlertTriangle size={13} /> Erro ao salvar</>}
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         <div className="flex-1 relative overflow-hidden">
             <AnimatePresence>
