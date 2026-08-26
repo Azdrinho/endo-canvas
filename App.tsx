@@ -3675,7 +3675,7 @@ export default function App() {
 
   return (
     <div className={`w-full h-screen flex flex-col overflow-hidden ${theme.bg} dark text-slate-900 dark:text-white transition-colors duration-300`}>
-        {/* Temporarily disabled per request — LoadingScreen show={isDataLoading || !minSplashElapsed} */}
+        <LoadingScreen show={isDataLoading || !minSplashElapsed} />
 
         {/* REMOVED ViewMode.IMPORT conditional rendering completely */}
 
