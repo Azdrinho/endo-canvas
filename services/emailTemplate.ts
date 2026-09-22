@@ -962,6 +962,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     const bgAssetScale = employee.providerBgAssetScale ?? 1;
     const bgAssetX = employee.providerBgAssetX || 0;
     const bgAssetY = employee.providerBgAssetY || 0;
+    const bgAssetRotate = employee.providerBgAssetRotate || 0;
     const bgAssetBaseWidth = Math.round(dims.w * 0.4);
     const bgAssetHtml = employee.providerBgAsset ? `
         <img src="${employee.providerBgAsset}" crossorigin="anonymous" draggable="false" style="
@@ -971,7 +972,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
             width: ${bgAssetBaseWidth}px;
             height: auto;
             max-width: none;
-            transform: translate(-50%, -50%) translate(${bgAssetX}px, ${bgAssetY}px) scale(${bgAssetScale});
+            transform: translate(-50%, -50%) translate(${bgAssetX}px, ${bgAssetY}px) rotate(${bgAssetRotate}deg) scale(${bgAssetScale});
             z-index: 2;
             pointer-events: none;
         " />

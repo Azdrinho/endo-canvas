@@ -42,6 +42,9 @@ export interface Employee {
   providerBgAssetScale?: number;
   providerBgAssetX?: number;
   providerBgAssetY?: number;
+  // Rotation in degrees. Applied after the X/Y translation so moving the
+  // asset stays on the card's own axes regardless of how it's rotated.
+  providerBgAssetRotate?: number;
   // Blur radius (px) applied to the decorative background spheres. 0 = off,
   // which renders them exactly as they were before this control existed.
   providerSphereBlur?: number;

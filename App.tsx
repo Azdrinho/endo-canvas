@@ -902,6 +902,7 @@ export default function App() {
       bgAssetScale: number;
       bgAssetX: number;
       bgAssetY: number;
+      bgAssetRotate: number;
       sphereBlur: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
@@ -915,6 +916,7 @@ export default function App() {
       bgAssetScale: 1,
       bgAssetX: 0,
       bgAssetY: 0,
+      bgAssetRotate: 0,
       sphereBlur: 0,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
@@ -1470,6 +1472,7 @@ export default function App() {
             providerBgAssetScale: providerData.bgAssetScale,
             providerBgAssetX: providerData.bgAssetX,
             providerBgAssetY: providerData.bgAssetY,
+            providerBgAssetRotate: providerData.bgAssetRotate,
             providerSphereBlur: providerData.sphereBlur,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
@@ -3275,9 +3278,15 @@ export default function App() {
                                 <div className="mt-4 space-y-3 px-1">
                                     <SliderRow
                                         label="Tamanho do Asset" dense={false}
-                                        min={10} max={300} step={5} suffix="%"
+                                        min={10} max={800} step={5} suffix="%"
                                         value={Math.round((providerData.bgAssetScale ?? 1) * 100)}
                                         onChange={(v) => setProviderData({...providerData, bgAssetScale: v / 100})}
+                                    />
+                                    <SliderRow
+                                        label="Rotação" dense={false} icon={<RotateCw size={12}/>}
+                                        min={-180} max={180} step={1} suffix="°"
+                                        value={providerData.bgAssetRotate || 0}
+                                        onChange={(v) => setProviderData({...providerData, bgAssetRotate: v})}
                                     />
                                     <SliderRow
                                         label="Asset X" dense={false} icon={<Move size={12}/>}
@@ -3292,10 +3301,10 @@ export default function App() {
                                         onChange={(v) => setProviderData({...providerData, bgAssetY: v})}
                                     />
                                     <button
-                                        onClick={() => setProviderData({...providerData, bgAssetScale: 1, bgAssetX: 0, bgAssetY: 0})}
+                                        onClick={() => setProviderData({...providerData, bgAssetScale: 1, bgAssetX: 0, bgAssetY: 0, bgAssetRotate: 0})}
                                         className="w-full py-2 rounded-xl text-xs font-medium bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
                                     >
-                                        Redefinir posição e tamanho
+                                        Redefinir posição, tamanho e rotação
                                     </button>
                                 </div>
                             )}
