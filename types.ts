@@ -48,6 +48,16 @@ export interface Employee {
   // Blur radius (px) applied to the decorative background spheres. 0 = off,
   // which renders them exactly as they were before this control existed.
   providerSphereBlur?: number;
+  // Per-sphere position nudges (px) from their default corner anchors:
+  // sphere 1 = top-left, sphere 2 = bottom-right.
+  providerSphere1X?: number;
+  providerSphere1Y?: number;
+  providerSphere2X?: number;
+  providerSphere2Y?: number;
+  // Multiplier for the Salsa Gator brand logo above the "NEW PROVIDER"
+  // title — independent of providerLogoScale, which sizes the provider's
+  // own logo inside the box below it.
+  providerGatorLogoScale?: number;
   gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   

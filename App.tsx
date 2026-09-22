@@ -904,6 +904,11 @@ export default function App() {
       bgAssetY: number;
       bgAssetRotate: number;
       sphereBlur: number;
+      sphere1X: number;
+      sphere1Y: number;
+      sphere2X: number;
+      sphere2Y: number;
+      gatorLogoScale: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
       gridConfigs: Record<string, ProviderGridConfig>;
@@ -918,6 +923,11 @@ export default function App() {
       bgAssetY: 0,
       bgAssetRotate: 0,
       sphereBlur: 0,
+      sphere1X: 0,
+      sphere1Y: 0,
+      sphere2X: 0,
+      sphere2Y: 0,
+      gatorLogoScale: 1,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1474,6 +1484,11 @@ export default function App() {
             providerBgAssetY: providerData.bgAssetY,
             providerBgAssetRotate: providerData.bgAssetRotate,
             providerSphereBlur: providerData.sphereBlur,
+            providerSphere1X: providerData.sphere1X,
+            providerSphere1Y: providerData.sphere1Y,
+            providerSphere2X: providerData.sphere2X,
+            providerSphere2Y: providerData.sphere2Y,
+            providerGatorLogoScale: providerData.gatorLogoScale,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -3231,6 +3246,17 @@ export default function App() {
                             />
                         </div>
 
+                        {/* Salsa Gator brand logo above the "NEW PROVIDER" title —
+                            separate from the provider's own logo sized above. */}
+                        <div className="px-1">
+                            <SliderRow
+                                label="Logo Salsa Gator" dense={false}
+                                min={50} max={300} step={5} suffix="%"
+                                value={Math.round((providerData.gatorLogoScale ?? 1) * 100)}
+                                onChange={(v) => setProviderData({...providerData, gatorLogoScale: v / 100})}
+                            />
+                        </div>
+
                         {/* Paint the logo white — for dark/single-color logos that
                             would otherwise vanish against the dark logo box. */}
                         <label className="flex items-center justify-between cursor-pointer px-1">
@@ -3313,13 +3339,48 @@ export default function App() {
                         {/* BACKGROUND SPHERES */}
                         <div className="mt-6 border-t border-white/10 pt-4">
                             <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Circle size={16}/> Esferas do Fundo</h3>
-                            <div className="px-1">
+                            <div className="px-1 space-y-3">
                                 <SliderRow
                                     label="Desfoque" dense={false}
                                     min={0} max={60} step={1} suffix="px"
                                     value={providerData.sphereBlur || 0}
                                     onChange={(v) => setProviderData({...providerData, sphereBlur: v})}
                                 />
+
+                                <div className="text-[10px] text-slate-500 uppercase tracking-wider pt-2">Esfera 1 (superior esquerda)</div>
+                                <SliderRow
+                                    label="Esfera 1 X" dense={false} icon={<Move size={12}/>}
+                                    min={-800} max={800} step={5} suffix="px"
+                                    value={providerData.sphere1X || 0}
+                                    onChange={(v) => setProviderData({...providerData, sphere1X: v})}
+                                />
+                                <SliderRow
+                                    label="Esfera 1 Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-800} max={800} step={5} suffix="px"
+                                    value={providerData.sphere1Y || 0}
+                                    onChange={(v) => setProviderData({...providerData, sphere1Y: v})}
+                                />
+
+                                <div className="text-[10px] text-slate-500 uppercase tracking-wider pt-2">Esfera 2 (inferior direita)</div>
+                                <SliderRow
+                                    label="Esfera 2 X" dense={false} icon={<Move size={12}/>}
+                                    min={-800} max={800} step={5} suffix="px"
+                                    value={providerData.sphere2X || 0}
+                                    onChange={(v) => setProviderData({...providerData, sphere2X: v})}
+                                />
+                                <SliderRow
+                                    label="Esfera 2 Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-800} max={800} step={5} suffix="px"
+                                    value={providerData.sphere2Y || 0}
+                                    onChange={(v) => setProviderData({...providerData, sphere2Y: v})}
+                                />
+
+                                <button
+                                    onClick={() => setProviderData({...providerData, sphere1X: 0, sphere1Y: 0, sphere2X: 0, sphere2Y: 0})}
+                                    className="w-full py-2 rounded-xl text-xs font-medium bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                                >
+                                    Redefinir posição das esferas
+                                </button>
                             </div>
                         </div>
 

@@ -311,10 +311,17 @@ const getWhatsappIcon = (fill: string) => `<svg xmlns="http://www.w3.org/2000/sv
 // than the sphere itself because CSS applies `filter` before `clip-path`:
 // blurring the sphere directly would soften it and then hard-cut the result
 // at the circle boundary, leaving a sharp edge instead of a diffused one.
-const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' | 'hiring' | 'brand' = 'portrait', blur: number = 0) => {
+const getSpheresHtml = (
+  variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' | 'hiring' | 'brand' = 'portrait',
+  blur: number = 0,
+  // Per-sphere nudges, also provider-only: [sphere1X, sphere1Y, sphere2X, sphere2Y].
+  offsets: { s1x?: number; s1y?: number; s2x?: number; s2y?: number } = {}
+) => {
   const noise = getNoiseOverlay();
   // Omitted entirely at 0 so the default rendering is byte-identical to before.
   const blurFilter = blur > 0 ? `filter: blur(${blur}px);` : '';
+  const s1Transform = (offsets.s1x || offsets.s1y) ? `transform: translate(${offsets.s1x || 0}px, ${offsets.s1y || 0}px);` : '';
+  const s2Transform = (offsets.s2x || offsets.s2y) ? `transform: translate(${offsets.s2x || 0}px, ${offsets.s2y || 0}px);` : '';
 
   // Pure two-stop cyan -> purple gradient, matching the photo panel background exactly.
   if (variant === 'brand') {
@@ -376,7 +383,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
   if (variant === 'provider') {
      return `
       <!-- Provider Sphere (Top Left) -->
-      <div style="position: absolute; top: -80px; left: -80px; width: 320px; height: 320px; z-index: 1; ${blurFilter}">
+      <div style="position: absolute; top: -80px; left: -80px; width: 320px; height: 320px; z-index: 1; ${blurFilter}${s1Transform}">
         <div style="
           width: 100%;
           height: 100%;
@@ -389,7 +396,7 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
         </div>
       </div>
        <!-- Provider Sphere (Bottom Right) -->
-      <div style="position: absolute; bottom: -50px; right: -50px; width: 250px; height: 250px; z-index: 1; ${blurFilter}">
+      <div style="position: absolute; bottom: -50px; right: -50px; width: 250px; height: 250px; z-index: 1; ${blurFilter}${s2Transform}">
         <div style="
           width: 100%;
           height: 100%;
@@ -680,7 +687,12 @@ const formatTenure = (tenure: string, language: Language): string => {
 // --- NEW PROVIDER GENERATOR ---
 const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat) => {
     const noise = getNoiseOverlay();
-    const spheres = getSpheresHtml('provider', employee.providerSphereBlur || 0);
+    const spheres = getSpheresHtml('provider', employee.providerSphereBlur || 0, {
+        s1x: employee.providerSphere1X,
+        s1y: employee.providerSphere1Y,
+        s2x: employee.providerSphere2X,
+        s2y: employee.providerSphere2Y,
+    });
     // REMOVED 'S' WATERMARK LOGO FOR NEW PROVIDER
     
     // FORMAT DIMENSIONS
@@ -978,11 +990,14 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
         " />
     ` : '';
 
-    // Calculate logo size based on format
-    let gatorLogoWidth = '180px';
-    if (format.includes('banner')) gatorLogoWidth = '140px';
-    if (format === 'post-story') gatorLogoWidth = '240px';
-    if (format === 'post-sq') gatorLogoWidth = '220px';
+    // Calculate logo size based on format, then apply the user's multiplier
+    // (separate from providerLogoScale, which sizes the provider's own logo
+    // inside the box below the title).
+    let gatorLogoBaseWidth = 180;
+    if (format.includes('banner')) gatorLogoBaseWidth = 140;
+    if (format === 'post-story') gatorLogoBaseWidth = 240;
+    if (format === 'post-sq') gatorLogoBaseWidth = 220;
+    const gatorLogoWidth = `${Math.round(gatorLogoBaseWidth * (employee.providerGatorLogoScale ?? 1))}px`;
 
     const gatorLogo = `
       <div style="width: ${gatorLogoWidth}; margin-bottom: 10px; display: flex; justify-content: ${contentAlign === 'center' ? 'center' : 'flex-start'};">
