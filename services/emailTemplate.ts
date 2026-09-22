@@ -1029,13 +1029,24 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     if (format === 'post-portrait') gatorLogoBaseWidth = 230;
     const gatorLogoWidth = `${Math.round(gatorLogoBaseWidth * (employee.providerGatorLogoScale ?? 1))}px`;
 
+    // Moved with a transform rather than margins so nudging it never reflows
+    // the title or the logo box below it — it just shifts visually.
+    const gatorLogoX = employee.providerGatorLogoX || 0;
+    const gatorLogoY = employee.providerGatorLogoY || 0;
+    const gatorLogoTransform = (gatorLogoX || gatorLogoY) ? ` transform: translate(${gatorLogoX}px, ${gatorLogoY}px);` : '';
+
     const gatorLogo = `
-      <div style="width: ${gatorLogoWidth}; margin-bottom: 10px; display: flex; justify-content: ${contentAlign === 'center' ? 'center' : 'flex-start'};">
+      <div style="width: ${gatorLogoWidth}; margin-bottom: 10px; display: flex; justify-content: ${contentAlign === 'center' ? 'center' : 'flex-start'};${gatorLogoTransform}">
          <svg viewBox="0 0 1000 380" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="fill: white;">
             ${SALSA_GATOR_SVG_CONTENT}
          </svg>
       </div>
     `;
+
+    // Extra space between the title and the box holding the provider's logo,
+    // on top of the column's own gap. Negative values tighten it; 0 leaves the
+    // format's default spacing exactly as it was.
+    const titleBoxGap = employee.providerTitleBoxGap || 0;
 
     // Provider Logo Box with Transform
     // Updated to use Orkney Font, no shadow, single line
@@ -1046,13 +1057,14 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
                 <span style="font-weight: 300;">NEW</span> <span style="font-weight: 700;">PROVIDER</span>
             </h2>
             <div style="
-                background: #0f281e; 
-                padding: ${logoBoxPadding}; 
-                border-radius: 40px; 
-                box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 30px #264743, inset 0 0 20px #264743; 
+                background: #0f281e;
+                padding: ${logoBoxPadding};
+                border-radius: 40px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 30px #264743, inset 0 0 20px #264743;
                 border: 1px solid #264743;
                 display: flex; align-items: center; justify-content: center;
                 min-width: ${logoBoxMinWidth};
+                ${titleBoxGap ? `margin-top: ${titleBoxGap}px;` : ''}
             ">
                 <img src="${providerLogo}" style="width: ${logoImgMaxWidth}; height: auto; object-fit: contain; display: block;${logoWhiteFilter}" />
             </div>

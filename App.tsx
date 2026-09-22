@@ -909,6 +909,9 @@ export default function App() {
       sphere2X: number;
       sphere2Y: number;
       gatorLogoScale: number;
+      gatorLogoX: number;
+      gatorLogoY: number;
+      titleBoxGap: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
       gridConfigs: Record<string, ProviderGridConfig>;
@@ -928,6 +931,9 @@ export default function App() {
       sphere2X: 0,
       sphere2Y: 0,
       gatorLogoScale: 1,
+      gatorLogoX: 0,
+      gatorLogoY: 0,
+      titleBoxGap: 0,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1489,6 +1495,9 @@ export default function App() {
             providerSphere2X: providerData.sphere2X,
             providerSphere2Y: providerData.sphere2Y,
             providerGatorLogoScale: providerData.gatorLogoScale,
+            providerGatorLogoX: providerData.gatorLogoX,
+            providerGatorLogoY: providerData.gatorLogoY,
+            providerTitleBoxGap: providerData.titleBoxGap,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -3249,12 +3258,32 @@ export default function App() {
 
                         {/* Salsa Gator brand logo above the "NEW PROVIDER" title —
                             separate from the provider's own logo sized above. */}
-                        <div className="px-1">
+                        <div className="px-1 space-y-3">
                             <SliderRow
                                 label="Logo Salsa Gator" dense={false}
                                 min={50} max={300} step={5} suffix="%"
                                 value={Math.round((providerData.gatorLogoScale ?? 1) * 100)}
                                 onChange={(v) => setProviderData({...providerData, gatorLogoScale: v / 100})}
+                            />
+                            <SliderRow
+                                label="Gator X" dense={false} icon={<Move size={12}/>}
+                                min={-400} max={400} step={5} suffix="px"
+                                value={providerData.gatorLogoX || 0}
+                                onChange={(v) => setProviderData({...providerData, gatorLogoX: v})}
+                            />
+                            <SliderRow
+                                label="Gator Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                min={-400} max={400} step={5} suffix="px"
+                                value={providerData.gatorLogoY || 0}
+                                onChange={(v) => setProviderData({...providerData, gatorLogoY: v})}
+                            />
+                            {/* Spacing between the "NEW PROVIDER" title and the box
+                                holding the provider logo. 0 = the format's default. */}
+                            <SliderRow
+                                label="Espaço Texto ↔ Logo" dense={false}
+                                min={-80} max={300} step={5} suffix="px"
+                                value={providerData.titleBoxGap || 0}
+                                onChange={(v) => setProviderData({...providerData, titleBoxGap: v})}
                             />
                         </div>
 

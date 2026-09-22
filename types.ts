@@ -58,6 +58,13 @@ export interface Employee {
   // title — independent of providerLogoScale, which sizes the provider's
   // own logo inside the box below it.
   providerGatorLogoScale?: number;
+  // Visual nudge (px) for that same Gator logo. Applied as a transform, so
+  // moving it never reflows the title or logo box beneath it.
+  providerGatorLogoX?: number;
+  providerGatorLogoY?: number;
+  // Extra spacing (px) between the "NEW PROVIDER" title and the box holding
+  // the provider's logo, on top of the format's own gap. 0 = unchanged.
+  providerTitleBoxGap?: number;
   gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   
