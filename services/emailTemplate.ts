@@ -946,6 +946,33 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
 
     const logoScale = employee.providerLogoScale || 1;
     const logoImgMaxWidth = `${logoImgMaxWidthBase * logoScale}px`;
+    // brightness(0) crushes every pixel to black, invert(1) then flips it to
+    // pure white — keeps the logo's exact silhouette/transparency regardless
+    // of its original colors, and works identically for PNG and SVG.
+    const logoWhiteFilter = employee.providerLogoWhite ? ' filter: brightness(0) invert(1);' : '';
+
+    // Decorative background asset: sits at z-index 2 — directly above the
+    // spheres/noise (z-index 1) and below the game grid (10) and the
+    // logo/title block (20), so it never covers the actual content.
+    // Base width is a share of the card width so a given scale looks the
+    // same across the very different format sizes (600px PR to 2160px banner).
+    const bgAssetScale = employee.providerBgAssetScale ?? 1;
+    const bgAssetX = employee.providerBgAssetX || 0;
+    const bgAssetY = employee.providerBgAssetY || 0;
+    const bgAssetBaseWidth = Math.round(dims.w * 0.4);
+    const bgAssetHtml = employee.providerBgAsset ? `
+        <img src="${employee.providerBgAsset}" crossorigin="anonymous" draggable="false" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: ${bgAssetBaseWidth}px;
+            height: auto;
+            max-width: none;
+            transform: translate(-50%, -50%) translate(${bgAssetX}px, ${bgAssetY}px) scale(${bgAssetScale});
+            z-index: 2;
+            pointer-events: none;
+        " />
+    ` : '';
 
     // Calculate logo size based on format
     let gatorLogoWidth = '180px';
@@ -978,7 +1005,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
                 display: flex; align-items: center; justify-content: center;
                 min-width: ${logoBoxMinWidth};
             ">
-                <img src="${providerLogo}" style="width: ${logoImgMaxWidth}; height: auto; object-fit: contain; display: block;" />
+                <img src="${providerLogo}" style="width: ${logoImgMaxWidth}; height: auto; object-fit: contain; display: block;${logoWhiteFilter}" />
             </div>
         </div>
     `;
@@ -987,8 +1014,9 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     <div id="capture-target" style="width: ${dims.w}px; height: ${dims.h}px; background: ${background}; position: relative; overflow: hidden; box-sizing: border-box;">
        ${noise}
        ${spheres}
+       ${bgAssetHtml}
        <!-- Removed Watermark Logo -->
-       
+
        <div style="${gridWrapperStyle}">
            <div style="${gridStyle}">
                ${gridHtml}

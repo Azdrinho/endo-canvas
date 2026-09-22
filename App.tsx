@@ -896,13 +896,24 @@ export default function App() {
       name: string;
       logo: string;
       logoScale: number;
+      logoWhite: boolean;
+      // Decorative asset layered above the background spheres.
+      bgAsset: string;
+      bgAssetScale: number;
+      bgAssetX: number;
+      bgAssetY: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
-      gridConfigs: Record<string, ProviderGridConfig>; 
+      gridConfigs: Record<string, ProviderGridConfig>;
   }>({
       name: '',
       logo: '',
       logoScale: 1,
+      logoWhite: false,
+      bgAsset: '',
+      bgAssetScale: 1,
+      bgAssetX: 0,
+      bgAssetY: 0,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1201,7 +1212,9 @@ export default function App() {
     }
     if (savedProviderData) {
       try {
-        setProviderData(JSON.parse(savedProviderData));
+        // Merged onto the defaults rather than replacing them wholesale, so a
+        // backup saved before a field existed doesn't restore it as undefined.
+        setProviderData(prev => ({ ...prev, ...JSON.parse(savedProviderData) }));
       } catch (e) {
         console.error("Failed to restore provider data backup", e);
       }
@@ -1450,6 +1463,11 @@ export default function App() {
             dateStr: '',
             providerLogo: providerData.logo,
             providerLogoScale: providerData.logoScale,
+            providerLogoWhite: providerData.logoWhite,
+            providerBgAsset: providerData.bgAsset,
+            providerBgAssetScale: providerData.bgAssetScale,
+            providerBgAssetX: providerData.bgAssetX,
+            providerBgAssetY: providerData.bgAssetY,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -2199,14 +2217,20 @@ export default function App() {
       let file = e.target.files?.[0];
       if (!file || !uploadTarget) return;
       
-      const conversionToastId = toast.loading('Processando e convertendo imagem para WEBP...');
-      try {
-          const convertedFile = await convertFileToWebP(file);
-          file = convertedFile;
-          toast.success('Imagem convertida para WEBP com sucesso!', { id: conversionToastId });
-      } catch (err) {
-          console.error('Falha na conversão para WEBP:', err);
-          toast.error('Erro ao converter para WEBP. Usando formato original.', { id: conversionToastId });
+      // SVGs are kept as-is: converting one to WebP rasterizes it at whatever
+      // size it happened to be, throwing away the scalability that's the whole
+      // point of uploading a vector for a resizable background asset.
+      const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+      if (!isSvg) {
+          const conversionToastId = toast.loading('Processando e convertendo imagem para WEBP...');
+          try {
+              const convertedFile = await convertFileToWebP(file);
+              file = convertedFile;
+              toast.success('Imagem convertida para WEBP com sucesso!', { id: conversionToastId });
+          } catch (err) {
+              console.error('Falha na conversão para WEBP:', err);
+              toast.error('Erro ao converter para WEBP. Usando formato original.', { id: conversionToastId });
+          }
       }
       
       if (selectedTemplate === TemplateType.HIRING && uploadTarget.field === 'photoUrl') {
@@ -2272,6 +2296,8 @@ export default function App() {
           if (uploadTarget.id === 'PROVIDER') {
               if (uploadTarget.field === 'logo') {
                   setProviderData(prev => ({ ...prev, logo: result }));
+              } else if (uploadTarget.field === 'bgAsset') {
+                  setProviderData(prev => ({ ...prev, bgAsset: result }));
               } else if (uploadTarget.field === 'thumbnails' && uploadTarget.index !== undefined) {
                   setProviderData(prev => {
                       const newThumbs = [...prev.thumbnails];
@@ -3197,6 +3223,79 @@ export default function App() {
                                 value={Math.round((providerData.logoScale || 1) * 100)}
                                 onChange={(v) => setProviderData({...providerData, logoScale: v / 100})}
                             />
+                        </div>
+
+                        {/* Paint the logo white — for dark/single-color logos that
+                            would otherwise vanish against the dark logo box. */}
+                        <label className="flex items-center justify-between cursor-pointer px-1">
+                            <span className="text-xs text-slate-400">Logo em Branco</span>
+                            <ThemeSwitch
+                                isDarkMode={!!providerData.logoWhite}
+                                toggle={() => setProviderData({...providerData, logoWhite: !providerData.logoWhite})}
+                            />
+                        </label>
+
+                        {/* BACKGROUND ASSET */}
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><ImageIcon size={16}/> Asset de Fundo</h3>
+                            <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+                                PNG ou SVG posicionado acima das esferas e atrás do grid de jogos e do logo.
+                            </p>
+
+                            <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 gap-2`}>
+                               <ImageIcon size={16} className="opacity-40 text-white shrink-0" />
+                               <input
+                                 value={providerData.bgAsset}
+                                 onChange={(e) => setProviderData({...providerData, bgAsset: e.target.value})}
+                                 className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30"
+                                 placeholder="URL do asset (PNG/SVG)"
+                               />
+                               <button
+                                  onClick={() => handleImageUploadTrigger('PROVIDER', 'bgAsset')}
+                                  className="p-1.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 shadow-lg"
+                                  title="Enviar asset (PNG/SVG)"
+                               >
+                                  <Upload size={14} />
+                               </button>
+                               {providerData.bgAsset && (
+                                   <button
+                                      onClick={() => setProviderData({...providerData, bgAsset: ''})}
+                                      className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white shrink-0 transition-all"
+                                      title="Remover asset"
+                                   >
+                                      <X size={14} />
+                                   </button>
+                               )}
+                            </div>
+
+                            {providerData.bgAsset && (
+                                <div className="mt-4 space-y-3 px-1">
+                                    <SliderRow
+                                        label="Tamanho do Asset" dense={false}
+                                        min={10} max={300} step={5} suffix="%"
+                                        value={Math.round((providerData.bgAssetScale ?? 1) * 100)}
+                                        onChange={(v) => setProviderData({...providerData, bgAssetScale: v / 100})}
+                                    />
+                                    <SliderRow
+                                        label="Asset X" dense={false} icon={<Move size={12}/>}
+                                        min={-1200} max={1200} step={10} suffix="px"
+                                        value={providerData.bgAssetX || 0}
+                                        onChange={(v) => setProviderData({...providerData, bgAssetX: v})}
+                                    />
+                                    <SliderRow
+                                        label="Asset Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                        min={-1200} max={1200} step={10} suffix="px"
+                                        value={providerData.bgAssetY || 0}
+                                        onChange={(v) => setProviderData({...providerData, bgAssetY: v})}
+                                    />
+                                    <button
+                                        onClick={() => setProviderData({...providerData, bgAssetScale: 1, bgAssetX: 0, bgAssetY: 0})}
+                                        className="w-full py-2 rounded-xl text-xs font-medium bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                                    >
+                                        Redefinir posição e tamanho
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* TEXT & LAYOUT ADJUSTMENTS */}
@@ -4709,7 +4808,9 @@ export default function App() {
             type="file"
             ref={fileInputRef}
             onChange={handleImageFileChange}
-            accept="image/*"
+            // .svg spelled out alongside image/* because some file pickers
+            // don't match SVG against the wildcard reliably.
+            accept="image/*,.svg"
             className="hidden"
         />
 

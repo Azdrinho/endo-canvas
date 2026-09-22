@@ -30,9 +30,19 @@ export interface Employee {
   managerId?: string; // For Org Chart
 
   // New Provider Fields
-  providerLogo?: string; 
+  providerLogo?: string;
   providerLogoScale?: number;
-  gameThumbnails?: string[]; 
+  // Paints the provider logo solid white — for logos that are dark or
+  // single-color and would otherwise disappear against the dark logo box.
+  // Works for PNG and SVG alike (applied as a CSS filter, not a recolor).
+  providerLogoWhite?: boolean;
+  // Optional decorative asset (PNG/SVG) layered directly above the
+  // background spheres, but behind the game grid and the logo/title block.
+  providerBgAsset?: string;
+  providerBgAssetScale?: number;
+  providerBgAssetX?: number;
+  providerBgAssetY?: number;
+  gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   
   // Custom Hiring Fields
