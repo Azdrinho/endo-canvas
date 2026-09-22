@@ -1644,6 +1644,7 @@ export default function App() {
              'pr-small': { w: 600, h: 400 },
              'pr-large': { w: 900, h: 500 },
              'post-sq': { w: 1080, h: 1080 },
+             'post-portrait': { w: 1080, h: 1350 },
              'post-story': { w: 1080, h: 1920 },
              'banner-small': { w: 1400, h: 480 },
              'banner-large': { w: 2160, h: 330 },
@@ -4638,6 +4639,7 @@ export default function App() {
                                 <div className="grid grid-cols-2 gap-1">
                                     {[
                                         { id: 'post-sq', label: 'Post (Sq)', icon: RectangleHorizontal },
+                                        { id: 'post-portrait', label: 'Post (4:5)', icon: RectangleVertical },
                                         { id: 'post-story', label: 'Story', icon: RectangleVertical },
                                         { id: 'banner-small', label: 'Banner S', icon: RectangleHorizontal },
                                         { id: 'banner-large', label: 'Banner L', icon: RectangleHorizontal },

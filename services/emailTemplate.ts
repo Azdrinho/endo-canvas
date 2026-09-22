@@ -700,6 +700,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
         'pr-small': { w: 600, h: 400 },
         'pr-large': { w: 900, h: 500 },
         'post-sq': { w: 1080, h: 1080 },
+        'post-portrait': { w: 1080, h: 1350 },
         'post-story': { w: 1080, h: 1920 },
         'banner-small': { w: 1400, h: 480 },
         'banner-large': { w: 2160, h: 330 },
@@ -760,9 +761,9 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
         baseRotateY = -12;
         baseRotateZ = -3;
     }
-    else if (format === 'post-sq') {
-        cols = 4; 
-        gridRenderList = activeThumbnails.slice(0, 4); 
+    else if (format === 'post-sq' || format === 'post-portrait') {
+        cols = 4;
+        gridRenderList = activeThumbnails.slice(0, 4);
         baseRotateX = 10;
         baseRotateY = 0;
         baseRotateZ = 0;
@@ -892,6 +893,34 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
         baseJustify = 'center';
         baseAlignItems = 'flex-end';
 
+    } else if (format === 'post-portrait') {
+        // 4:5 (1080x1350) — the square layout, with the extra 270px of height
+        // spent on breathing room: the text block sits a little higher and the
+        // grid takes proportionally less of the frame so it stays a strip
+        // peeking in from the bottom rather than dominating the card.
+        baseTitleSizePx = 100;
+        contentAlign = 'center';
+        textAlignment = 'center';
+        logoBoxMinWidth = '580px';
+        logoBoxPadding = '55px 65px';
+        logoImgMaxWidthBase = 470;
+        gridGap = '20px';
+        logoGap = '32px';
+        gridOrigin = `center bottom`;
+
+        logoBaseTransform = 'translate(-50%, -50%)';
+        logoContainerStyle = `position: absolute; top: 38%; left: 50%; z-index: 20; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;`;
+
+        // Grid Base
+        baseBottom = '-60px';
+        baseLeft = '50%';
+        baseWidth = '120%';
+        baseHeight = '42%';
+        baseTransform = `translateX(-50%)`;
+        baseTranslateYPercent = 0;
+        baseJustify = 'center';
+        baseAlignItems = 'flex-end';
+
     } else if (format === 'pr-large') {
         baseTitleSizePx = 42;
         logoBaseTransform = 'translateY(-50%)';
@@ -920,7 +949,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     // APPLY POSITION OVERRIDES TO WRAPPER
     // We append the User X/Y to the transform string
     let finalWrapperTransform = baseTransform;
-    if (format === 'post-story' || format === 'post-sq') {
+    if (format === 'post-story' || format === 'post-sq' || format === 'post-portrait') {
         // These use translateX(-50%) as base. We add X/Y to it.
         // translate(calc(-50% + Xpx), Ypx)
         finalWrapperTransform = `translate(calc(-50% + ${cfg.x || 0}px), ${cfg.y || 0}px)`;
@@ -997,6 +1026,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     if (format.includes('banner')) gatorLogoBaseWidth = 140;
     if (format === 'post-story') gatorLogoBaseWidth = 240;
     if (format === 'post-sq') gatorLogoBaseWidth = 220;
+    if (format === 'post-portrait') gatorLogoBaseWidth = 230;
     const gatorLogoWidth = `${Math.round(gatorLogoBaseWidth * (employee.providerGatorLogoScale ?? 1))}px`;
 
     const gatorLogo = `

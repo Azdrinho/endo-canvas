@@ -143,7 +143,7 @@ export enum TemplateType {
   ACTIVATION = 'General Disclosure'
 }
 
-export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-story' | 'banner-small' | 'banner-large';
+export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-portrait' | 'post-story' | 'banner-small' | 'banner-large';
 
 export type Orientation = 'portrait' | 'landscape';
 
