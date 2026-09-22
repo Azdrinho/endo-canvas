@@ -1054,6 +1054,9 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     // on top of the column's own gap. Negative values tighten it; 0 leaves the
     // format's default spacing exactly as it was.
     const titleBoxGap = employee.providerTitleBoxGap || 0;
+    // Corner rounding of the box holding the provider's logo. 40 is the
+    // original hardcoded value, so an untouched card renders identically.
+    const logoBoxRadius = employee.providerLogoBoxRadius ?? 40;
 
     // Provider Logo Box with Transform
     // Updated to use Orkney Font, no shadow, single line
@@ -1066,7 +1069,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
             <div style="
                 background: #0f281e;
                 padding: ${logoBoxPadding};
-                border-radius: 40px;
+                border-radius: ${logoBoxRadius}px;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 30px #264743, inset 0 0 20px #264743;
                 border: 1px solid #264743;
                 display: flex; align-items: center; justify-content: center;

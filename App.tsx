@@ -913,6 +913,7 @@ export default function App() {
       gatorLogoY: number;
       titleBoxGap: number;
       compositionScale: number;
+      logoBoxRadius: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
       gridConfigs: Record<string, ProviderGridConfig>;
@@ -936,6 +937,7 @@ export default function App() {
       gatorLogoY: 0,
       titleBoxGap: 0,
       compositionScale: 1,
+      logoBoxRadius: 40,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1501,6 +1503,7 @@ export default function App() {
             providerGatorLogoY: providerData.gatorLogoY,
             providerTitleBoxGap: providerData.titleBoxGap,
             providerCompositionScale: providerData.compositionScale,
+            providerLogoBoxRadius: providerData.logoBoxRadius,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -3252,13 +3255,19 @@ export default function App() {
                            </button>
                         </div>
                         
-                        {/* Logo Scale */}
-                        <div className="px-1">
+                        {/* Logo Scale + the rounding of the box it sits in */}
+                        <div className="px-1 space-y-3">
                             <SliderRow
                                 label="Tamanho do Logo" dense={false}
                                 min={20} max={200} step={10} suffix="%"
                                 value={Math.round((providerData.logoScale || 1) * 100)}
                                 onChange={(v) => setProviderData({...providerData, logoScale: v / 100})}
+                            />
+                            <SliderRow
+                                label="Suavização da Caixa" dense={false}
+                                min={0} max={150} step={2} suffix="px"
+                                value={providerData.logoBoxRadius ?? 40}
+                                onChange={(v) => setProviderData({...providerData, logoBoxRadius: v})}
                             />
                         </div>
 

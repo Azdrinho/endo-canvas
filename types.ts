@@ -68,6 +68,9 @@ export interface Employee {
   // Scales the whole logo composition (Gator logo + title + provider logo
   // box) as a unit, on top of each part's individual size control.
   providerCompositionScale?: number;
+  // Corner rounding (px) of the box holding the provider's logo.
+  // Defaults to 40, the value it was hardcoded to.
+  providerLogoBoxRadius?: number;
   gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   
