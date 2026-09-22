@@ -306,8 +306,15 @@ const getWhatsappIcon = (fill: string) => `<svg xmlns="http://www.w3.org/2000/sv
 
 
 // Shared Sphere Elements
-const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' | 'hiring' | 'brand' = 'portrait') => {
+// `blur` (px) currently only applies to the 'provider' variant, whose spheres
+// are user-adjustable. It's applied to a wrapper around each sphere rather
+// than the sphere itself because CSS applies `filter` before `clip-path`:
+// blurring the sphere directly would soften it and then hard-cut the result
+// at the circle boundary, leaving a sharp edge instead of a diffused one.
+const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'anniversary_landscape' | 'welcome' | 'signature' | 'signature_logo' | 'farewell' | 'job_change' | 'provider' | 'hiring' | 'brand' = 'portrait', blur: number = 0) => {
   const noise = getNoiseOverlay();
+  // Omitted entirely at 0 so the default rendering is byte-identical to before.
+  const blurFilter = blur > 0 ? `filter: blur(${blur}px);` : '';
 
   // Pure two-stop cyan -> purple gradient, matching the photo panel background exactly.
   if (variant === 'brand') {
@@ -369,34 +376,30 @@ const getSpheresHtml = (variant: 'portrait' | 'landscape' | 'anniversary' | 'ann
   if (variant === 'provider') {
      return `
       <!-- Provider Sphere (Top Left) -->
-      <div style="
-        position: absolute;
-        top: -80px;
-        left: -80px;
-        width: 320px; 
-        height: 320px;
-        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
-        background: radial-gradient(circle at 30% 30%, #17261d 0%, #191e1b 100%);
-        box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
-        z-index: 1;
-        overflow: hidden;
-      ">
-         ${noise}
+      <div style="position: absolute; top: -80px; left: -80px; width: 320px; height: 320px; z-index: 1; ${blurFilter}">
+        <div style="
+          width: 100%;
+          height: 100%;
+          border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
+          background: radial-gradient(circle at 30% 30%, #17261d 0%, #191e1b 100%);
+          box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
+          overflow: hidden;
+        ">
+           ${noise}
+        </div>
       </div>
        <!-- Provider Sphere (Bottom Right) -->
-      <div style="
-        position: absolute;
-        bottom: -50px;
-        right: -50px;
-        width: 250px; 
-        height: 250px;
-        border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
-        background: radial-gradient(circle at 70% 70%, #17261d 0%, #191e1b 100%);
-        box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
-        z-index: 1;
-        overflow: hidden;
-      ">
-         ${noise}
+      <div style="position: absolute; bottom: -50px; right: -50px; width: 250px; height: 250px; z-index: 1; ${blurFilter}">
+        <div style="
+          width: 100%;
+          height: 100%;
+          border-radius: 50%; -webkit-clip-path: circle(49.8% at 50% 50%); clip-path: circle(49.8% at 50% 50%);
+          background: radial-gradient(circle at 70% 70%, #17261d 0%, #191e1b 100%);
+          box-shadow: 0 0 30px #264743, inset 0 0 40px #264743;
+          overflow: hidden;
+        ">
+           ${noise}
+        </div>
       </div>
      `;
   }
@@ -677,7 +680,7 @@ const formatTenure = (tenure: string, language: Language): string => {
 // --- NEW PROVIDER GENERATOR ---
 const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat) => {
     const noise = getNoiseOverlay();
-    const spheres = getSpheresHtml('provider');
+    const spheres = getSpheresHtml('provider', employee.providerSphereBlur || 0);
     // REMOVED 'S' WATERMARK LOGO FOR NEW PROVIDER
     
     // FORMAT DIMENSIONS

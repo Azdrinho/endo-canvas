@@ -902,6 +902,7 @@ export default function App() {
       bgAssetScale: number;
       bgAssetX: number;
       bgAssetY: number;
+      sphereBlur: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
       gridConfigs: Record<string, ProviderGridConfig>;
@@ -914,6 +915,7 @@ export default function App() {
       bgAssetScale: 1,
       bgAssetX: 0,
       bgAssetY: 0,
+      sphereBlur: 0,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1468,6 +1470,7 @@ export default function App() {
             providerBgAssetScale: providerData.bgAssetScale,
             providerBgAssetX: providerData.bgAssetX,
             providerBgAssetY: providerData.bgAssetY,
+            providerSphereBlur: providerData.sphereBlur,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -3296,6 +3299,19 @@ export default function App() {
                                     </button>
                                 </div>
                             )}
+                        </div>
+
+                        {/* BACKGROUND SPHERES */}
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Circle size={16}/> Esferas do Fundo</h3>
+                            <div className="px-1">
+                                <SliderRow
+                                    label="Desfoque" dense={false}
+                                    min={0} max={60} step={1} suffix="px"
+                                    value={providerData.sphereBlur || 0}
+                                    onChange={(v) => setProviderData({...providerData, sphereBlur: v})}
+                                />
+                            </div>
                         </div>
 
                         {/* TEXT & LAYOUT ADJUSTMENTS */}

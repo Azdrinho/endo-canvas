@@ -42,6 +42,9 @@ export interface Employee {
   providerBgAssetScale?: number;
   providerBgAssetX?: number;
   providerBgAssetY?: number;
+  // Blur radius (px) applied to the decorative background spheres. 0 = off,
+  // which renders them exactly as they were before this control existed.
+  providerSphereBlur?: number;
   gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   
