@@ -912,6 +912,7 @@ export default function App() {
       gatorLogoX: number;
       gatorLogoY: number;
       titleBoxGap: number;
+      compositionScale: number;
       thumbnails: string[];
       // CHANGED: Store configs per format to isolate changes
       gridConfigs: Record<string, ProviderGridConfig>;
@@ -934,6 +935,7 @@ export default function App() {
       gatorLogoX: 0,
       gatorLogoY: 0,
       titleBoxGap: 0,
+      compositionScale: 1,
       thumbnails: ['', '', '', '', '', ''],
       gridConfigs: {} // Initialize empty
   });
@@ -1498,6 +1500,7 @@ export default function App() {
             providerGatorLogoX: providerData.gatorLogoX,
             providerGatorLogoY: providerData.gatorLogoY,
             providerTitleBoxGap: providerData.titleBoxGap,
+            providerCompositionScale: providerData.compositionScale,
             photoPosition: { x: 0, y: 0 },
             gameThumbnails: providerData.thumbnails,
             providerGridConfig: specificConfig
@@ -3214,9 +3217,12 @@ export default function App() {
                {/* Data Sidebar Content */}
                {isNewProvider ? (
                    <div className="space-y-4 animate-in slide-in-from-right-8 duration-300">
-                        {/* Title */}
-                        <h3 className="text-sm font-bold text-cyan-300 uppercase mb-2 flex items-center gap-2"><Gamepad2 size={16}/> Provider Details</h3>
-                        
+                        {/* Panel is grouped by what each control acts on —
+                            provider identity, the logo composition, the Gator
+                            logo, background art, and the game grid — rather
+                            than in the order features happened to be added. */}
+                        <h3 className="text-sm font-bold text-cyan-300 uppercase mb-2 flex items-center gap-2"><Gamepad2 size={16}/> Provedor</h3>
+
                         {/* Name Input */}
                         <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}>
                            <User size={16} className="opacity-40 mr-3 text-white" />
@@ -3249,41 +3255,10 @@ export default function App() {
                         {/* Logo Scale */}
                         <div className="px-1">
                             <SliderRow
-                                label="Logo Size" dense={false}
+                                label="Tamanho do Logo" dense={false}
                                 min={20} max={200} step={10} suffix="%"
                                 value={Math.round((providerData.logoScale || 1) * 100)}
                                 onChange={(v) => setProviderData({...providerData, logoScale: v / 100})}
-                            />
-                        </div>
-
-                        {/* Salsa Gator brand logo above the "NEW PROVIDER" title —
-                            separate from the provider's own logo sized above. */}
-                        <div className="px-1 space-y-3">
-                            <SliderRow
-                                label="Logo Salsa Gator" dense={false}
-                                min={50} max={300} step={5} suffix="%"
-                                value={Math.round((providerData.gatorLogoScale ?? 1) * 100)}
-                                onChange={(v) => setProviderData({...providerData, gatorLogoScale: v / 100})}
-                            />
-                            <SliderRow
-                                label="Gator X" dense={false} icon={<Move size={12}/>}
-                                min={-400} max={400} step={5} suffix="px"
-                                value={providerData.gatorLogoX || 0}
-                                onChange={(v) => setProviderData({...providerData, gatorLogoX: v})}
-                            />
-                            <SliderRow
-                                label="Gator Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
-                                min={-400} max={400} step={5} suffix="px"
-                                value={providerData.gatorLogoY || 0}
-                                onChange={(v) => setProviderData({...providerData, gatorLogoY: v})}
-                            />
-                            {/* Spacing between the "NEW PROVIDER" title and the box
-                                holding the provider logo. 0 = the format's default. */}
-                            <SliderRow
-                                label="Espaço Texto ↔ Logo" dense={false}
-                                min={-80} max={300} step={5} suffix="px"
-                                value={providerData.titleBoxGap || 0}
-                                onChange={(v) => setProviderData({...providerData, titleBoxGap: v})}
                             />
                         </div>
 
@@ -3296,6 +3271,75 @@ export default function App() {
                                 toggle={() => setProviderData({...providerData, logoWhite: !providerData.logoWhite})}
                             />
                         </label>
+
+                        {/* COMPOSITION — everything that moves/sizes the whole
+                            Gator logo + title + provider logo box block together. */}
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-1 flex items-center gap-2"><Layers size={16}/> Composição</h3>
+                            <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+                                Logo Salsa Gator + texto "NEW PROVIDER" + caixa com o logo do provedor.
+                            </p>
+                            <div className="px-1 space-y-3">
+                                <SliderRow
+                                    label="Escala da Composição" dense={false}
+                                    min={40} max={250} step={5} suffix="%"
+                                    value={Math.round((providerData.compositionScale ?? 1) * 100)}
+                                    onChange={(v) => setProviderData({...providerData, compositionScale: v / 100})}
+                                />
+                                <SliderRow
+                                    label="Composição X" dense={false} icon={<Move size={12}/>}
+                                    min={-300} max={300} step={5} suffix="px"
+                                    value={activeGridConfig.textX || 0}
+                                    onChange={(v) => updateGridConfig('textX', v)}
+                                />
+                                <SliderRow
+                                    label="Composição Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-300} max={300} step={5} suffix="px"
+                                    value={activeGridConfig.textY || 0}
+                                    onChange={(v) => updateGridConfig('textY', v)}
+                                />
+                                <SliderRow
+                                    label="Tamanho do Texto" dense={false}
+                                    min={50} max={300} step={10} suffix="%"
+                                    value={Math.round((activeGridConfig.textScale || 1) * 100)}
+                                    onChange={(v) => updateGridConfig('textScale', v / 100)}
+                                />
+                                {/* Spacing between the "NEW PROVIDER" title and the box
+                                    holding the provider logo. 0 = the format's default. */}
+                                <SliderRow
+                                    label="Espaço Texto ↔ Logo" dense={false}
+                                    min={-80} max={300} step={5} suffix="px"
+                                    value={providerData.titleBoxGap || 0}
+                                    onChange={(v) => setProviderData({...providerData, titleBoxGap: v})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* SALSA GATOR LOGO — its own size/position, independent of
+                            the provider's logo sized in the section above. */}
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Sparkles size={16}/> Logo Salsa Gator</h3>
+                            <div className="px-1 space-y-3">
+                                <SliderRow
+                                    label="Tamanho" dense={false}
+                                    min={50} max={300} step={5} suffix="%"
+                                    value={Math.round((providerData.gatorLogoScale ?? 1) * 100)}
+                                    onChange={(v) => setProviderData({...providerData, gatorLogoScale: v / 100})}
+                                />
+                                <SliderRow
+                                    label="Gator X" dense={false} icon={<Move size={12}/>}
+                                    min={-400} max={400} step={5} suffix="px"
+                                    value={providerData.gatorLogoX || 0}
+                                    onChange={(v) => setProviderData({...providerData, gatorLogoX: v})}
+                                />
+                                <SliderRow
+                                    label="Gator Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
+                                    min={-400} max={400} step={5} suffix="px"
+                                    value={providerData.gatorLogoY || 0}
+                                    onChange={(v) => setProviderData({...providerData, gatorLogoY: v})}
+                                />
+                            </div>
+                        </div>
 
                         {/* BACKGROUND ASSET */}
                         <div className="mt-6 border-t border-white/10 pt-4">
@@ -3414,40 +3458,9 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* TEXT & LAYOUT ADJUSTMENTS */}
-                        <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Type size={16}/> Text & Layout</h3>
-
-                            {/* Text Size */}
-                            <div className="mb-4 px-1">
-                                <SliderRow
-                                    label="Text Size" dense={false}
-                                    min={50} max={300} step={10} suffix="%"
-                                    value={Math.round((activeGridConfig.textScale || 1) * 100)}
-                                    onChange={(v) => updateGridConfig('textScale', v / 100)}
-                                />
-                            </div>
-
-                            {/* Text Position */}
-                            <div className="space-y-3 mb-4">
-                                <SliderRow
-                                    label="Text X" dense={false} icon={<Move size={12}/>}
-                                    min={-300} max={300} step={5} suffix="px"
-                                    value={activeGridConfig.textX || 0}
-                                    onChange={(v) => updateGridConfig('textX', v)}
-                                />
-                                <SliderRow
-                                    label="Text Y" dense={false} icon={<Move size={12} className="rotate-90"/>}
-                                    min={-300} max={300} step={5} suffix="px"
-                                    value={activeGridConfig.textY || 0}
-                                    onChange={(v) => updateGridConfig('textY', v)}
-                                />
-                            </div>
-                        </div>
-
                         {/* GRID ADJUSTMENTS */}
-                        <div className="mt-2 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Grid size={16}/> Grid Settings</h3>
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Grid size={16}/> Grid de Jogos</h3>
 
                             {/* Grid Scale */}
                              <div className="mb-4 px-1">

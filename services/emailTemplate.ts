@@ -943,8 +943,15 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     
     // Apply Text Transformations
     const titleSize = `${baseTitleSizePx * txtScale}px`;
+    // Scales the whole logo composition (Gator logo + title + provider logo
+    // box) as one unit, on top of the individual size controls for each part.
+    // Origin follows the layout: centered formats grow outward from the
+    // middle, left-anchored ones (banner/PR) grow to the right so they don't
+    // spill off the left edge of the card.
+    const compositionScale = employee.providerCompositionScale ?? 1;
+    const compositionScalePart = compositionScale !== 1 ? ` scale(${compositionScale})` : '';
     // Append user X/Y offsets to base transform
-    logoContainerStyle += ` transform: ${logoBaseTransform} translate(${txtX}px, ${txtY}px);`;
+    logoContainerStyle += ` transform: ${logoBaseTransform} translate(${txtX}px, ${txtY}px)${compositionScalePart}; transform-origin: ${contentAlign === 'center' ? 'center center' : 'left center'};`;
 
     // APPLY POSITION OVERRIDES TO WRAPPER
     // We append the User X/Y to the transform string

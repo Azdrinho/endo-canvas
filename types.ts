@@ -65,6 +65,9 @@ export interface Employee {
   // Extra spacing (px) between the "NEW PROVIDER" title and the box holding
   // the provider's logo, on top of the format's own gap. 0 = unchanged.
   providerTitleBoxGap?: number;
+  // Scales the whole logo composition (Gator logo + title + provider logo
+  // box) as a unit, on top of each part's individual size control.
+  providerCompositionScale?: number;
   gameThumbnails?: string[];
   providerGridConfig?: ProviderGridConfig; // New Grid Configuration
   
