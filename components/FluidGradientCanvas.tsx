@@ -1,17 +1,31 @@
 import React, { useEffect, useRef } from 'react';
 
-// Real "aurora" gradient: a live linear gradient (the header's exact
-// cyan/purple/darker-cyan pair) fills the canvas every frame as the base —
-// never a flat dark backdrop — and several soft color masses are layered on
-// top with `globalCompositeOperation: 'lighter'` (additive blending), each
-// moving along its own combination of sine/cosine waves with irrational-ish
-// frequency ratios so the motion never feels like it loops or syncs up.
-// Wherever two masses overlap they genuinely glow brighter — this is real
-// per-frame computation, not a single CSS gradient shape being nudged around.
-const COLORS = ['#22d3ee', '#594B98', '#06b6d4', '#7c5cbf', '#22d3ee'];
+// Recreation of the "flow" blend exported from feralui.dev/gradients:
+//
+//   PALE LAGOON #6FD8F2 @ 0.25  ->  EDO PURPLE #745399 @ 0.75
+//   divider 0.5 · soften 0 · noise 6 · speed 30
+//
+// Drawn per frame on a canvas: a slowly rotating two-stop base gradient,
+// warped by soft masses of those same two colors drifting along their own
+// sine/cosine paths, finished with fine grain. The masses use normal alpha
+// blending rather than additive — with only two hues, additive blending
+// washes the overlaps out to white instead of reading as cyan <-> purple.
+const PALE_LAGOON = { r: 111, g: 216, b: 242 };
+const EDO_PURPLE = { r: 116, g: 83, b: 153 };
+// Stop positions from the export: the outer quarter of the axis stays solid
+// on each end, and the blend happens across the middle half.
+const STOP_A = 0.25;
+const STOP_B = 0.75;
+// Export values are 0-100; scaled here to the units each one drives.
+const NOISE_ALPHA = 6 / 100;
+const SPEED = 30 / 100;
 
-interface Blob {
-  color: string;
+const rgb = (c: { r: number; g: number; b: number }) => `rgb(${c.r}, ${c.g}, ${c.b})`;
+const rgba = (c: { r: number; g: number; b: number }, a: number) => `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+
+interface Mass {
+  color: { r: number; g: number; b: number };
+  alpha: number;
   fx: number;
   fy: number;
   phaseX: number;
@@ -22,6 +36,19 @@ interface Blob {
   baseY: number;
   radius: number;
 }
+
+// Alternating hues so neither color ever fully takes over the field, on
+// irrational-ish frequency ratios so the motion never visibly loops. Purple
+// carries slightly more weight — and holds the middle — because the pale
+// lagoon end is so much lighter that an even split reads as a cyan wash with
+// purple only in the corners.
+const MASSES: Mass[] = [
+  { color: PALE_LAGOON, alpha: 0.75, fx: 0.31, fy: 0.24, phaseX: 0.4, phaseY: 1.1, ampX: 0.30, ampY: 0.26, baseX: 0.22, baseY: 0.24, radius: 0.50 },
+  { color: EDO_PURPLE, alpha: 0.85, fx: 0.23, fy: 0.33, phaseX: 2.1, phaseY: 0.3, ampX: 0.28, ampY: 0.30, baseX: 0.78, baseY: 0.30, radius: 0.55 },
+  { color: EDO_PURPLE, alpha: 0.75, fx: 0.19, fy: 0.27, phaseX: 3.7, phaseY: 2.4, ampX: 0.32, ampY: 0.24, baseX: 0.30, baseY: 0.78, radius: 0.50 },
+  { color: PALE_LAGOON, alpha: 0.60, fx: 0.27, fy: 0.21, phaseX: 5.2, phaseY: 3.9, ampX: 0.26, ampY: 0.28, baseX: 0.74, baseY: 0.76, radius: 0.45 },
+  { color: EDO_PURPLE, alpha: 0.45, fx: 0.15, fy: 0.37, phaseX: 1.6, phaseY: 4.8, ampX: 0.34, ampY: 0.22, baseX: 0.52, baseY: 0.50, radius: 0.44 },
+];
 
 export const FluidGradientCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,49 +74,78 @@ export const FluidGradientCanvas: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
-    const blobs: Blob[] = COLORS.map((color, i) => ({
-      color,
-      fx: 0.00035 + i * 0.00021,
-      fy: 0.00028 + i * 0.00026,
-      phaseX: i * 1.7 + 0.4,
-      phaseY: i * 2.3 + 1.1,
-      ampX: 0.3 + (i % 3) * 0.06,
-      ampY: 0.26 + ((i + 1) % 3) * 0.06,
-      baseX: [0.28, 0.72, 0.5, 0.2, 0.8][i],
-      baseY: [0.32, 0.28, 0.7, 0.75, 0.62][i],
-      radius: 0.36 + (i % 2) * 0.06,
-    }));
+    // Grain is a single small tile of random greys, built once and repeated —
+    // regenerating noise per frame across the full viewport would cost far
+    // more than the effect is worth.
+    const grainTile = document.createElement('canvas');
+    grainTile.width = 128;
+    grainTile.height = 128;
+    const grainCtx = grainTile.getContext('2d');
+    let grainPattern: CanvasPattern | null = null;
+    if (grainCtx) {
+      const img = grainCtx.createImageData(128, 128);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = Math.random() * 255;
+        img.data[i] = v;
+        img.data[i + 1] = v;
+        img.data[i + 2] = v;
+        img.data[i + 3] = 255;
+      }
+      grainCtx.putImageData(img, 0, 0);
+      grainPattern = ctx.createPattern(grainTile, 'repeat');
+    }
 
     const start = performance.now();
     let raf = 0;
 
     const draw = (now: number) => {
-      const t = now - start;
-      ctx.clearRect(0, 0, width, height);
-      // Base is always a live gradient (never a flat dark backdrop) — the
-      // animated blobs below layer extra glow/movement on top of it.
-      const baseGrad = ctx.createLinearGradient(0, 0, width, height);
-      baseGrad.addColorStop(0, '#22d3ee');
-      baseGrad.addColorStop(0.5, '#594B98');
-      baseGrad.addColorStop(1, '#06b6d4');
-      ctx.fillStyle = baseGrad;
+      // Seconds since mount, scaled by the export's speed value.
+      const t = ((now - start) / 1000) * SPEED;
+
+      // Base gradient, its axis rotating slowly so the blend direction drifts.
+      const cx = width / 2;
+      const cy = height / 2;
+      const angle = Math.PI * 0.25 + Math.sin(t * 0.35) * 0.4;
+      const reach = Math.max(width, height) * 0.75;
+      const dx = Math.cos(angle) * reach;
+      const dy = Math.sin(angle) * reach;
+      const base = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
+      base.addColorStop(0, rgb(PALE_LAGOON));
+      base.addColorStop(STOP_A, rgb(PALE_LAGOON));
+      base.addColorStop(STOP_B, rgb(EDO_PURPLE));
+      base.addColorStop(1, rgb(EDO_PURPLE));
+      ctx.fillStyle = base;
       ctx.fillRect(0, 0, width, height);
 
-      ctx.globalCompositeOperation = 'lighter';
       const maxDim = Math.max(width, height);
-      for (const b of blobs) {
-        const cx = (b.baseX + Math.sin(t * b.fx + b.phaseX) * b.ampX) * width;
-        const cy = (b.baseY + Math.cos(t * b.fy + b.phaseY) * b.ampY) * height;
-        const r = b.radius * maxDim;
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        grad.addColorStop(0, b.color);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = grad;
+      for (const m of MASSES) {
+        const x = (m.baseX + Math.sin(t * m.fx * Math.PI * 2 + m.phaseX) * m.ampX) * width;
+        const y = (m.baseY + Math.cos(t * m.fy * Math.PI * 2 + m.phaseY) * m.ampY) * height;
+        const r = m.radius * maxDim;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, rgba(m.color, m.alpha));
+        g.addColorStop(0.55, rgba(m.color, m.alpha * 0.45));
+        g.addColorStop(1, rgba(m.color, 0));
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.globalCompositeOperation = 'source-over';
+
+      if (grainPattern) {
+        // Shifted on a ~12fps step rather than every frame: at 60fps the grain
+        // reads as harsh static instead of film grain.
+        const step = Math.floor(now / 83);
+        const ox = (step * 37) % 128;
+        const oy = (step * 61) % 128;
+        ctx.save();
+        ctx.globalAlpha = NOISE_ALPHA;
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.translate(-ox, -oy);
+        ctx.fillStyle = grainPattern;
+        ctx.fillRect(0, 0, width + 128, height + 128);
+        ctx.restore();
+      }
 
       raf = requestAnimationFrame(draw);
     };

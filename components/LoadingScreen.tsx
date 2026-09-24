@@ -32,13 +32,17 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ show }) => (
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
           className="relative z-10 inline-block"
+          // Two stacked shadows — a tight dark halo plus a wider soft one —
+          // because the pale lagoon end of the gradient is light enough that a
+          // white wordmark on a single downward shadow loses its edges.
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(20,16,40,0.45)) drop-shadow(0 6px 28px rgba(20,16,40,0.35))' }}
         >
-          <EndoCanvasLogo className="h-14 md:h-16 w-auto fill-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.25)]" />
+          <EndoCanvasLogo className="h-14 md:h-16 w-auto fill-white" />
 
           {/* Anchored to the bottom-right corner of the Endocanvas logo, not
               centered as a separate block below it. */}
           <div className="absolute right-0 top-full translate-y-3 flex items-center gap-2">
-            <span className="text-white/75 text-xs font-normal uppercase tracking-[0.15em] whitespace-nowrap">Powered by:</span>
+            <span className="text-white/90 text-xs font-normal uppercase tracking-[0.15em] whitespace-nowrap">Powered by:</span>
             <SalsaLogo variant="light" className="h-6 w-20 shrink-0" />
           </div>
         </motion.div>
