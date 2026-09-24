@@ -12,7 +12,6 @@ import { generateBackground } from './services/magnificService';
 import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, fetchActivationImages, addActivationImage, deleteActivationImage, uploadActivationImageToStorage, uploadEmployeePhoto } from './services/supabase';
 import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from './services/imageConverter';
 import { EmployeeManager } from './components/EmployeeManager';
-import { NetworkBackground } from './components/NetworkBackground';
 import { SalsaLogo } from './components/SalsaLogo';
 import { LoadingScreen } from './components/LoadingScreen';
 import { EndoCanvasLogo } from './components/EndoCanvasLogo';
@@ -237,8 +236,10 @@ const ThemeSwitch = React.memo(({ isDarkMode, toggle }: { isDarkMode: boolean, t
     <div className="theme-switch-wrapper drop-shadow-md">
       <style>{`
         .theme-switch-wrapper {
-          --hue: 189; 
-          --primary: hsl(var(--hue),90%,50%);
+          --hue: 189;
+          /* Greyscale to match the rest of the editor chrome: dark track,
+             light knob, rather than a cyan knob on a white track. */
+          --primary: #f2f2f2;
           --trans-dur: 0.6s;
           --trans-timing: cubic-bezier(0.65,0,0.35,1);
           font-size: 16px; 
@@ -248,8 +249,8 @@ const ThemeSwitch = React.memo(({ isDarkMode, toggle }: { isDarkMode: boolean, t
         .switch__inner { border-radius: 0.5em; display: block; overflow: hidden; position: absolute; top: 0.25em; left: 0.25em; width: 2.25em; height: 1em; }
         .switch__inner:before { transition: transform var(--trans-dur) var(--trans-timing); transform: translateX(-1.25em); }
         .switch__inner:before { background-color: var(--primary); border-radius: inherit; content: ""; display: block; width: 100%; height: 100%; }
-        .switch__input { background-color: hsl(0,0%,100%); border-radius: 0.75em; box-shadow: 0 0 0 0.0625em hsla(var(--hue),90%,50%,0), 0 0.125em 0.5em hsla(var(--hue),10%,10%,0.1); outline: transparent; width: 2.75em; height: 1.5em; -webkit-appearance: none; appearance: none; transition: background-color var(--trans-dur), box-shadow var(--trans-dur); cursor: pointer; }
-        .switch__input:checked { background-color: hsl(0,0%,100%); }
+        .switch__input { background-color: #262626; border-radius: 0.75em; box-shadow: 0 0 0 0.0625em hsla(var(--hue),90%,50%,0), 0 0.125em 0.5em hsla(var(--hue),10%,10%,0.1); outline: transparent; width: 2.75em; height: 1.5em; -webkit-appearance: none; appearance: none; transition: background-color var(--trans-dur), box-shadow var(--trans-dur); cursor: pointer; }
+        .switch__input:checked { background-color: #3a3a3a; }
         .switch__input:checked ~ .switch__inner:before { transform: translateX(1.25em); }
       `}</style>
       <label className="switch">
@@ -394,6 +395,24 @@ const RichTextField = React.memo(function RichTextField({ field, html, className
   );
 }, (prev, next) => prev.field === next.field && prev.html === next.html && prev.className === next.className && prev.placeholder === next.placeholder);
 
+// --- CONTROL SURFACE TOKENS -------------------------------------------------
+// One documented scale for the whole editor chrome, so radius and colour stay
+// consistent across every control.
+//   surface  panel + canvas backdrop (off-black, never #000)
+//   track    the unfilled part of a control
+//   fill     the filled part of a slider
+//   ink      primary label + value text, and the active state
+//   muted    section headers, inactive segment labels, helper text
+// Radius rule: slider/input rows use `rounded-lg`, anything segmented or
+// button-like uses `rounded-full`, the panel itself uses `rounded-2xl`.
+const UI = {
+  surface: '#141414',
+  track: '#262626',
+  fill: '#3a3a3a',
+  ink: '#f2f2f2',
+  muted: '#8c8c8c',
+};
+
 // The sidebar's 4 top tab buttons (Data/Templates/Settings/Images) were each
 // ~25 lines of near-identical hand-copied markup — the active-tab gradient,
 // radius, and animation were duplicated 4x, so a visual tweak meant touching
@@ -411,21 +430,17 @@ const SidebarTabButton: React.FC<{
     whileTap={{ scale: 0.92 }}
     transition={{ type: "spring", stiffness: 400, damping: 25 }}
     onClick={onClick}
-    className={`relative flex-1 flex items-center justify-center rounded-full transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+    className="relative flex-1 flex items-center justify-center rounded-full transition-colors duration-200"
+    style={{ color: isActive ? UI.surface : UI.muted }}
     title={title}
   >
     {isActive && (
       <motion.div
         layoutId="activeTabIndicator"
         className="absolute inset-0"
-        transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.3 }}
+        transition={{ type: "tween", ease: [0.4, 0, 0.2, 1], duration: 0.28 }}
       >
-        <motion.div
-          key={`indicator-${indicatorKey}`}
-          className="w-full h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg"
-          animate={{ scaleX: [1, 1.1, 1] }}
-          transition={{ duration: 0.3, times: [0, 0.5, 1], ease: "easeInOut" }}
-        />
+        <div className="w-full h-full rounded-full" style={{ background: UI.ink }} />
       </motion.div>
     )}
     <span className="relative z-10">{icon}</span>
@@ -455,11 +470,12 @@ function OptionToggleGroup<T extends string>({ options, value, onChange, columns
             key={opt.id}
             onClick={() => onChange(opt.id)}
             title={opt.label}
-            className={iconOnly
-              ? `flex items-center justify-center py-2.5 rounded-2xl border transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`
-              : `flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl border text-[10px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+            className={`flex items-center justify-center rounded-full text-[10px] font-semibold transition-colors ${iconOnly ? 'py-2' : 'flex-col gap-1 px-2 py-2.5 uppercase tracking-wide'}`}
+            style={isActive
+              ? { background: UI.ink, color: UI.surface }
+              : { background: UI.track, color: UI.muted }}
           >
-            <Icon size={16} />
+            <Icon size={15} />
             {!iconOnly && <span className="text-center leading-tight">{opt.label}</span>}
           </button>
         );
@@ -492,23 +508,20 @@ function SliderRow({ label, icon, value, min, max, step, onChange, suffix = '', 
     const v = parseFloat(raw);
     if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
   };
+  // Fill spans the full min..max range, so sliders that start negative
+  // (position offsets) fill from their left edge like any other.
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
-    <div>
-      <div className={`flex items-center justify-between mb-1 ${dense ? 'text-[10px] text-slate-500' : 'text-xs text-slate-400'}`}>
-        <span className="flex items-center gap-1">{icon}{label}</span>
-        <span className="flex items-center gap-0.5 tabular-nums">
-          <input
-            type="number"
-            min={min}
-            max={max}
-            step={step}
-            value={displayValue}
-            onChange={(e) => commit(e.target.value)}
-            className="w-11 bg-transparent text-right outline-none focus:text-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          {suffix}
-        </span>
-      </div>
+    <div
+      className={`relative w-full overflow-hidden rounded-lg ${dense ? 'h-8' : 'h-9'}`}
+      style={{ background: UI.track }}
+    >
+      <div
+        className="absolute inset-y-0 left-0"
+        style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: UI.fill }}
+      />
+
+      {/* Invisible range sitting on the bar: click or drag anywhere to set. */}
       <input
         type="range"
         min={min}
@@ -516,8 +529,32 @@ function SliderRow({ label, icon, value, min, max, step, onChange, suffix = '', 
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="styled-slider w-full"
+        className="absolute inset-0 z-10 w-full cursor-ew-resize opacity-0"
       />
+
+      <span
+        className="pointer-events-none absolute inset-y-0 left-3 z-20 flex items-center gap-1.5 text-[11px] font-semibold"
+        style={{ color: UI.ink }}
+      >
+        {icon}{label}
+      </span>
+
+      <span
+        className="absolute inset-y-0 right-2.5 z-20 flex items-center gap-0.5 text-[11px] font-semibold tabular-nums"
+        style={{ color: UI.ink }}
+      >
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={displayValue}
+          onChange={(e) => commit(e.target.value)}
+          className="w-12 bg-transparent text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          style={{ color: UI.ink }}
+        />
+        {suffix}
+      </span>
     </div>
   );
 }
@@ -1038,12 +1075,10 @@ export default function App() {
   }, [employees, selectedEmployeeId, selectedTemplate]);
 
   // Define Theme based on selectedTemplate
-  const theme = useMemo(() => {
-    switch(selectedTemplate) {
-        case TemplateType.NEW_PROVIDER: return { bg: 'bg-gradient-to-br from-[#0a261f] to-black' };
-        default: return { bg: 'bg-gradient-to-br from-slate-900 to-black' };
-    }
-  }, [selectedTemplate]);
+  // Flat near-black shell for every template. The editor chrome is deliberately
+  // colourless so the artwork on the canvas is the only saturated thing on
+  // screen; the old per-template background tints competed with it.
+  const theme = useMemo(() => ({ bg: 'bg-[#101010]' }), []);
 
   // --- SIGNATURE HTML GEN STATES ---
   const [signatureLinks, setSignatureLinks] = useState<Record<string, string>>({
@@ -3084,14 +3119,14 @@ export default function App() {
         mass: 0.8
       }}
       style={{ width: 340, transformOrigin: 'top left' }}
-      className="absolute top-24 left-6 bottom-8 rounded-[2.5rem] bg-[#121212] border border-white/10 z-30 shadow-2xl flex flex-col overflow-visible"
+      className="absolute top-24 left-6 bottom-8 rounded-2xl border border-white/[0.06] z-30 shadow-2xl flex flex-col overflow-visible"
     >
        {/* Inner wrapper to enclose content neatly inside the custom-shaped card */}
-       <div className="w-full h-full flex flex-col overflow-hidden rounded-[2.5rem] bg-[#121212]">
+       <div className="w-full h-full flex flex-col overflow-hidden rounded-2xl" style={{ background: UI.surface }}>
        
        {/* 1. Header Tabs */}
        <div className="p-4 shrink-0">
-          <div className="flex bg-white/10 rounded-full p-1 h-14 relative">
+          <div className="flex rounded-full p-1 h-12 relative" style={{ background: UI.track }}>
              {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                  <SidebarTabButton
                     isActive={activeTab === 'DATA'}
@@ -3147,7 +3182,7 @@ export default function App() {
              >
                 {activeTab === 'IMAGES' && (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) && (
              <div className="animate-in slide-in-from-right-4 duration-300 pt-2">
-                <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Image Library</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-4 flex items-center gap-2" style={{ color: UI.muted }}><ImageIcon size={16}/> Image Library</h3>
                 <div className="grid grid-cols-2 gap-3">
                     {(selectedTemplate === TemplateType.HIRING 
                         ? customHiringImages 
@@ -3224,10 +3259,10 @@ export default function App() {
                             provider identity, the logo composition, the Gator
                             logo, background art, and the game grid — rather
                             than in the order features happened to be added. */}
-                        <h3 className="text-sm font-bold text-cyan-300 uppercase mb-2 flex items-center gap-2"><Gamepad2 size={16}/> Provedor</h3>
+                        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-2 flex items-center gap-2" style={{ color: UI.muted }}><Gamepad2 size={16}/> Provedor</h3>
 
                         {/* Name Input */}
-                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10`}>
+                        <div className={`flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626]`}>
                            <User size={16} className="opacity-40 mr-3 text-white" />
                            <input 
                              value={providerData.name} 
@@ -3238,7 +3273,7 @@ export default function App() {
                         </div>
 
                         {/* Logo Input */}
-                        <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 gap-2`}>
+                        <div className={`flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] gap-2`}>
                            <ImageIcon size={16} className="opacity-40 text-white shrink-0" />
                            <input 
                              value={providerData.logo} 
@@ -3248,7 +3283,7 @@ export default function App() {
                            />
                            <button 
                               onClick={() => handleImageUploadTrigger('PROVIDER', 'logo')} 
-                              className="p-1.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 shadow-lg"
+                              className="p-1.5 rounded-full hover:opacity-90 shrink-0" style={{ background: UI.fill, color: UI.ink }}
                               title="Upload Logo"
                            >
                               <Upload size={14} />
@@ -3284,7 +3319,7 @@ export default function App() {
                         {/* COMPOSITION — everything that moves/sizes the whole
                             Gator logo + title + provider logo box block together. */}
                         <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-1 flex items-center gap-2"><Layers size={16}/> Composição</h3>
+                            <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1 flex items-center gap-2" style={{ color: UI.muted }}><Layers size={16}/> Composição</h3>
                             <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
                                 Logo Salsa Gator + texto "NEW PROVIDER" + caixa com o logo do provedor.
                             </p>
@@ -3327,7 +3362,7 @@ export default function App() {
                         {/* SALSA GATOR LOGO — its own size/position, independent of
                             the provider's logo sized in the section above. */}
                         <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Sparkles size={16}/> Logo Salsa Gator</h3>
+                            <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-3 flex items-center gap-2" style={{ color: UI.muted }}><Sparkles size={16}/> Logo Salsa Gator</h3>
                             <div className="px-1 space-y-3">
                                 <SliderRow
                                     label="Tamanho" dense={false}
@@ -3352,12 +3387,12 @@ export default function App() {
 
                         {/* BACKGROUND ASSET */}
                         <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><ImageIcon size={16}/> Asset de Fundo</h3>
+                            <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-3 flex items-center gap-2" style={{ color: UI.muted }}><ImageIcon size={16}/> Asset de Fundo</h3>
                             <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
                                 PNG ou SVG posicionado acima das esferas e atrás do grid de jogos e do logo.
                             </p>
 
-                            <div className={`flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 gap-2`}>
+                            <div className={`flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] gap-2`}>
                                <ImageIcon size={16} className="opacity-40 text-white shrink-0" />
                                <input
                                  value={providerData.bgAsset}
@@ -3367,7 +3402,7 @@ export default function App() {
                                />
                                <button
                                   onClick={() => handleImageUploadTrigger('PROVIDER', 'bgAsset')}
-                                  className="p-1.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 shadow-lg"
+                                  className="p-1.5 rounded-full hover:opacity-90 shrink-0" style={{ background: UI.fill, color: UI.ink }}
                                   title="Enviar asset (PNG/SVG)"
                                >
                                   <Upload size={14} />
@@ -3421,7 +3456,7 @@ export default function App() {
 
                         {/* BACKGROUND SPHERES */}
                         <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Circle size={16}/> Esferas do Fundo</h3>
+                            <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-3 flex items-center gap-2" style={{ color: UI.muted }}><Circle size={16}/> Esferas do Fundo</h3>
                             <div className="px-1 space-y-3">
                                 <SliderRow
                                     label="Desfoque" dense={false}
@@ -3469,7 +3504,7 @@ export default function App() {
 
                         {/* GRID ADJUSTMENTS */}
                         <div className="mt-6 border-t border-white/10 pt-4">
-                            <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2"><Grid size={16}/> Grid de Jogos</h3>
+                            <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-3 flex items-center gap-2" style={{ color: UI.muted }}><Grid size={16}/> Grid de Jogos</h3>
 
                             {/* Grid Scale */}
                              <div className="mb-4 px-1">
@@ -3489,7 +3524,8 @@ export default function App() {
                                         <button 
                                             key={num}
                                             onClick={() => updateGridConfig('columns', num)}
-                                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${activeGridConfig.columns === num ? 'bg-cyan-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                                            className="flex-1 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                                            style={activeGridConfig.columns === num ? { background: UI.ink, color: UI.surface } : { background: UI.track, color: UI.muted }}
                                         >
                                             {num === 0 ? 'Auto' : num}
                                         </button>
@@ -3556,8 +3592,8 @@ export default function App() {
 
                         {/* Thumbnails */}
                         <div className="flex items-center justify-between mt-4 mb-2 border-t border-white/10 pt-4">
-                           <h3 className="text-sm font-bold text-cyan-300 uppercase flex items-center gap-2"><ImageIcon size={16}/> Game Thumbnails</h3>
-                           <button onClick={handleAddThumbnail} className="text-xs text-white bg-cyan-600 hover:bg-cyan-500 px-2 py-1 rounded-lg flex items-center gap-1 transition-colors">
+                           <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] flex items-center gap-2" style={{ color: UI.muted }}><ImageIcon size={16}/> Game Thumbnails</h3>
+                           <button onClick={handleAddThumbnail} className="text-xs px-2 py-1 rounded-full flex items-center gap-1 hover:opacity-90 transition-opacity" style={{ background: UI.fill, color: UI.ink }}>
                               <Plus size={12}/> Add
                            </button>
                         </div>
@@ -3577,7 +3613,7 @@ export default function App() {
                                     />
                                     <button 
                                         onClick={() => handleImageUploadTrigger('PROVIDER', 'thumbnails', i)} 
-                                        className="p-1.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
+                                        className="p-1.5 rounded-full shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" style={{ background: UI.fill, color: UI.ink }}
                                         title="Upload Thumbnail"
                                     >
                                         <Upload size={12} />
@@ -3638,8 +3674,8 @@ export default function App() {
                                         corners unevenly (a notched/cut look) during and after the animation. */}
                                     <div className={`absolute inset-0 overflow-hidden rounded-2xl border ${
                                         (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE)
-                                            ? (selectedEmployeeIds.includes(emp.id) ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 opacity-70 hover:opacity-100')
-                                            : (selectedEmployeeId === emp.id ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 opacity-70 hover:opacity-100')
+                                            ? (selectedEmployeeIds.includes(emp.id) ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
+                                            : (selectedEmployeeId === emp.id ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
                                     }`}>
                                         <img src={emp.photoUrl || 'https://via.placeholder.com/150'} className="absolute inset-0 w-full h-full object-cover" />
 
@@ -3685,7 +3721,7 @@ export default function App() {
                           {selectedTemplate === TemplateType.ACTIVATION ? (
                               <div className="space-y-4">
                                   <div>
-                                      <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Formato do Texto</div>
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: UI.muted }}>Formato do Texto</div>
                                       <OptionToggleGroup
                                           options={[
                                               { id: 'title', label: 'Título', icon: Heading2 },
@@ -3698,7 +3734,7 @@ export default function App() {
                                   </div>
 
                                   <div>
-                                      <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Alinhamento do Texto</div>
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: UI.muted }}>Alinhamento do Texto</div>
                                       <OptionToggleGroup
                                           iconOnly
                                           options={[
@@ -3712,7 +3748,7 @@ export default function App() {
                                   </div>
 
                                   <div>
-                                      <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Imagem</div>
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: UI.muted }}>Imagem</div>
                                       <OptionToggleGroup
                                           options={[
                                               { id: 'background', label: 'Fundo', icon: ImageIcon },
@@ -3773,13 +3809,13 @@ export default function App() {
                                   {(selectedEmployee.activationTextMode || 'title') !== 'paragraph' && (
                                       <div>
                                           <div className="flex items-center justify-between mb-1">
-                                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Título</div>
+                                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: UI.muted }}>Título</div>
                                               <div className="flex items-center gap-1">
                                                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito"><Bold size={12} /></button>
                                                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico"><Italic size={12} /></button>
                                               </div>
                                           </div>
-                                          <div className="flex items-start px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <div className="flex items-start px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors">
                                               <Heading2 size={16} className="opacity-40 mr-3 mt-1 text-white shrink-0" />
                                               <RichTextField
                                                   field="name"
@@ -3811,13 +3847,13 @@ export default function App() {
                                   {(selectedEmployee.activationTextMode === 'paragraph' || selectedEmployee.activationTextMode === 'title_paragraph') && (
                                       <div>
                                           <div className="flex items-center justify-between mb-1">
-                                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Parágrafo</div>
+                                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: UI.muted }}>Parágrafo</div>
                                               <div className="flex items-center gap-1">
                                                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito"><Bold size={12} /></button>
                                                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico"><Italic size={12} /></button>
                                               </div>
                                           </div>
-                                          <div className="flex items-start px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                          <div className="flex items-start px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors">
                                               <Pilcrow size={16} className="opacity-40 mr-3 mt-1 text-white shrink-0" />
                                               <RichTextField
                                                   field="activationParagraph"
@@ -3883,31 +3919,31 @@ export default function App() {
                                       {selectedTemplate !== TemplateType.HIRING && selectedTemplate !== TemplateType.BABY && (
                                           <>
                                               <div>
-                                                  <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Aniversário</div>
-                                                  <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors"><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
+                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1" style={{ color: UI.muted }}>Aniversário</div>
+                                                  <div className="flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors"><Calendar size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.dateStr} onChange={(e) => updateEmployee(selectedEmployee.id, 'dateStr', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Birthday (DD/MM)" /></div>
                                               </div>
 
                                               <div>
-                                                  <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Data de Admissão</div>
-                                                  <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors"><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
+                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1" style={{ color: UI.muted }}>Data de Admissão</div>
+                                                  <div className="flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors"><Clock size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.admissionDate || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'admissionDate', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Admission Date" /></div>
                                               </div>
 
                                               <div>
-                                                  <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Cargo Anterior</div>
-                                                  <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors"><TrendingUp size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.previousRole || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'previousRole', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Previous Role (Job Change)" /></div>
+                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1" style={{ color: UI.muted }}>Cargo Anterior</div>
+                                                  <div className="flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors"><TrendingUp size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.previousRole || ''} onChange={(e) => updateEmployee(selectedEmployee.id, 'previousRole', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Previous Role (Job Change)" /></div>
                                               </div>
                                           </>
                                       )}
 
                                       <div>
-                                          <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">URL da Foto</div>
-                                          <div className="flex items-center px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors"><ImageIcon size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.photoUrl} onChange={(e) => updateEmployee(selectedEmployee.id, 'photoUrl', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Photo URL" /></div>
+                                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1" style={{ color: UI.muted }}>URL da Foto</div>
+                                          <div className="flex items-center px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors"><ImageIcon size={16} className="opacity-40 mr-3 text-white" /><input value={selectedEmployee.photoUrl} onChange={(e) => updateEmployee(selectedEmployee.id, 'photoUrl', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium text-white placeholder:text-white/30" placeholder="Photo URL" /></div>
                                       </div>
 
                                       {(selectedTemplate === TemplateType.WELCOME || selectedTemplate === TemplateType.BABY) && (
                                           <div>
                                               <div className="flex items-center justify-between mb-1">
-                                                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Resumo / Descrição</div>
+                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: UI.muted }}>Resumo / Descrição</div>
                                                   <div className="flex items-center gap-1">
                                                       <button
                                                           type="button"
@@ -3929,7 +3965,7 @@ export default function App() {
                                                       </button>
                                                   </div>
                                               </div>
-                                              <div className="flex items-start px-4 py-3 rounded-2xl border bg-white/5 border-white/10 focus-within:border-cyan-500/50 transition-colors">
+                                              <div className="flex items-start px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors">
                                                   <Pilcrow size={16} className="opacity-40 mr-3 mt-1 text-white shrink-0" />
                                                   {/* contentEditable (not a plain textarea) so Negrito/Itálico can actually
                                                       apply — it shares data-field="description" with the canvas version,
@@ -3967,7 +4003,7 @@ export default function App() {
           {activeTab === 'SETTINGS' && (
             <div className="animate-in slide-in-from-right-4 duration-300 pt-2 space-y-6">
                 <div>
-                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><Palette size={16}/> Cores da Marca</h3>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-4 flex items-center gap-2" style={{ color: UI.muted }}><Palette size={16}/> Cores da Marca</h3>
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-bold text-slate-400 block mb-2">Cor Primária</label>
@@ -3982,7 +4018,7 @@ export default function App() {
                                     type="text" 
                                     value={config.primaryColor}
                                     onChange={(e) => setConfig(prev => ({ ...prev, primaryColor: e.target.value }))}
-                                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-cyan-500"
+                                    className="bg-[#262626] border border-transparent rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-white/20"
                                 />
                             </div>
                         </div>
@@ -3999,7 +4035,7 @@ export default function App() {
                                     type="text" 
                                     value={config.secondaryColor}
                                     onChange={(e) => setConfig(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-cyan-500"
+                                    className="bg-[#262626] border border-transparent rounded-lg px-3 py-2 text-sm text-white flex-1 outline-none focus:border-white/20"
                                 />
                             </div>
                         </div>
@@ -4007,14 +4043,14 @@ export default function App() {
                 </div>
 
                 <div>
-                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-4 flex items-center gap-2"><ImageIcon size={16}/> Logo da Empresa</h3>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-4 flex items-center gap-2" style={{ color: UI.muted }}><ImageIcon size={16}/> Logo da Empresa</h3>
                     <div className="space-y-3">
                         <input 
                             type="text" 
                             value={config.companyLogo}
                             onChange={(e) => setConfig(prev => ({ ...prev, companyLogo: e.target.value }))}
                             placeholder="URL do Logo (PNG/SVG)"
-                            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white w-full outline-none focus:border-cyan-500"
+                            className="bg-[#262626] border border-transparent rounded-lg px-3 py-2 text-sm text-white w-full outline-none focus:border-white/20"
                         />
                         {config.companyLogo && (
                             <div className="p-4 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center">
@@ -4025,7 +4061,7 @@ export default function App() {
                 </div>
 
                 <div className="border-t border-white/10 pt-6">
-                    <h3 className="text-sm font-bold text-cyan-300 uppercase mb-3 flex items-center gap-2">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-3 flex items-center gap-2" style={{ color: UI.muted }}>
                         <ImageIcon size={16}/> Otimização de Imagens
                     </h3>
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
@@ -4035,7 +4071,7 @@ export default function App() {
                         <button
                             onClick={convertExistingImagesToWebP}
                             disabled={isConvertingAll}
-                            className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            className="w-full py-3 bg-[#3a3a3a] hover:bg-[#454545] disabled:bg-[#262626] disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                         >
                             {isConvertingAll ? (
                                 <>
@@ -4053,7 +4089,7 @@ export default function App() {
 
           {activeTab === 'TEMPLATES' && (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-3 pt-2">
-                <div className="relative flex items-center px-4 py-2.5 rounded-full border transition-all bg-white/5 border-white/10 focus-within:border-cyan-500/50">
+                <div className="relative flex items-center px-3 py-2 rounded-lg border border-transparent transition-all bg-[#262626] focus-within:border-white/20">
                     <Search size={16} className="opacity-50 mr-2.5 text-white shrink-0" />
                     <input
                         value={templateSearchQuery}
@@ -4080,7 +4116,8 @@ export default function App() {
                                         setSelectedTemplate(t.id as TemplateType);
                                         recordRecentTemplate(t.id);
                                     }}
-                                    className={`px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${selectedTemplate === t.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                    className="px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors"
+                                    style={selectedTemplate === t.id ? { background: UI.ink, color: UI.surface } : { background: UI.track, color: UI.muted }}
                                 >
                                     {t.label}
                                 </button>
@@ -4130,7 +4167,7 @@ export default function App() {
                            // Removed auto-navigation logic for NEW_PROVIDER here
                        }} 
                        className={`relative h-[140px] rounded-2xl text-left transition-colors duration-300 group overflow-hidden border
-                         ${selectedTemplate === t.id ? 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'border-white/10 opacity-80 hover:opacity-100 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}
+                         ${selectedTemplate === t.id ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100 hover:border-white/30'}
                        `}
                     >
                        {/* Background Image */}
@@ -4145,7 +4182,7 @@ export default function App() {
                        {/* Text Content */}
                        <div className="absolute bottom-4 left-5 z-10">
                           <div className="font-sans text-xl text-white font-normal mb-0.5 shadow-black drop-shadow-md">{t.label}</div>
-                          <div className="text-[10px] text-cyan-200 font-medium uppercase tracking-wide drop-shadow-md whitespace-pre-line">{t.desc}</div>
+                          <div className="text-[10px] text-white/70 font-medium uppercase tracking-wide drop-shadow-md whitespace-pre-line">{t.desc}</div>
                        </div>
                     </motion.button>
                   );
@@ -4160,13 +4197,14 @@ export default function App() {
        </div>
 
        {/* 3. Bottom Actions */}
-       <div className="p-4 pt-2 shrink-0 flex flex-col gap-2 border-t border-white/5 bg-[#121212]">
+       <div className="p-4 pt-2 shrink-0 flex flex-col gap-2 border-t border-white/[0.06]" style={{ background: UI.surface }}>
            <div className="flex gap-2">
                <motion.button
                   whileHover={isDownloading ? undefined : { scale: 1.02 }}
                   whileTap={isDownloading ? undefined : { scale: 0.97 }}
                   transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                  className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-full shadow-lg transition-colors font-medium uppercase tracking-wide text-white text-base ${isDownloading ? 'bg-cyan-700 cursor-wait' : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-purple-500/20'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-full transition-opacity font-semibold uppercase tracking-wide text-sm ${isDownloading ? 'cursor-wait opacity-70' : 'hover:opacity-90'}`}
+                  style={{ background: UI.ink, color: UI.surface }}
                   onClick={handleDownload}
                   disabled={isDownloading}
                >
@@ -4223,7 +4261,7 @@ export default function App() {
               }`}
             >
               {saveStatus === 'saving' && <><Loader2 size={13} className="animate-spin" /> Salvando...</>}
-              {saveStatus === 'saved' && <><CheckCircle2 size={13} className="text-cyan-400" /> Salvo</>}
+              {saveStatus === 'saved' && <><CheckCircle2 size={13} style={{ color: UI.ink }} /> Salvo</>}
               {saveStatus === 'error' && <><AlertTriangle size={13} /> Erro ao salvar</>}
             </motion.div>
           )}
@@ -4266,14 +4304,13 @@ export default function App() {
             {SidebarContent}
 
             <div
-                className={`flex flex-1 relative overflow-hidden bg-slate-200/50 dark:bg-black/50 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
+                className={`flex flex-1 relative overflow-hidden ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onWheel={handleWheel}
             >
-                    <NetworkBackground cardRef={canvasWrapperRef} />
 
                     <div ref={containerRef} className="w-full h-full relative">
                        <div
@@ -4334,7 +4371,8 @@ export default function App() {
                                         onClick={handleGenerateBackground}
                                         disabled={isGeneratingBg}
                                         title="Gerar Imagem"
-                                        className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-purple-600 hover:opacity-95 active:scale-[0.95] transition-all text-white rounded-full flex items-center justify-center shadow-lg mr-1 shrink-0 cursor-pointer disabled:cursor-default"
+                                        className="w-16 h-16 hover:opacity-90 active:scale-[0.95] transition-all rounded-full flex items-center justify-center shadow-lg mr-1 shrink-0 cursor-pointer disabled:cursor-default"
+                                        style={{ background: UI.ink, color: UI.surface }}
                                     >
                                         {isGeneratingBg ? (
                                             <Loader2 className="animate-spin text-white" size={26} />
@@ -4367,10 +4405,10 @@ export default function App() {
                                           <div className="h-full w-px bg-white absolute"></div>
                                       </div>
                                       <div 
-                                          className="w-[32px] h-[32px] rounded-full bg-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.5)] relative z-10 cursor-grab active:cursor-grabbing flex items-center justify-center"
-                                          style={{ transform: `translate(${joystickUiPos.x}px, ${joystickUiPos.y}px)` }}
+                                          className="w-[32px] h-[32px] rounded-full relative z-10 cursor-grab active:cursor-grabbing flex items-center justify-center"
+                                          style={{ background: UI.ink, transform: `translate(${joystickUiPos.x}px, ${joystickUiPos.y}px)` }}
                                       >
-                                          <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
+                                          <div className="w-2 h-2 rounded-full opacity-80" style={{ background: UI.surface }}></div>
                                       </div>
                                   </motion.div>
 
@@ -4400,14 +4438,15 @@ export default function App() {
                     </div>
 
                     <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
-                        <button onClick={undo} disabled={historyIndex === 0} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
-                        <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed" title="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
+                        <button onClick={undo} disabled={historyIndex === 0} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
+                        <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
 
                         {selectedEmployee && (
                         <div className="relative" ref={versionsPanelRef}>
                             <button
                                 onClick={() => setShowVersionsPanel(v => !v)}
-                                className={`p-3 rounded-full shadow-lg transition-all ${showVersionsPanel ? 'bg-cyan-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                className="p-3 rounded-full shadow-lg transition-colors"
+                                style={showVersionsPanel ? { background: UI.ink, color: UI.surface } : { background: UI.track, color: UI.ink }}
                                 title="Versões salvas deste card"
                             >
                                 <History size={20}/>
@@ -4423,12 +4462,12 @@ export default function App() {
                                             onChange={(e) => setVersionNameDraft(e.target.value)}
                                             onKeyDown={(e) => { if (e.key === 'Enter' && versionNameDraft.trim()) { saveCardVersion(versionNameDraft); setVersionNameDraft(''); } }}
                                             placeholder="Nome da versão..."
-                                            className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none border bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-cyan-500/50"
+                                            className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none border border-transparent bg-[#262626] text-white placeholder:text-slate-600 focus:border-white/20"
                                         />
                                         <button
                                             onClick={() => { if (versionNameDraft.trim()) { saveCardVersion(versionNameDraft); setVersionNameDraft(''); } }}
                                             disabled={!versionNameDraft.trim()}
-                                            className="p-2 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                            className="p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90" style={{ background: UI.fill, color: UI.ink }}
                                             title="Salvar versão atual"
                                         >
                                             <Save size={15} />
@@ -4447,7 +4486,7 @@ export default function App() {
                                                 </div>
                                                 <button
                                                     onClick={() => restoreCardVersion(entry)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-white/10 transition-colors shrink-0"
+                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
                                                     title="Restaurar esta versão"
                                                 >
                                                     <RotateCw size={14} />
@@ -4473,7 +4512,7 @@ export default function App() {
                             whileTap={{ scale: 0.92 }}
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             onClick={() => handleZoom(0.1)}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80" style={{ background: UI.track, color: UI.ink }}
                             title="Aumentar zoom"
                         >
                             <ZoomIn size={20}/>
@@ -4489,7 +4528,7 @@ export default function App() {
                                 const rect = containerRef.current?.getBoundingClientRect();
                                 zoomAtPoint(1, rect ? rect.width / 2 : 0, rect ? rect.height / 2 : 0);
                             }}
-                            className="py-1.5 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-[10px] font-bold tabular-nums text-center"
+                            className="py-1.5 rounded-full shadow-lg transition-opacity hover:opacity-80 text-[10px] font-bold tabular-nums text-center" style={{ background: UI.track, color: UI.ink }}
                             title="Redefinir zoom (100%)"
                         >
                             {Math.round(zoomLevel * 100)}%
@@ -4499,7 +4538,7 @@ export default function App() {
                             whileTap={{ scale: 0.92 }}
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             onClick={() => handleZoom(-0.1)}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80" style={{ background: UI.track, color: UI.ink }}
                             title="Diminuir zoom"
                         >
                             <ZoomOut size={20}/>
@@ -4703,7 +4742,8 @@ export default function App() {
                                             whileTap={{ scale: 0.96 }}
                                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                             onClick={() => setProviderFormat(fmt.id as ProviderFormat)}
-                                            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${providerFormat === fmt.id ? 'bg-cyan-500 text-white shadow-lg' : 'hover:bg-white/10 text-slate-300'}`}
+                                            className="px-3 py-2 rounded-full text-xs font-semibold flex items-center gap-2 transition-colors"
+                                            style={providerFormat === fmt.id ? { background: UI.ink, color: UI.surface } : { color: UI.muted }}
                                         >
                                             <fmt.icon size={14} />
                                             {fmt.label}
@@ -4752,7 +4792,7 @@ export default function App() {
                                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-[10px] font-bold text-white uppercase leading-none">Apenas Nomes</span>
-                                                    <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Sem fotos</span>
+                                                    <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>Sem fotos</span>
                                                 </div>
                                                 <ThemeSwitch isDarkMode={isCompactMonthView} toggle={() => setIsCompactMonthView(!isCompactMonthView)} />
                                             </div>
@@ -4761,7 +4801,7 @@ export default function App() {
                                     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                         <div className="flex flex-col items-end">
                                             <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Mensal</span>
-                                            <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Ver todos do mês</span>
+                                            <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>Ver todos do mês</span>
                                         </div>
                                         <ThemeSwitch isDarkMode={isMonthView} toggle={() => setIsMonthView(!isMonthView)} />
                                     </div>
@@ -4773,7 +4813,7 @@ export default function App() {
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                     <div className="flex flex-col items-end">
                                         <span className="text-[10px] font-bold text-white uppercase leading-none">Fundo Escuro</span>
-                                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Seção do texto</span>
+                                        <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>Seção do texto</span>
                                     </div>
                                     <ThemeSwitch isDarkMode={welcomeVariant === 'dark'} toggle={() => setWelcomeVariant(welcomeVariant === 'dark' ? 'light' : 'dark')} />
                                 </div>
@@ -4784,7 +4824,7 @@ export default function App() {
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                     <div className="flex flex-col items-end">
                                         <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Grupo</span>
-                                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter leading-none mt-0.5">Adicionar pessoas</span>
+                                        <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>Adicionar pessoas</span>
                                     </div>
                                     <ThemeSwitch isDarkMode={isGroupMode} toggle={() => {
                                         const next = !isGroupMode;
@@ -4902,7 +4942,8 @@ export default function App() {
                                                 whileTap={{ scale: 0.92 }}
                                                 transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                                 onClick={() => setLanguage(lang)}
-                                                className={`w-9 h-full rounded-full text-[10px] font-bold uppercase transition-all flex items-center justify-center leading-none pt-[1px] ${language === lang ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                                className="w-9 h-full rounded-full text-[10px] font-bold uppercase transition-colors flex items-center justify-center leading-none pt-[1px]"
+                                                style={language === lang ? { background: UI.ink, color: UI.surface } : { color: UI.muted }}
                                             >
                                                 {lang}
                                             </motion.button>

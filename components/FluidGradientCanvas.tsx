@@ -62,9 +62,15 @@ export const FluidGradientCanvas: React.FC = () => {
     let height = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+    // Measured from the canvas's own parent rather than the window: the
+    // element is `absolute inset-0`, so the parent is the truth, and reading
+    // the window leaves the gradient clipped whenever the layout settles to a
+    // different size after mount (which the window `resize` event misses).
     const resize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
+      const parent = canvas.parentElement;
+      const rect = parent ? parent.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+      width = Math.max(1, Math.round(rect.width));
+      height = Math.max(1, Math.round(rect.height));
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
@@ -72,7 +78,9 @@ export const FluidGradientCanvas: React.FC = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
-    window.addEventListener('resize', resize);
+
+    const observer = new ResizeObserver(resize);
+    if (canvas.parentElement) observer.observe(canvas.parentElement);
 
     // Grain is a single small tile of random greys, built once and repeated —
     // regenerating noise per frame across the full viewport would cost far
@@ -153,7 +161,7 @@ export const FluidGradientCanvas: React.FC = () => {
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
+      observer.disconnect();
     };
   }, []);
 
