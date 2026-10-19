@@ -7,13 +7,12 @@ import { Toaster, toast } from 'sonner';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat, ProviderGridConfig } from './types';
-import { generateCardCanvas, applyActivationTextFit } from './services/emailTemplate';
+import { generateCardCanvas, applyActivationTextFit, FAREWELL_GROUP_MAX } from './services/emailTemplate';
 import { generateBackground } from './services/magnificService'; 
 import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, fetchActivationImages, addActivationImage, deleteActivationImage, uploadActivationImageToStorage, uploadEmployeePhoto } from './services/supabase';
 import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from './services/imageConverter';
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
-import { LoadingScreen } from './components/LoadingScreen';
 import { EndoCanvasLogo } from './components/EndoCanvasLogo';
 import * as XLSX from 'xlsx';
 import { toPng, toJpeg } from 'html-to-image';
@@ -559,6 +558,14 @@ function SliderRow({ label, icon, value, min, max, step, onChange, suffix = '', 
   );
 }
 
+// Templates that can assemble several people onto a single card through the
+// "Modo Grupo" toggle. Job Change has always been unbounded; Farewell caps at
+// FAREWELL_GROUP_MAX, which the generator enforces too so the card can never
+// be handed more people than it can render legibly.
+const GROUP_CAPABLE_TEMPLATES: TemplateType[] = [TemplateType.JOB_CHANGE, TemplateType.FAREWELL];
+const supportsGroupMode = (t: TemplateType) => GROUP_CAPABLE_TEMPLATES.includes(t);
+const groupLimitFor = (t: TemplateType) => (t === TemplateType.FAREWELL ? FAREWELL_GROUP_MAX : Infinity);
+
 const TEMPLATE_LIST = [
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
@@ -576,16 +583,6 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [isManagementMode, setIsManagementMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  // Boot splash: stays up until the initial employee fetch resolves AND a
-  // minimum display time has passed (so it never just flickers if the fetch
-  // is fast), then the LoadingScreen animates itself away.
-  const [isDataLoading, setIsDataLoading] = useState(true);
-  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setMinSplashElapsed(true), 2800);
-    return () => clearTimeout(t);
-  }, []);
 
   // 3. Silent Auto Backup Synchronization to LocalStorage
   useEffect(() => {
@@ -1336,7 +1333,7 @@ export default function App() {
           setSelectedEmployeeId(remoteData[0].id);
         }
       }
-    }).finally(() => setIsDataLoading(false));
+    });
 
     fetchHiringImages().then(images => {
       if (images && images.length > 0) {
@@ -1590,13 +1587,15 @@ export default function App() {
         } as Employee;
     }
 
-    if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
+    if (isGroupMode && supportsGroupMode(selectedTemplate)) {
         // Always return an array in group mode to trigger the group template
         if (selectedEmployeeIds.length === 0) {
             const current = employees.find(e => e.id === selectedEmployeeId) || employees[0];
             return [current];
         }
-        return employees.filter(e => selectedEmployeeIds.includes(e.id));
+        const limit = groupLimitFor(selectedTemplate);
+        const picked = employees.filter(e => selectedEmployeeIds.includes(e.id));
+        return Number.isFinite(limit) ? picked.slice(0, limit) : picked;
     }
 
     if (isMonthView && selectedTemplate === TemplateType.BIRTHDAY) {
@@ -3649,18 +3648,22 @@ export default function App() {
                                     transition={{ duration: 0.2 }}
                                     key={emp.id} 
                                     onClick={() => {
-                                        if (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE) {
-                                            setSelectedEmployeeIds(prev => 
-                                                prev.includes(emp.id) 
-                                                    ? prev.filter(id => id !== emp.id)
-                                                    : [...prev, emp.id]
-                                            );
+                                        if (isGroupMode && supportsGroupMode(selectedTemplate)) {
+                                            setSelectedEmployeeIds(prev => {
+                                                if (prev.includes(emp.id)) return prev.filter(id => id !== emp.id);
+                                                // Over the cap the click is ignored rather than swapping
+                                                // someone out: the counter on the Modo Grupo pill shows the
+                                                // limit, so a click that does nothing is readable, while an
+                                                // unannounced replacement would not be.
+                                                if (prev.length >= groupLimitFor(selectedTemplate)) return prev;
+                                                return [...prev, emp.id];
+                                            });
                                         } else {
                                             setSelectedEmployeeId(emp.id);
                                         }
                                     }}
                                     onDoubleClick={() => {
-                                        if (!(isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE)) {
+                                        if (!(isGroupMode && supportsGroupMode(selectedTemplate))) {
                                             setSelectedEmployeeId(emp.id);
                                             setSidebarDataView('DETAIL');
                                         }
@@ -3673,7 +3676,7 @@ export default function App() {
                                         overflow-hidden on the SAME element makes the browser render the rounded
                                         corners unevenly (a notched/cut look) during and after the animation. */}
                                     <div className={`absolute inset-0 overflow-hidden rounded-2xl border ${
-                                        (isGroupMode && selectedTemplate === TemplateType.JOB_CHANGE)
+                                        (isGroupMode && supportsGroupMode(selectedTemplate))
                                             ? (selectedEmployeeIds.includes(emp.id) ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
                                             : (selectedEmployeeId === emp.id ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
                                     }`}>
@@ -4238,8 +4241,6 @@ export default function App() {
 
   return (
     <div className={`w-full h-screen flex flex-col overflow-hidden ${theme.bg} dark text-slate-900 dark:text-white transition-colors duration-300`}>
-        <LoadingScreen show={isDataLoading || !minSplashElapsed} />
-
         {/* REMOVED ViewMode.IMPORT conditional rendering completely */}
 
         {HeaderContent}
@@ -4819,12 +4820,16 @@ export default function App() {
                                 </div>
                             )}
 
-                            {/* MODO GRUPO TOGGLE (Only for Job Change) */}
-                            {selectedTemplate === TemplateType.JOB_CHANGE && (
+                            {/* MODO GRUPO TOGGLE (Job Change + See You Soon) */}
+                            {supportsGroupMode(selectedTemplate) && (
                                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                                     <div className="flex flex-col items-end">
                                         <span className="text-[10px] font-bold text-white uppercase leading-none">Modo Grupo</span>
-                                        <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>Adicionar pessoas</span>
+                                        <span className="text-[8px] uppercase tracking-tighter leading-none mt-0.5" style={{ color: UI.muted }}>
+                                            {isGroupMode && Number.isFinite(groupLimitFor(selectedTemplate))
+                                                ? `${Math.min(selectedEmployeeIds.length, groupLimitFor(selectedTemplate))}/${groupLimitFor(selectedTemplate)} pessoas`
+                                                : 'Adicionar pessoas'}
+                                        </span>
                                     </div>
                                     <ThemeSwitch isDarkMode={isGroupMode} toggle={() => {
                                         const next = !isGroupMode;

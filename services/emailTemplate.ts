@@ -2232,6 +2232,170 @@ const generateFarewellCardTemplate = (
   }
 };
 
+// --- SEE YOU SOON (FAREWELL) — GROUP LAYOUT ---
+// Multi-person variant of the farewell card, built on the same gradient-band
+// + photo-grid skeleton as the birthday month card and the job-change group
+// card so the three read as one family. What is specific to this one: the
+// farewell title is two lines in every language, each tile carries the
+// person's role rather than a date or a before/after role pair, and the band
+// fades into the card's own background instead of into a hardcoded white.
+//
+// Capped at ten people: past that the tiles are too small for a name to
+// survive, so the extras are dropped rather than rendered illegibly.
+export const FAREWELL_GROUP_MAX = 10;
+
+const generateFarewellGroupTemplate = (
+  employees: Employee[],
+  _config: CanvasConfig,
+  language: Language,
+  orientation: Orientation = 'portrait',
+  variant: 'light' | 'dark' = 'light'
+): string => {
+  const isDark = variant === 'dark';
+  const isLandscape = orientation === 'landscape';
+  const cardWidth = isLandscape ? 740 : 360;
+  const cardBg = isDark ? '#1a1a1a' : '#f1f1f1';
+  const purpleColor = '#594C99';
+  const noise = getNoiseOverlay();
+  const spheres = getSpheresHtml('brand');
+  const logo = getPepperLogoHtml(`position: absolute; top: 15px; right: ${isLandscape ? '25px' : '15px'}; width: 20px; height: 28px; z-index: 60;`, true);
+
+  const people = employees.slice(0, FAREWELL_GROUP_MAX);
+  const count = Math.max(people.length, 1);
+
+  // A transparent *white* stop over a dark card interpolates through grey and
+  // leaves a visible haze where the band meets the body — which is what the
+  // older group cards do in their dark variant. Fading to a transparent copy
+  // of the body color instead keeps that seam invisible in both variants.
+  const fadeOut = isDark ? 'rgba(26,26,26,0)' : 'rgba(241,241,241,0)';
+  const brandGradient = `linear-gradient(135deg, #22d3ee 0%, ${purpleColor} 100%)`;
+  const bandGradient = `linear-gradient(to top, ${cardBg} 0%, ${fadeOut} 80%), ${brandGradient}`;
+  // Only shows where a photo is missing or transparent; the highlight runs
+  // top-down here so a failed image still reads as a framed tile.
+  const frameGradient = `linear-gradient(to bottom, ${cardBg} 0%, ${fadeOut} 80%), ${brandGradient}`;
+
+  const rawTitle = TEXTS.FAREWELL[language]; // two lines, separated by <br/>
+  const longestTitleLine = rawTitle.split('<br/>').reduce((a, l) => Math.max(a, l.length), 0);
+  let headerFontSize = isLandscape ? 54 : 44;
+  if (longestTitleLine > 7) headerFontSize -= isLandscape ? 6 : 5;
+  if (longestTitleLine > 9) headerFontSize -= isLandscape ? 6 : 5;
+
+  const gap = 12;
+  const paddingX = isLandscape ? 40 : 30;
+
+  // Column count is chosen so a tile never drops much below 90px, which is
+  // where the two-line name stops fitting. Portrait stays on two columns for
+  // as long as it can and grows downward instead: a taller card with 144px
+  // tiles reads far better than a 540px one with 92px tiles.
+  let columns = isLandscape
+    ? (count <= 3 ? 3 : count <= 8 ? 4 : 5)
+    : (count <= 6 ? 2 : 3);
+  if (columns > count) columns = count;
+
+  const availableWidth = cardWidth - paddingX * 2;
+  // Capped so one or two people do not blow a tile up to most of the card:
+  // the row is centered, so a clamped tile just leaves margins at the sides.
+  const maxTileWidth = isLandscape ? 260 : 300;
+  const tileSize = Math.min((availableWidth - (columns - 1) * gap) / columns, maxTileWidth);
+  const rows = Math.ceil(count / columns);
+
+  const headerHeight = isLandscape ? 140 : 160;
+  const bodyPadY = 22;
+  // Never shorter than the single-person card of the same orientation, so the
+  // two variants stay interchangeable wherever the card gets placed.
+  const minHeight = isLandscape ? 360 : 540;
+
+  // Tiles are square by default, but a handful of people would otherwise sit
+  // in the middle of a card held open by minHeight with a void above and
+  // below. When the square grid comes up short, the tiles take the slack by
+  // growing taller (never wider), capped at 3:2 so the photos stay
+  // recognizably square-ish rather than turning into slivers.
+  const slackHeight = minHeight - headerHeight - bodyPadY * 2;
+  const squareGridHeight = rows * tileSize + (rows - 1) * gap;
+  const tileHeight = squareGridHeight < slackHeight
+    ? Math.min(tileSize * 1.5, (slackHeight - (rows - 1) * gap) / rows)
+    : tileSize;
+
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  // Type scales off the actual tile width rather than off a compact/roomy
+  // boolean, so every column count lands on sizes proportional to its tiles.
+  const baseNameSize = clamp(Math.round(tileSize * 0.115), 8, 18);
+  const roleSize = clamp(Math.round(tileSize * 0.075), 6, 12);
+  const tilePad = clamp(Math.round(tileSize * 0.085), 6, 14);
+  const roleMaxHeight = Math.round(roleSize * 1.2 * 2); // two lines, then clipped
+  // The caption's scrim is the caption's own background rather than a fixed
+  // share of the tile, so it grows with the text: a three-line name over a
+  // two-line role on a bright photo would otherwise poke out above a
+  // fixed-height scrim and lose its contrast.
+  const scrimRamp = Math.round(tileSize * 0.38);
+
+  // Width of the photo panel the per-person pan was dialled in against on the
+  // single-person card.
+  const sourcePanelWidth = isLandscape ? cardWidth * 0.45 : cardWidth;
+  const panRatio = tileSize / sourcePanelWidth;
+
+  let gridItems = '';
+  people.forEach((emp) => {
+    const firstName = emp.name.split(' ')[0] || '';
+    const restName = emp.name.split(' ').slice(1).join(' ');
+    const longestNameLine = Math.max(firstName.length, restName.length);
+    let nameSize = baseNameSize;
+    if (longestNameLine > 9) nameSize -= 1;
+    if (longestNameLine > 13) nameSize -= 1;
+    if (longestNameLine > 17) nameSize -= 1;
+    nameSize = Math.max(nameSize, 7);
+
+    const role = (emp.role || '').toUpperCase();
+
+    // Zoom is a ratio and carries over untouched; the pan is stored in pixels
+    // dialled in against sourcePanelWidth, so reused verbatim it would throw
+    // the photo clean out of a 90px tile. Rescaled by the tile's share of
+    // that panel, a face the user centered on the single card stays centered.
+    const photoScale = emp.photoScale || 1;
+    const posX = (emp.photoPosition?.x || 0) * panRatio;
+    const posY = (emp.photoPosition?.y || 0) * panRatio;
+    const photoTransform = (photoScale !== 1 || posX || posY)
+      ? `transform: scale(${photoScale}) translate(${posX.toFixed(2)}px, ${posY.toFixed(2)}px); transform-origin: center center;`
+      : '';
+
+    gridItems += `
+      <div style="width: ${tileSize.toFixed(2)}px; height: ${tileHeight.toFixed(2)}px; position: relative; overflow: hidden; background: ${frameGradient}; box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
+        <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${photoTransform}"/>
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: ${scrimRamp}px ${tilePad}px ${tilePad}px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
+          <p class="akira-font" style="font-size: ${nameSize}px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
+            ${firstName}${restName ? `<br/>${restName}` : ''}
+          </p>
+          ${role ? `<p style="font-family: 'Orkney', sans-serif; font-weight: 300; font-size: ${roleSize}px; line-height: 1.2; max-height: ${roleMaxHeight}px; overflow: hidden; margin: ${Math.round(roleSize * 0.45)}px 0 0 0; color: rgba(255,255,255,0.88); text-transform: uppercase; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">${role}</p>` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  const containerHeight = Math.round(Math.max(
+    minHeight,
+    headerHeight + bodyPadY * 2 + rows * tileHeight + (rows - 1) * gap
+  ));
+
+  return `
+    <div id="capture-target" style="width: ${cardWidth}px; height: ${containerHeight}px; background: ${cardBg}; position: relative; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+       <div style="height: ${headerHeight}px; width: 100%; background: ${bandGradient}; position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; z-index: 20; flex-shrink: 0;">
+          ${noise}
+          ${spheres}
+          ${logo}
+          <h1 class="akira-font" style="font-size: ${headerFontSize}px; line-height: 1.02; color: ${cardBg}; margin: 0; text-align: center; letter-spacing: 2px; position: relative; z-index: 10; text-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            ${rawTitle}
+          </h1>
+       </div>
+       <div style="flex: 1; width: 100%; background: ${cardBg}; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: ${bodyPadY}px 0;">
+          <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: ${gap}px; width: 100%; padding: 0 ${paddingX}px; z-index: 10; position: relative; box-sizing: border-box;">
+             ${gridItems}
+          </div>
+       </div>
+    </div>
+  `;
+};
+
+
 // --- WELCOME ABOARD — ALTERNATE "INVERTED FRAME" LAYOUT ---
 // Experimental variant requested to test a different composition: the
 // gradient/sphere identity panel and the photo panel swap roles. The photo
@@ -3053,6 +3217,8 @@ export const generateCardCanvas = (data: Employee | Employee[], config: CanvasCo
          }
       } else if (type === TemplateType.JOB_CHANGE) {
          cardHtml = generateJobChangeGroupTemplate(data, config, language, orientation);
+      } else if (type === TemplateType.FAREWELL) {
+         cardHtml = generateFarewellGroupTemplate(data, config, language, orientation, opts?.welcomeVariant || 'light');
       } else {
          return generateCardCanvas(data[0], config, type, orientation, language, isExportMode, links, providerFormat, department);
       }
