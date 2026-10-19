@@ -2359,7 +2359,7 @@ const generateFarewellGroupTemplate = (
       : '';
 
     gridItems += `
-      <div style="width: ${tileSize.toFixed(2)}px; height: ${tileHeight.toFixed(2)}px; position: relative; overflow: hidden; background: ${frameGradient}; box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
+      <div data-emp-id="${emp.id}" data-pan-ratio="${panRatio.toFixed(4)}" style="width: ${tileSize.toFixed(2)}px; height: ${tileHeight.toFixed(2)}px; position: relative; overflow: hidden; background: ${frameGradient}; box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
         <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${photoTransform}"/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: ${scrimRamp}px ${tilePad}px ${tilePad}px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: ${nameSize}px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
@@ -2705,6 +2705,12 @@ const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasCon
   // Estimate item height (square aspect ratio)
   const availableWidth = cardWidth - (paddingX * 2);
   const approxItemSize = (availableWidth - ((columns - 1) * gap)) / columns;
+
+  // Same treatment as the farewell group card: zoom carries over as a ratio
+  // and the pan, stored in pixels against the single card's photo panel, is
+  // rescaled to the tile's share of it.
+  const jcSourcePanelWidth = isLandscape ? cardWidth * 0.45 : cardWidth;
+  const jcPanRatio = approxItemSize / jcSourcePanelWidth;
   
   let containerHeight = headerHeight + bodyPaddingY + (rows * approxItemSize) + ((rows - 1) * gap);
   if (!isLandscape && containerHeight < 540) containerHeight = 540;
@@ -2735,9 +2741,16 @@ const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasCon
       if (newRole.length > 25) roleSizeNum -= 1;
       const finalRoleSize = `${roleSizeNum}px`;
 
+      const jcScale = emp.photoScale || 1;
+      const jcPosX = (emp.photoPosition?.x || 0) * jcPanRatio;
+      const jcPosY = (emp.photoPosition?.y || 0) * jcPanRatio;
+      const jcTransform = (jcScale !== 1 || jcPosX || jcPosY)
+        ? `transform: scale(${jcScale}) translate(${jcPosX.toFixed(2)}px, ${jcPosY.toFixed(2)}px); transform-origin: center center;`
+        : '';
+
       gridItems += `
-        <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-            <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+        <div data-emp-id="${emp.id}" data-pan-ratio="${jcPanRatio.toFixed(4)}" style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
+            <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${jcTransform}"/>
             
             <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;">
                 <!-- Name Overlay with Gradient Fade -->

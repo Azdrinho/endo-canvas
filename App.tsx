@@ -566,6 +566,23 @@ const GROUP_CAPABLE_TEMPLATES: TemplateType[] = [TemplateType.JOB_CHANGE, Templa
 const supportsGroupMode = (t: TemplateType) => GROUP_CAPABLE_TEMPLATES.includes(t);
 const groupLimitFor = (t: TemplateType) => (t === TemplateType.FAREWELL ? FAREWELL_GROUP_MAX : Infinity);
 
+// A group card draws each photo in a tile that is only a fraction of the
+// single-person card's photo panel, and scales the stored pan by that same
+// fraction when it draws it. Left uncompensated the joystick would crawl
+// there, so the group templates publish the fraction they used on each tile
+// and the joystick divides its step by it: the photo then travels the same
+// distance on screen whichever card is on the canvas. Anything without the
+// attribute (every single-person card) is drawn 1:1 and needs no scaling.
+const readPanStepFactor = (employeeId: string): number => {
+  try {
+    const tile = document.querySelector(`#capture-target [data-emp-id="${CSS.escape(employeeId)}"][data-pan-ratio]`);
+    const ratio = tile ? parseFloat(tile.getAttribute('data-pan-ratio') || '') : NaN;
+    return Number.isFinite(ratio) && ratio > 0 ? 1 / ratio : 1;
+  } catch {
+    return 1;
+  }
+};
+
 const TEMPLATE_LIST = [
   { id: TemplateType.HIRING, label: 'Hiring', desc: 'Recruitment Card', image: 'https://img.mailinblue.com/2600492/images/content_library/original/69cd286e93e704e0f8774c28.png' },
   { id: TemplateType.WELCOME, label: 'Welcome Aboard', desc: 'For new hires', image: 'https://img.mailinblue.com/2600492/images/content_library/original/698e73f1187dda7445a894d8.png' },
@@ -1440,12 +1457,16 @@ export default function App() {
       
       updatePosition(startX, startY);
 
+      // Read once per grab rather than per tick: the tile cannot change size
+      // while the knob is held, and this runs at 50fps.
+      const panStepFactor = readPanStepFactor(selectedEmployee.id);
+
       if (!joystickIntervalRef.current) {
           joystickIntervalRef.current = window.setInterval(() => {
               const v = joystickVelocityRef.current;
               if (Math.abs(v.x) < 0.1 && Math.abs(v.y) < 0.1) return; // Deadzone
               
-              const speed = 4; // REDUCED SENSITIVITY
+              const speed = 4 * panStepFactor; // REDUCED SENSITIVITY
 
               // Only for employees now, New Provider logic removed
               const targetId = selectedEmployee.id;
@@ -3649,11 +3670,17 @@ export default function App() {
                                     key={emp.id} 
                                     onClick={() => {
                                         if (isGroupMode && supportsGroupMode(selectedTemplate)) {
+                                            // A click means "work on this person": it aims the photo
+                                            // joystick and zoom slider at them, and pulls them onto the
+                                            // card if they were not on it yet. Taking someone off is the
+                                            // X badge, so a click can never silently drop a face the user
+                                            // only meant to select.
+                                            setSelectedEmployeeId(emp.id);
                                             setSelectedEmployeeIds(prev => {
-                                                if (prev.includes(emp.id)) return prev.filter(id => id !== emp.id);
-                                                // Over the cap the click is ignored rather than swapping
+                                                if (prev.includes(emp.id)) return prev;
+                                                // Over the cap the add is ignored rather than swapping
                                                 // someone out: the counter on the Modo Grupo pill shows the
-                                                // limit, so a click that does nothing is readable, while an
+                                                // limit, so a click that adds nothing is readable, while an
                                                 // unannounced replacement would not be.
                                                 if (prev.length >= groupLimitFor(selectedTemplate)) return prev;
                                                 return [...prev, emp.id];
@@ -3677,7 +3704,9 @@ export default function App() {
                                         corners unevenly (a notched/cut look) during and after the animation. */}
                                     <div className={`absolute inset-0 overflow-hidden rounded-2xl border ${
                                         (isGroupMode && supportsGroupMode(selectedTemplate))
-                                            ? (selectedEmployeeIds.includes(emp.id) ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
+                                            ? (selectedEmployeeIds.includes(emp.id)
+                                                ? (selectedEmployeeId === emp.id ? 'border-white ring-2 ring-white/30' : 'border-white/45')
+                                                : 'border-white/10 opacity-60 hover:opacity-100')
                                             : (selectedEmployeeId === emp.id ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
                                     }`}>
                                         <img src={emp.photoUrl || 'https://via.placeholder.com/150'} className="absolute inset-0 w-full h-full object-cover" />
@@ -3709,6 +3738,26 @@ export default function App() {
                                             }
                                             return null;
                                         })()}
+
+                                        {isGroupMode && supportsGroupMode(selectedTemplate) && selectedEmployeeIds.includes(emp.id) && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedEmployeeIds(prev => prev.filter(id => id !== emp.id));
+                                                    }}
+                                                    title="Tirar do card"
+                                                    className="absolute top-1 left-1 z-20 p-1 rounded-full bg-black/60 text-white hover:bg-black/85 transition-colors"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                                {selectedEmployeeId === emp.id && (
+                                                    <div className="absolute top-1.5 right-1.5 z-20 px-1.5 py-0.5 rounded-full bg-white text-[8px] font-bold uppercase tracking-wider text-black flex items-center gap-1">
+                                                        <Move size={9} /> Ajustando
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
 
                                         <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                                             <div className="text-white text-xs font-bold truncate">{emp.name}</div>
