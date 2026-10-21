@@ -3010,7 +3010,15 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
     return result;
   };
 
-  const uniqueId = Math.random().toString(36).substring(2, 9);
+  // Namespacing the logo SVG's internal ids keeps two copies of the same
+  // brand mark on one page from fighting over their gradient and clip-path
+  // definitions. It used to be Math.random(), which made this template the
+  // only one whose output differed every call: previewHtml then never
+  // compared equal between renders, so the card's dangerouslySetInnerHTML
+  // subtree was torn down and rebuilt on every unrelated state change -- and
+  // a snapshot of it could never be stable. Derived from the card's own
+  // identity instead: still unique per card, now the same every render.
+  const uniqueId = `${employee.id}-${brand}`.replace(/[^a-zA-Z0-9_-]/g, '');
   const finalLogoContent = makeUniqueSvg(brandLogoContent, uniqueId);
 
   const textMaxWidth = isPortrait ? cardWidth - 80 : 1000;
