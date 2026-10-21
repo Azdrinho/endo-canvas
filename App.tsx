@@ -1681,6 +1681,15 @@ export default function App() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Always-current view of the employee list, for handlers that read a value
+  // and immediately write a new one derived from it. A wheel burst or a drag
+  // started right after another edit fires several times inside one render,
+  // and the closure's `employees` is the list as of that render -- so four
+  // wheel notches all read the same starting scale and only the last one
+  // survived, which read as the zoom ignoring most of the gesture.
+  const employeesRef = useRef(employees);
+  useEffect(() => { employeesRef.current = employees; }, [employees]);
+
   const positionRef = useRef({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -1844,6 +1853,11 @@ export default function App() {
   const pendingSavesRef = useRef(0);
   const saveStatusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // `value` may be an updater, `(current) => next`, for the handlers that
+  // derive a new value from the old one. A plain value read from the render's
+  // closure goes stale inside a burst of events that lands between two
+  // renders -- five wheel notches in one frame all read the same starting
+  // scale and collapsed into a single step. An updater sees the live value.
   const updateEmployee = useCallback((id: string, field: keyof Employee, value: any) => {
     let updatedEmp: Employee | null = null;
     let nextState: Employee[] = [];
@@ -1851,9 +1865,10 @@ export default function App() {
     setEmployees(prev => {
         nextState = prev.map(e => {
             if (e.id === id) {
-                const updated = { ...e, [field]: value };
+                const resolved = typeof value === 'function' ? value(e[field]) : value;
+                const updated = { ...e, [field]: resolved };
                 if (field === 'admissionDate') {
-                    const newTenure = calculateTenure(value);
+                    const newTenure = calculateTenure(resolved);
                     if (newTenure) updated.tenure = newTenure;
                 }
                 updatedEmp = updated;
@@ -2172,6 +2187,24 @@ export default function App() {
   }, [zoomLevel, zoomAtPoint]);
 
   const handleWheel = (e: React.WheelEvent) => {
+    // Over a photo the wheel zooms the photo inside its frame, which is what
+    // the gesture means in every other image editor and what makes the drag
+    // above a complete way to reframe a shot without touching the sidebar.
+    // Anywhere else on the canvas it keeps zooming the canvas. Alt bypasses
+    // this, for zooming the canvas while the pointer happens to sit on a face.
+    if (!e.altKey) {
+      const photo = findPannableAt(e.clientX, e.clientY);
+      const id = photo?.getAttribute('data-pannable');
+      if (id && employeesRef.current.some(emp => emp.id === id)) {
+        const step = e.deltaY < 0 ? 0.05 : -0.05;
+        // Same 0.5-3 range as the sidebar slider, so the two controls cannot
+        // disagree about what is reachable.
+        updateEmployee(id, 'photoScale', (current: number | undefined) =>
+          Math.min(3, Math.max(0.5, (current || 1) + step)));
+        return;
+      }
+    }
+
     const rect = containerRef.current?.getBoundingClientRect();
     const anchorX = rect ? e.clientX - rect.left : 0;
     const anchorY = rect ? e.clientY - rect.top : 0;
@@ -2183,10 +2216,125 @@ export default function App() {
     zoomAtPoint(zoomLevel + (e.deltaY < 0 ? step : -step), anchorX, anchorY);
   };
 
+
+  // --- DRAG THE PHOTO ON THE CARD ------------------------------------------
+  // Framing a photo used to mean nudging the joystick parked off to the side
+  // of the canvas: indirect, and the one piece of friction in every single
+  // card. The photo is now dragged where it is. The joystick stays for fine
+  // adjustment.
+  //
+  // Templates mark each photo the pan/zoom controls drive with
+  // data-pannable="<employee id>", and group cards add data-pan-ratio on the
+  // tile (see readPanStepFactor). The hit test goes through elementsFromPoint
+  // rather than the event target because every card stacks scrims, gradients
+  // and text over its photo, so the target is usually one of those.
+  const photoDragRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    screenPerUnit: number;
+    frame: number | null;
+  } | null>(null);
+
+  const findPannableAt = (clientX: number, clientY: number): HTMLElement | null => {
+    const stack = document.elementsFromPoint(clientX, clientY);
+    for (const el of stack) {
+      // Stop at the canvas edge so a pannable photo in some other part of the
+      // page (there is none today, but the sidebar thumbnails are images too)
+      // can never be picked up by a canvas drag.
+      if (el.id === 'capture-target') break;
+      const hit = (el as HTMLElement).closest?.('[data-pannable]');
+      if (hit) return hit as HTMLElement;
+    }
+    return null;
+  };
+
+  const beginPhotoDrag = (photo: HTMLElement, e: React.MouseEvent): boolean => {
+    const id = photo.getAttribute('data-pannable');
+    if (!id) return false;
+    const employee = employeesRef.current.find(emp => emp.id === id);
+    if (!employee) return false;
+
+    // How far one stored unit moves the photo on screen. Measured from the
+    // rendered geometry rather than computed from zoomLevel x photoScale x
+    // pan ratio, so it stays correct whatever the canvas, the template or a
+    // future wrapper does to the scale in between.
+    const rect = photo.getBoundingClientRect();
+    const layoutWidth = (photo as HTMLImageElement).offsetWidth || rect.width;
+    const renderedScale = layoutWidth > 0 ? rect.width / layoutWidth : 1;
+    const tile = photo.closest('[data-pan-ratio]');
+    const panRatio = tile ? parseFloat(tile.getAttribute('data-pan-ratio') || '1') : 1;
+    const screenPerUnit = renderedScale * (Number.isFinite(panRatio) && panRatio > 0 ? panRatio : 1);
+    if (!Number.isFinite(screenPerUnit) || screenPerUnit <= 0) return false;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Dragging someone's photo is also a statement about who you are working
+    // on, so it aims the side controls at them the way clicking the list does.
+    if (selectedEmployeeId !== id && !isGroupMode) setSelectedEmployeeId(id);
+
+    photoDragRef.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: employee.photoPosition?.x || 0,
+      originY: employee.photoPosition?.y || 0,
+      screenPerUnit,
+      frame: null,
+    };
+    document.body.style.cursor = 'grabbing';
+
+    const onMove = (ev: MouseEvent) => {
+      const drag = photoDragRef.current;
+      if (!drag) return;
+      // Coalesced to one update per frame: each one regenerates the card's
+      // whole HTML string, which at raw mousemove rate is wasted work.
+      if (drag.frame !== null) cancelAnimationFrame(drag.frame);
+      drag.frame = requestAnimationFrame(() => {
+        drag.frame = null;
+        const x = drag.originX + (ev.clientX - drag.startX) / drag.screenPerUnit;
+        const y = drag.originY + (ev.clientY - drag.startY) / drag.screenPerUnit;
+        // Plain setEmployees during the gesture: the history snapshot and the
+        // Supabase write both happen once on release, so a drag is one undo
+        // step rather than a few hundred.
+        setEmployees(prev => prev.map(emp =>
+          emp.id === drag.id ? { ...emp, photoPosition: { x, y } } : emp));
+      });
+    };
+
+    const onUp = () => {
+      const drag = photoDragRef.current;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      photoDragRef.current = null;
+      if (!drag) return;
+      if (drag.frame !== null) cancelAnimationFrame(drag.frame);
+      // Commit through the normal path so the move is undoable and saved.
+      setEmployees(prev => {
+        const moved = prev.find(emp => emp.id === drag.id);
+        if (moved) updateEmployee(drag.id, 'photoPosition', moved.photoPosition);
+        return prev;
+      });
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return true;
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('.image-controls') || target.closest('.signature-controls') || target.closest('.slide-editor-ui') || target.closest('[contenteditable]') || target.hasAttribute('contenteditable') || target.closest('button, input, textarea, select')) return; 
     
+    if (e.button === 0) {
+        const photo = findPannableAt(e.clientX, e.clientY);
+        if (photo && beginPhotoDrag(photo, e)) return;
+    }
+
     // NEW LOGIC FOR PROVIDER GRID DRAG (Left Click Only)
     if (isNewProvider && e.button === 0) { 
         e.preventDefault();

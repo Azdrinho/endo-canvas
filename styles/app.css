@@ -318,3 +318,11 @@
         --tw-ring-width: 2px !important;
         --tw-ring-color: #06b6d4 !important; /* cyan-500 */
       }
+
+/* The card's photos are draggable to reframe them (see beginPhotoDrag in
+   App.tsx). Where a scrim or a text block covers the photo the cursor stays
+   default -- the drag still works there, since the hit test walks the stack
+   under the pointer rather than reading the event target. */
+#capture-target [data-pannable] {
+  cursor: grab;
+}
