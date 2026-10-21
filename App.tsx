@@ -12,6 +12,7 @@ import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from '.
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { EndoCanvasLogo } from './components/EndoCanvasLogo';
+import { useConfirmDialog } from './components/ConfirmDialog';
 import {
   captureCardHtml,
   captureNode,
@@ -443,7 +444,7 @@ const SidebarTabButton: React.FC<{
     onClick={onClick}
     className="relative flex-1 flex items-center justify-center rounded-full transition-colors duration-200"
     style={{ color: isActive ? UI.surface : UI.muted }}
-    title={title}
+    title={title} aria-label={title}
   >
     {isActive && (
       <motion.div
@@ -480,7 +481,7 @@ function OptionToggleGroup<T extends string>({ options, value, onChange, columns
           <button
             key={opt.id}
             onClick={() => onChange(opt.id)}
-            title={opt.label}
+            title={opt.label} aria-label={opt.label}
             className={`flex items-center justify-center rounded-full text-[10px] font-semibold transition-colors ${iconOnly ? 'py-2' : 'flex-col gap-1 px-2 py-2.5 uppercase tracking-wide'}`}
             style={isActive
               ? { background: UI.ink, color: UI.surface }
@@ -614,6 +615,10 @@ const TEMPLATE_LIST = [
 
 export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+
+  // Permanent deletions used to happen on one click with nothing in between.
+  // `confirm` resolves to a boolean; `confirmDialog` is rendered below.
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [isManagementMode, setIsManagementMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -644,7 +649,16 @@ export default function App() {
       }));
   };
 
-  const handleDeleteEmployeeDB = async (id: string) => {
+  // `skipConfirm` is for the bulk path in EmployeeManager, which asks once
+  // for the whole selection -- without it, deleting ten people would mean
+  // eleven dialogs.
+  const handleDeleteEmployeeDB = async (id: string, options?: { skipConfirm?: boolean }) => {
+      const target = employeesRef.current.find(e => e.id === id);
+      const ok = options?.skipConfirm || await confirm({
+        title: `Excluir ${target?.name || 'este funcionário'}?`,
+        description: 'O registro sai do banco de dados e não pode ser recuperado. Os cartões já exportados não são afetados.',
+      });
+      if (!ok) return;
       setEmployees(prev => prev.filter(e => e.id !== id));
       deleteEmployee(id); // Fire and forget
   };
@@ -1014,6 +1028,7 @@ export default function App() {
   const [isGroupMode, setIsGroupMode] = useState<boolean>(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(new Date().getMonth());
+
   const [showImageControls, setShowImageControls] = useState<boolean>(false);
   const [customHiringImages, setCustomHiringImages] = useState<string[]>([]);
   const [customBabyImages, setCustomBabyImages] = useState<string[]>([]);
@@ -1065,6 +1080,56 @@ export default function App() {
       return next;
     });
   }, []);
+
+  // --- THIS MONTH'S BIRTHDAYS ----------------------------------------------
+  // The app already holds every birth date and already knows how to lay out a
+  // month, but nobody was ever told a month had arrived -- you had to
+  // remember to go and look. It now says so once per month, with a button
+  // that opens exactly that view. Dismissed per month in localStorage, so it
+  // is a reminder rather than something to close every morning.
+  const birthdayNudgeShownRef = useRef(false);
+  useEffect(() => {
+    if (birthdayNudgeShownRef.current) return;
+    if (!employees.length || employees === INITIAL_EMPLOYEES) return;
+
+    const now = new Date();
+    const monthIndex = now.getMonth();
+    const seenKey = `end-birthday-nudge-${now.getFullYear()}-${monthIndex}`;
+    try {
+      if (localStorage.getItem(seenKey)) {
+        birthdayNudgeShownRef.current = true;
+        return;
+      }
+    } catch { /* private mode: just show it */ }
+
+    const target = String(monthIndex + 1).padStart(2, '0');
+    const celebrating = employees.filter(emp => {
+      if (!emp.dateStr) return false;
+      const parts = emp.dateStr.trim().split(/[\/\-.]/);
+      return parts.length >= 2 && parts[1] === target;
+    });
+    if (celebrating.length === 0) return;
+
+    birthdayNudgeShownRef.current = true;
+    try { localStorage.setItem(seenKey, '1'); } catch { /* ignore quota errors */ }
+
+    const monthName = MONTHS[monthIndex];
+    const people = celebrating.length === 1 ? '1 aniversariante' : `${celebrating.length} aniversariantes`;
+    toast(`${people} em ${monthName}`, {
+      description: celebrating.slice(0, 3).map(e => e.name.split(' ')[0]).join(', ')
+        + (celebrating.length > 3 ? ` e mais ${celebrating.length - 3}` : ''),
+      duration: 12000,
+      action: {
+        label: 'Ver cartões',
+        onClick: () => {
+          setSelectedTemplate(TemplateType.BIRTHDAY);
+          setSelectedMonthIndex(monthIndex);
+          setIsMonthView(true);
+          recordRecentTemplate(TemplateType.BIRTHDAY);
+        },
+      },
+    });
+  }, [employees, recordRecentTemplate]);
 
   const [popupPosition, setPopupPosition] = useState({ x: 20, y: 20 });
   const popupRef = useRef<HTMLDivElement>(null);
@@ -3061,7 +3126,7 @@ export default function App() {
                  <SidebarTabButton
                     isActive={activeTab === 'DATA'}
                     indicatorKey="DATA"
-                    title={selectedTemplate === TemplateType.ACTIVATION ? 'Texto' : 'Employee Data'}
+                    title={selectedTemplate === TemplateType.ACTIVATION ? 'Texto' : 'Employee Data'} aria-label={selectedTemplate === TemplateType.ACTIVATION ? 'Texto' : 'Employee Data'}
                     icon={selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : selectedTemplate === TemplateType.ACTIVATION ? <Type size={22} /> : <Users size={22} />}
                     onClick={() => {
                         setActiveTab('DATA');
@@ -3076,14 +3141,14 @@ export default function App() {
              <SidebarTabButton
                 isActive={activeTab === 'TEMPLATES'}
                 indicatorKey="TEMPLATES"
-                title="Templates"
+                title="Templates" aria-label="Templates"
                 icon={<Palette size={22} />}
                 onClick={() => setActiveTab('TEMPLATES')}
              />
              <SidebarTabButton
                 isActive={activeTab === 'SETTINGS'}
                 indicatorKey="SETTINGS"
-                title="Visual Identity"
+                title="Visual Identity" aria-label="Visual Identity"
                 icon={<Settings size={22} />}
                 onClick={() => setActiveTab('SETTINGS')}
              />
@@ -3091,7 +3156,7 @@ export default function App() {
                <SidebarTabButton
                   isActive={activeTab === 'IMAGES'}
                   indicatorKey="IMAGES"
-                  title="Images"
+                  title="Images" aria-label="Images"
                   icon={<ImageIcon size={22} />}
                   onClick={() => setActiveTab('IMAGES')}
                />
@@ -3129,11 +3194,16 @@ export default function App() {
                                 }}
                                 className={`w-full relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${selectedEmployee.photoUrl === img ? 'border-cyan-500 scale-[0.98]' : 'border-transparent hover:border-white/20'}`}
                             >
-                                <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <img src={img} alt="" aria-hidden="true" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             </button>
                             <button 
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                     e.stopPropagation();
+                                    const ok = await confirm({
+                                        title: 'Excluir esta imagem da biblioteca?',
+                                        description: 'A imagem é apagada do servidor e some para todo mundo que usa o Endo Canvas.',
+                                    });
+                                    if (!ok) return;
                                     if (selectedTemplate === TemplateType.HIRING) {
                                         setCustomHiringImages(prev => {
                                             const newImages = prev.filter((_, idx) => idx !== i);
@@ -3164,7 +3234,7 @@ export default function App() {
                                     }
                                 }}
                                 className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                title="Remove Image"
+                                title="Remove Image" aria-label="Remove Image"
                             >
                                 <X size={14} />
                             </button>
@@ -3214,7 +3284,7 @@ export default function App() {
                            <button 
                               onClick={() => handleImageUploadTrigger('PROVIDER', 'logo')} 
                               className="p-1.5 rounded-full hover:opacity-90 shrink-0" style={{ background: UI.fill, color: UI.ink }}
-                              title="Upload Logo"
+                              title="Upload Logo" aria-label="Upload Logo"
                            >
                               <Upload size={14} />
                            </button>
@@ -3333,7 +3403,7 @@ export default function App() {
                                <button
                                   onClick={() => handleImageUploadTrigger('PROVIDER', 'bgAsset')}
                                   className="p-1.5 rounded-full hover:opacity-90 shrink-0" style={{ background: UI.fill, color: UI.ink }}
-                                  title="Enviar asset (PNG/SVG)"
+                                  title="Enviar asset (PNG/SVG)" aria-label="Enviar asset (PNG/SVG)"
                                >
                                   <Upload size={14} />
                                </button>
@@ -3341,7 +3411,7 @@ export default function App() {
                                    <button
                                       onClick={() => setProviderData({...providerData, bgAsset: ''})}
                                       className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white shrink-0 transition-all"
-                                      title="Remover asset"
+                                      title="Remover asset" aria-label="Remover asset"
                                    >
                                       <X size={14} />
                                    </button>
@@ -3544,14 +3614,14 @@ export default function App() {
                                     <button 
                                         onClick={() => handleImageUploadTrigger('PROVIDER', 'thumbnails', i)} 
                                         className="p-1.5 rounded-full shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" style={{ background: UI.fill, color: UI.ink }}
-                                        title="Upload Thumbnail"
+                                        title="Upload Thumbnail" aria-label="Upload Thumbnail"
                                     >
                                         <Upload size={12} />
                                     </button>
                                     <button 
                                         onClick={() => handleRemoveThumbnail(i)}
                                         className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white shrink-0 opacity-60 group-hover:opacity-100 transition-all"
-                                        title="Remove"
+                                        title="Remove" aria-label="Remove"
                                     >
                                         <X size={12} />
                                     </button>
@@ -3619,7 +3689,7 @@ export default function App() {
                                                 : 'border-white/10 opacity-60 hover:opacity-100')
                                             : (selectedEmployeeId === emp.id ? 'border-white/80' : 'border-white/10 opacity-70 hover:opacity-100')
                                     }`}>
-                                        <img src={emp.photoUrl || 'https://via.placeholder.com/150'} className="absolute inset-0 w-full h-full object-cover" />
+                                        <img src={emp.photoUrl || 'https://via.placeholder.com/150'} alt={emp.name} className="absolute inset-0 w-full h-full object-cover" />
 
                                         {/* New Employee Tag */}
                                         {(() => {
@@ -3656,7 +3726,7 @@ export default function App() {
                                                         e.stopPropagation();
                                                         setSelectedEmployeeIds(prev => prev.filter(id => id !== emp.id));
                                                     }}
-                                                    title="Tirar do card"
+                                                    title="Tirar do card" aria-label="Tirar do card"
                                                     className="absolute top-1 left-1 z-20 p-1 rounded-full bg-black/60 text-white hover:bg-black/85 transition-colors"
                                                 >
                                                     <X size={12} />
@@ -3773,8 +3843,8 @@ export default function App() {
                                           <div className="flex items-center justify-between mb-1">
                                               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: UI.muted }}>Título</div>
                                               <div className="flex items-center gap-1">
-                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito"><Bold size={12} /></button>
-                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico"><Italic size={12} /></button>
+                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito" aria-label="Negrito"><Bold size={12} /></button>
+                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico" aria-label="Itálico"><Italic size={12} /></button>
                                               </div>
                                           </div>
                                           <div className="flex items-start px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors">
@@ -3811,8 +3881,8 @@ export default function App() {
                                           <div className="flex items-center justify-between mb-1">
                                               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: UI.muted }}>Parágrafo</div>
                                               <div className="flex items-center gap-1">
-                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito"><Bold size={12} /></button>
-                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico"><Italic size={12} /></button>
+                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('bold')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Negrito" aria-label="Negrito"><Bold size={12} /></button>
+                                                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyTextFormat('italic')} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Itálico" aria-label="Itálico"><Italic size={12} /></button>
                                               </div>
                                           </div>
                                           <div className="flex items-start px-3 py-2.5 rounded-lg border border-transparent bg-[#262626] focus-within:border-white/20 transition-colors">
@@ -3855,7 +3925,7 @@ export default function App() {
                                           <div className="flex flex-col items-center text-center mb-6">
                                               <div className="relative w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/10 shadow-lg bg-white/5 mb-4 shrink-0">
                                                   {selectedEmployee.photoUrl ? (
-                                                      <img src={selectedEmployee.photoUrl} className="w-full h-full object-cover" />
+                                                      <img src={selectedEmployee.photoUrl} alt={`Foto de ${selectedEmployee.name}`} className="w-full h-full object-cover" />
                                                   ) : (
                                                       <div className="w-full h-full flex items-center justify-center text-slate-600"><User size={32} /></div>
                                                   )}
@@ -3912,7 +3982,7 @@ export default function App() {
                                                           onMouseDown={(e) => e.preventDefault()}
                                                           onClick={() => applyTextFormat('bold')}
                                                           className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                                                          title="Negrito"
+                                                          title="Negrito" aria-label="Negrito"
                                                       >
                                                           <Bold size={12} />
                                                       </button>
@@ -3921,7 +3991,7 @@ export default function App() {
                                                           onMouseDown={(e) => e.preventDefault()}
                                                           onClick={() => applyTextFormat('italic')}
                                                           className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                                                          title="Itálico"
+                                                          title="Itálico" aria-label="Itálico"
                                                       >
                                                           <Italic size={12} />
                                                       </button>
@@ -3951,7 +4021,15 @@ export default function App() {
                                               <Settings size={16} />
                                               Manage Employees
                                           </button>
-                                          <button onClick={(e) => removeEmployee(selectedEmployee.id, e)} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
+                                          <button onClick={async (e) => {
+                                              e.stopPropagation();
+                                              const ok = await confirm({
+                                                  title: `Remover ${selectedEmployee.name} da lista?`,
+                                                  description: 'Sai apenas desta lista, neste dispositivo. O registro continua no banco de dados.',
+                                                  confirmLabel: 'Remover',
+                                              });
+                                              if (ok) removeEmployee(selectedEmployee.id, e);
+                                          }} className="w-full py-3 rounded-2xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs font-bold transition-all mt-2">Remove Employee</button>
                                       </>
                                   )}
                               </>
@@ -4179,7 +4257,7 @@ export default function App() {
                   transition={{ type: "spring", stiffness: 400, damping: 22 }}
                   onClick={() => setIsManagementMode(true)}
                   className="w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/10 bg-white/10 hover:bg-white/20 transition-colors shrink-0"
-                  title="Employee Management"
+                  title="Employee Management" aria-label="Employee Management"
                >
                   <Users size={20} />
                </motion.button>
@@ -4200,6 +4278,7 @@ export default function App() {
 
   return (
     <div className={`w-full h-screen flex flex-col overflow-hidden ${theme.bg} dark text-slate-900 dark:text-white transition-colors duration-300`}>
+        {confirmDialog}
         {/* REMOVED ViewMode.IMPORT conditional rendering completely */}
 
         {HeaderContent}
@@ -4243,6 +4322,7 @@ export default function App() {
                             onClose={() => setIsManagementMode(false)}
                             onUpdateEmployee={handleUpdateEmployeeDB}
                             onDeleteEmployee={handleDeleteEmployeeDB}
+                            confirm={confirm}
                             onAddEmployee={handleAddEmployeeDB}
                             onDuplicateEmployee={handleDuplicateEmployeeDB}
                         />
@@ -4330,7 +4410,7 @@ export default function App() {
                                     <button 
                                         onClick={handleGenerateBackground}
                                         disabled={isGeneratingBg}
-                                        title="Gerar Imagem"
+                                        title="Gerar Imagem" aria-label="Gerar Imagem"
                                         className="w-16 h-16 hover:opacity-90 active:scale-[0.95] transition-all rounded-full flex items-center justify-center shadow-lg mr-1 shrink-0 cursor-pointer disabled:cursor-default"
                                         style={{ background: UI.ink, color: UI.surface }}
                                     >
@@ -4398,8 +4478,8 @@ export default function App() {
                     </div>
 
                     <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
-                        <button onClick={undo} disabled={historyIndex === 0} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
-                        <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
+                        <button onClick={undo} disabled={historyIndex === 0} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Desfazer (Ctrl+Z)" aria-label="Desfazer (Ctrl+Z)"><Undo2 size={20}/></button>
+                        <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed" style={{ background: UI.track, color: UI.ink }} title="Refazer (Ctrl+Y)" aria-label="Refazer (Ctrl+Y)"><Redo2 size={20}/></button>
 
                         {selectedEmployee && (
                         <div className="relative" ref={versionsPanelRef}>
@@ -4407,7 +4487,7 @@ export default function App() {
                                 onClick={() => setShowVersionsPanel(v => !v)}
                                 className="p-3 rounded-full shadow-lg transition-colors"
                                 style={showVersionsPanel ? { background: UI.ink, color: UI.surface } : { background: UI.track, color: UI.ink }}
-                                title="Versões salvas deste card"
+                                title="Versões salvas deste card" aria-label="Versões salvas deste card"
                             >
                                 <History size={20}/>
                             </button>
@@ -4428,7 +4508,7 @@ export default function App() {
                                             onClick={() => { if (versionNameDraft.trim()) { saveCardVersion(versionNameDraft); setVersionNameDraft(''); } }}
                                             disabled={!versionNameDraft.trim()}
                                             className="p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90" style={{ background: UI.fill, color: UI.ink }}
-                                            title="Salvar versão atual"
+                                            title="Salvar versão atual" aria-label="Salvar versão atual"
                                         >
                                             <Save size={15} />
                                         </button>
@@ -4447,14 +4527,20 @@ export default function App() {
                                                 <button
                                                     onClick={() => restoreCardVersion(entry)}
                                                     className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-                                                    title="Restaurar esta versão"
+                                                    title="Restaurar esta versão" aria-label="Restaurar esta versão"
                                                 >
                                                     <RotateCw size={14} />
                                                 </button>
                                                 <button
-                                                    onClick={() => deleteCardVersion(selectedEmployee.id, entry.id)}
+                                                    onClick={async () => {
+                                                        const ok = await confirm({
+                                                            title: `Excluir a versão "${entry.name}"?`,
+                                                            description: 'Esta versão salva do cartão é removida deste dispositivo e não pode ser recuperada.',
+                                                        });
+                                                        if (ok) deleteCardVersion(selectedEmployee.id, entry.id);
+                                                    }}
                                                     className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                                                    title="Excluir versão"
+                                                    title="Excluir versão" aria-label="Excluir versão"
                                                 >
                                                     <X size={14} />
                                                 </button>
@@ -4473,7 +4559,7 @@ export default function App() {
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             onClick={() => handleZoom(0.1)}
                             className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80" style={{ background: UI.track, color: UI.ink }}
-                            title="Aumentar zoom"
+                            title="Aumentar zoom" aria-label="Aumentar zoom"
                         >
                             <ZoomIn size={20}/>
                         </motion.button>
@@ -4489,7 +4575,7 @@ export default function App() {
                                 zoomAtPoint(1, rect ? rect.width / 2 : 0, rect ? rect.height / 2 : 0);
                             }}
                             className="py-1.5 rounded-full shadow-lg transition-opacity hover:opacity-80 text-[10px] font-bold tabular-nums text-center" style={{ background: UI.track, color: UI.ink }}
-                            title="Redefinir zoom (100%)"
+                            title="Redefinir zoom (100%)" aria-label="Redefinir zoom (100%)"
                         >
                             {Math.round(zoomLevel * 100)}%
                         </motion.button>
@@ -4499,7 +4585,7 @@ export default function App() {
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             onClick={() => handleZoom(-0.1)}
                             className="p-3 rounded-full shadow-lg transition-opacity hover:opacity-80" style={{ background: UI.track, color: UI.ink }}
-                            title="Diminuir zoom"
+                            title="Diminuir zoom" aria-label="Diminuir zoom"
                         >
                             <ZoomOut size={20}/>
                         </motion.button>
@@ -4743,7 +4829,7 @@ export default function App() {
                                                 transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                                 onClick={handleBatchExportPDF}
                                                 disabled={isDownloading || filteredEmployees.length === 0}
-                                                title="Gera um único PDF com todos os cartões do mês, uma página cada — útil para imprimir ou compartilhar num arquivo só"
+                                                title="Gera um único PDF com todos os cartões do mês, uma página cada — útil para imprimir ou compartilhar num arquivo só" aria-label="Gera um único PDF com todos os cartões do mês, uma página cada — útil para imprimir ou compartilhar num arquivo só"
                                                 className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs px-4 py-1 rounded-full shadow-xl flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Download size={14} />
@@ -4924,7 +5010,7 @@ export default function App() {
                                         transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                         onClick={() => handleOrientationChange('portrait')} 
                                         className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'portrait' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                                        title="Portrait"
+                                        title="Portrait" aria-label="Portrait"
                                     >
                                         <RectangleVertical size={18} />
                                     </motion.button>
@@ -4934,7 +5020,7 @@ export default function App() {
                                         transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                         onClick={() => handleOrientationChange('landscape')} 
                                         className={`w-9 h-full rounded-full flex items-center justify-center transition-all ${orientation === 'landscape' ? 'bg-cyan-500 text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                                        title="Landscape"
+                                        title="Landscape" aria-label="Landscape"
                                     >
                                         <RectangleHorizontal size={18} />
                                     </motion.button>
@@ -4972,14 +5058,14 @@ export default function App() {
                 <button
                     onClick={() => applyTextFormat('bold')}
                     className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                    title="Negrito"
+                    title="Negrito" aria-label="Negrito"
                 >
                     <Bold size={14} />
                 </button>
                 <button
                     onClick={() => applyTextFormat('italic')}
                     className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                    title="Itálico"
+                    title="Itálico" aria-label="Itálico"
                 >
                     <Italic size={14} />
                 </button>
@@ -4999,7 +5085,7 @@ export default function App() {
                                 <button
                                     key={opt.id}
                                     onClick={() => updateEmployee(selectedEmployee.id, 'activationTextAlign', opt.id)}
-                                    title={opt.label}
+                                    title={opt.label} aria-label={opt.label}
                                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-white hover:bg-white/10'}`}
                                 >
                                     <Icon size={14} />
@@ -5012,14 +5098,14 @@ export default function App() {
                         <button
                             onClick={() => adjustActivationFontScale(activeToolbarField, -0.1)}
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                            title="Diminuir fonte"
+                            title="Diminuir fonte" aria-label="Diminuir fonte"
                         >
                             <Minus size={14} />
                         </button>
                         <button
                             onClick={() => adjustActivationFontScale(activeToolbarField, 0.1)}
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                            title="Aumentar fonte"
+                            title="Aumentar fonte" aria-label="Aumentar fonte"
                         >
                             <Plus size={14} />
                         </button>
@@ -5034,7 +5120,7 @@ export default function App() {
                             <button
                                 onClick={() => setShowFontColorPicker(v => !v)}
                                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
-                                title="Cor da fonte"
+                                title="Cor da fonte" aria-label="Cor da fonte"
                             >
                                 <div
                                     className="rounded-full border border-white/40 shadow-sm"
@@ -5090,7 +5176,7 @@ export default function App() {
                                             <button
                                                 key={color}
                                                 onClick={() => applyActivationFontColor(color)}
-                                                title={color.toUpperCase()}
+                                                title={color.toUpperCase()} aria-label={color.toUpperCase()}
                                                 className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${selectedEmployee.activationFontColor?.toLowerCase() === color.toLowerCase() ? 'border-cyan-400' : 'border-white/20'}`}
                                                 style={{ background: color }}
                                             />
@@ -5099,7 +5185,7 @@ export default function App() {
                                             cover its swatch (no clipping/offset) so it isn't silently
                                             invisible to browsers that skip hit-testing on odd-shaped
                                             inputs — but the controls above are the primary path now. */}
-                                        <div className="relative w-7 h-7 rounded-full border-2 border-dashed border-white/30 shrink-0" title="Cor personalizada (seletor do navegador)">
+                                        <div className="relative w-7 h-7 rounded-full border-2 border-dashed border-white/30 shrink-0" title="Cor personalizada (seletor do navegador)" aria-label="Cor personalizada (seletor do navegador)">
                                             <Palette size={12} className="absolute inset-0 m-auto text-slate-400 pointer-events-none" />
                                             <input
                                                 ref={fontColorInputRef}
@@ -5119,7 +5205,7 @@ export default function App() {
                                                     <button
                                                         key={`${color}-${i}`}
                                                         onClick={() => applyActivationFontColor(color)}
-                                                        title={color.toUpperCase()}
+                                                        title={color.toUpperCase()} aria-label={color.toUpperCase()}
                                                         className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${selectedEmployee.activationFontColor?.toLowerCase() === color.toLowerCase() ? 'border-cyan-400' : 'border-white/20'}`}
                                                         style={{ background: color }}
                                                     />

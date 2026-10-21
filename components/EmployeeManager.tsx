@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Employee } from '../types';
 import { EmployeeEditor } from './EmployeeEditor';
+import type { ConfirmFn } from './ConfirmDialog';
 import {
   Search,
   Grid,
@@ -28,7 +29,9 @@ interface EmployeeManagerProps {
   employees: Employee[];
   onClose: () => void;
   onUpdateEmployee: (id: string, updates: Partial<Employee>) => void;
-  onDeleteEmployee: (id: string) => void;
+  onDeleteEmployee: (id: string, options?: { skipConfirm?: boolean }) => void;
+  /** Shared in-app confirmation prompt; see components/ConfirmDialog.tsx. */
+  confirm: ConfirmFn;
   onAddEmployee: () => Promise<Employee> | Employee;
   onDuplicateEmployee: (id: string) => Promise<Employee> | Employee | void;
 }
@@ -38,6 +41,7 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   onClose,
   onUpdateEmployee,
   onDeleteEmployee,
+  confirm,
   onAddEmployee,
   onDuplicateEmployee
 }) => {
@@ -123,9 +127,15 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     selectedIds.forEach(id => onUpdateEmployee(id, { status }));
   };
 
-  const handleBulkDelete = () => {
-    if (!window.confirm(`Excluir ${selectedIds.size} funcionário(s) selecionado(s)? Essa ação não pode ser desfeita.`)) return;
-    selectedIds.forEach(id => onDeleteEmployee(id));
+  const handleBulkDelete = async () => {
+    const ok = await confirm({
+      title: `Excluir ${selectedIds.size} funcionário(s)?`,
+      description: 'Os registros saem do banco de dados e não podem ser recuperados.',
+    });
+    if (!ok) return;
+    // Already confirmed for the whole selection, so each delete skips its own
+    // prompt rather than asking once per person.
+    selectedIds.forEach(id => onDeleteEmployee(id, { skipConfirm: true }));
     clearSelection();
   };
 
@@ -181,7 +191,7 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
           <button 
             onClick={onClose}
             className={`p-2 rounded-full transition-colors flex items-center justify-center ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-800'}`}
-            title="Voltar"
+            title="Voltar" aria-label="Voltar"
           >
             <ArrowLeft size={24} />
           </button>
@@ -396,21 +406,21 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                       <button
                         onClick={() => setEditingId(emp.id)}
                         className="p-2 bg-white rounded-full text-gray-900 hover:text-cyan-600 hover:scale-110 transition-all shadow-md"
-                        title="Edit"
+                        title="Edit" aria-label="Edit"
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
                         onClick={() => onDuplicateEmployee(emp.id)}
                         className="p-2 bg-white rounded-full text-gray-900 hover:text-purple-600 hover:scale-110 transition-all shadow-md"
-                        title="Duplicate"
+                        title="Duplicate" aria-label="Duplicate"
                       >
                         <Copy size={14} />
                       </button>
                       <button
                         onClick={() => onDeleteEmployee(emp.id)}
                         className="p-2 bg-white rounded-full text-red-500 hover:bg-red-50 hover:scale-110 transition-all shadow-md"
-                        title="Delete"
+                        title="Delete" aria-label="Delete"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -482,7 +492,7 @@ export const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     </td>
                     <td className="px-6 py-4 flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full overflow-hidden shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'}`}>
-                        {emp.photoUrl && <img src={emp.photoUrl} className="w-full h-full object-cover" />}
+                        {emp.photoUrl && <img src={emp.photoUrl} alt={emp.name} className="w-full h-full object-cover" />}
                       </div>
                       <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{emp.name}</div>
                     </td>

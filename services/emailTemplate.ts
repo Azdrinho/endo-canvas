@@ -1014,7 +1014,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
     const bgAssetRotate = employee.providerBgAssetRotate || 0;
     const bgAssetBaseWidth = Math.round(dims.w * 0.4);
     const bgAssetHtml = employee.providerBgAsset ? `
-        <img src="${employee.providerBgAsset}" crossorigin="anonymous" draggable="false" style="
+        <img alt="" src="${employee.providerBgAsset}" crossorigin="anonymous" draggable="false" style="
             position: absolute;
             top: 50%;
             left: 50%;
@@ -1077,7 +1077,7 @@ const generateNewProviderTemplate = (employee: Employee, format: ProviderFormat)
                 min-width: ${logoBoxMinWidth};
                 ${titleBoxGap ? `margin-top: ${titleBoxGap}px;` : ''}
             ">
-                <img src="${providerLogo}" style="width: ${logoImgMaxWidth}; height: auto; object-fit: contain; display: block;${logoWhiteFilter}" />
+                <img alt="" src="${providerLogo}" style="width: ${logoImgMaxWidth}; height: auto; object-fit: contain; display: block;${logoWhiteFilter}" />
             </div>
         </div>
     `;
@@ -1200,7 +1200,7 @@ const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig,
 
           gridItems += `
             <div style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-                <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="${nameContainerStyle}">
                     <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         ${firstName}<br/>${lastName}
@@ -1326,7 +1326,7 @@ const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: Canv
 
           gridItems += `
             <div style="width: ${itemWidthPct}; aspect-ratio: 1; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-                <img src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="${nameContainerStyle}">
                     <p class="akira-font" style="font-size: ${finalNameSize}; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         ${firstName}<br/>${lastName}
@@ -1474,7 +1474,7 @@ const generateLandscapeTemplate = (
           </h1>
        </div>
        <div style="width: 45%; height: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, ${purpleColor} 100%);">
-          <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+          <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${gradientHeight}; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 6; pointer-events: none;"></div>
           ${isJobChange ? `
             <div style="position: absolute; bottom: 89px; left: 20px; z-index: 10; max-width: 85%;">
@@ -1615,7 +1615,7 @@ const generatePortraitTemplate = (
           </h1>
        </div>
        <div style="flex: 1; width: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, ${purpleColor} 100%);">
-          <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+          <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${gradientHeight}; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 6; pointer-events: none;"></div>
           ${isJobChange_p ? `
             <div style="position: absolute; bottom: 89px; left: 20px; z-index: 10; max-width: 85%;">
@@ -1737,7 +1737,7 @@ const generateBirthdayCardTemplate = (
   const nameFontSize = `${nameFontSizeNum}px`;
 
   const photoPanel = `
-    <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+    <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
     ${noise}
     ${spheres}
     ${backgroundConfetti}
@@ -1880,7 +1880,7 @@ const generateAnniversaryCardTemplate = (
   const nameFontSize = `${nameFontSizeNum}px`;
 
   const photoPanel = `
-    <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+    <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
     ${noise}
     ${spheres}
     ${backgroundConfetti}
@@ -2051,7 +2051,7 @@ const generateJobChangeCardTemplate = (
   `;
 
   const photoPanel = `
-    <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+    <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
     ${noise}
     ${spheres}
     ${logo}
@@ -2190,7 +2190,7 @@ const generateFarewellCardTemplate = (
   const nameFontSize = `${nameFontSizeNum}px`;
 
   const photoPanel = `
-    <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+    <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
     ${noise}
     ${spheres}
     ${logo}
@@ -2361,7 +2361,7 @@ const generateFarewellGroupTemplate = (
 
     gridItems += `
       <div data-emp-id="${emp.id}" data-pan-ratio="${panRatio.toFixed(4)}" style="width: ${tileSize.toFixed(2)}px; height: ${tileHeight.toFixed(2)}px; position: relative; overflow: hidden; background: ${frameGradient}; box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="${emp.id}" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${photoTransform}"/>
+        <img alt="" data-pannable="${emp.id}" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${photoTransform}"/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: ${scrimRamp}px ${tilePad}px ${tilePad}px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: ${nameSize}px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             ${firstName}${restName ? `<br/>${restName}` : ''}
@@ -2551,7 +2551,7 @@ const generateWelcomeTemplate = (
           ${noise}
           ${spheres}
           ${logo}
-          <img data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
+          <img alt="" data-pannable="${employee.id}" src="${employee.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(${scale}) translate(${posX}px, ${posY}px); transform-origin: center center;" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 55%; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 6; pointer-events: none;"></div>
           <!-- Role always sits directly below the name now (was a separate bottom-right block before). -->
           <div style="position: absolute; bottom: 20px; left: 20px; z-index: 10; text-align: left; max-width: 80%;">
@@ -2751,7 +2751,7 @@ const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasCon
 
       gridItems += `
         <div data-emp-id="${emp.id}" data-pan-ratio="${jcPanRatio.toFixed(4)}" style="width: ${itemWidth}; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: ${frameGradient}; overflow: hidden; flex-shrink: 0;">
-            <img data-pannable="${emp.id}" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${jcTransform}"/>
+            <img alt="" data-pannable="${emp.id}" src="${emp.photoUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; ${jcTransform}"/>
             
             <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;">
                 <!-- Name Overlay with Gradient Fade -->
@@ -2866,7 +2866,7 @@ export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, l
 
        <!-- Right Side (Image) -->
        <div class="upload-hover-zone" style="width: 45%; height: 100%; position: relative; z-index: 5; background: #ffffff; overflow: hidden;">
-          <img data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl || 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />
+          <img alt="" data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl || 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px);" />
           ${getUploadOverlayHtml(employee.id)}
        </div>
     </div>
@@ -3036,7 +3036,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
   const circleImageHtml = imageMode === 'circle' ? `
     <div style="width: 100%; display: flex; justify-content: ${circleJustify}; margin-bottom: 18px;">
       <div class="upload-hover-zone" data-activation-circle style="position: relative; width: ${circleSize}px; height: ${circleSize}px; border-radius: 50%; overflow: hidden; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.35); background: #1a1a1a;">
-        ${employee.photoUrl ? `<img data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${circlePosY}px);" />` : ''}
+        ${employee.photoUrl ? `<img alt="" data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${circlePosY}px);" />` : ''}
         ${getUploadOverlayHtml(employee.id)}
       </div>
     </div>
@@ -3047,7 +3047,7 @@ export const generateActivationTemplate = (employee: Employee, orientation: Orie
 
        <!-- Background Image (only in 'background' display mode) -->
        ${imageMode === 'background' && employee.photoUrl ? `
-       <img data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1; pointer-events: none;" />
+       <img alt="" data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1; pointer-events: none;" />
        ` : ''}
 
        ${imageMode === 'background' ? `
@@ -3149,7 +3149,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
   return `
     <div id="capture-target" style="width: 540px; height: 540px; background: white; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'Orkney', sans-serif;">
       <!-- Full Background Image -->
-      <img data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1;" onload="
+      <img alt="" data-pannable="${employee.id}" class="upload-hover-img" src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); z-index: 1;" onload="
         try {
           const canvas = document.createElement('canvas');
           canvas.width = 100;
@@ -3185,7 +3185,7 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
         
         <!-- Blur Background Workaround for html-to-image -->
         <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1;">
-          <img src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: -320px; left: -20px; width: 540px; height: 540px; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); filter: blur(12px);" />
+          <img alt="" src="${employee.photoUrl || 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop'}" crossorigin="anonymous" draggable="false" style="position: absolute; top: -320px; left: -20px; width: 540px; height: 540px; object-fit: cover; transform: scale(${scale}) translate(${posX}px, ${posY}px); filter: blur(12px);" />
           <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.15);"></div>
         </div>
 

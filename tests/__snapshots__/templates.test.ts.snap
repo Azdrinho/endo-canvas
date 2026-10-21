@@ -153,7 +153,7 @@ exports[`card snapshots > Baby / landscape is unchanged 1`] = `
 
        <!-- Right Side (Image) -->
        <div class="upload-hover-zone" style="width: 45%; height: 100%; position: relative; z-index: 5; background: #ffffff; overflow: hidden;">
-          <img data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1) translate(0px, 0px);" />
+          <img alt="" data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1) translate(0px, 0px);" />
           
   <div class="upload-hover-icon" onclick="window.__triggerImageUpload && window.__triggerImageUpload('emp-fixture-1', 'photoUrl')">
     <div style="width: 15%; min-width: 44px; max-width: 64px; aspect-ratio: 1; border-radius: 50%; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.65); box-shadow: 0 4px 16px rgba(0,0,0,0.35);">
@@ -224,7 +224,7 @@ exports[`card snapshots > General Disclosure / landscape is unchanged 1`] = `
 
        <!-- Background Image (only in 'background' display mode) -->
        
-       <img data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(1) translate(0px, -45px); z-index: 1; pointer-events: none;" />
+       <img alt="" data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(1) translate(0px, -45px); z-index: 1; pointer-events: none;" />
        
 
        
@@ -388,7 +388,7 @@ exports[`card snapshots > Happy Birthday / landscape is unchanged 1`] = `
         </div>
         <div style="width: 45%; height: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -614,7 +614,7 @@ exports[`card snapshots > Happy Birthday / portrait is unchanged 1`] = `
         </div>
         <div style="flex: 1; width: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -831,7 +831,7 @@ exports[`card snapshots > Hiring / portrait is unchanged 1`] = `
   
     <div id="capture-target" style="width: 540px; height: 540px; background: white; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'Orkney', sans-serif;">
       <!-- Full Background Image -->
-      <img data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1) translate(0px, 0px); z-index: 1;" onload="
+      <img alt="" data-pannable="emp-fixture-1" class="upload-hover-img" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1) translate(0px, 0px); z-index: 1;" onload="
         try {
           const canvas = document.createElement('canvas');
           canvas.width = 100;
@@ -924,7 +924,7 @@ exports[`card snapshots > Hiring / portrait is unchanged 1`] = `
         
         <!-- Blur Background Workaround for html-to-image -->
         <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1;">
-          <img src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: -320px; left: -20px; width: 540px; height: 540px; object-fit: cover; transform: scale(1) translate(0px, 0px); filter: blur(12px);" />
+          <img alt="" src="https://example.test/photo.png" crossorigin="anonymous" draggable="false" style="position: absolute; top: -320px; left: -20px; width: 540px; height: 540px; object-fit: cover; transform: scale(1) translate(0px, 0px); filter: blur(12px);" />
           <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.15);"></div>
         </div>
 
@@ -1025,7 +1025,7 @@ exports[`card snapshots > Job Change / portrait is unchanged 1`] = `
         </div>
         <div style="flex: 1; width: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -1502,7 +1502,7 @@ exports[`card snapshots > New Provider / portrait is unchanged 1`] = `
                 min-width: 550px;
                 
             ">
-                <img src="https://via.placeholder.com/300x150?text=LOGO" style="width: 450px; height: auto; object-fit: contain; display: block;" />
+                <img alt="" src="https://via.placeholder.com/300x150?text=LOGO" style="width: 450px; height: auto; object-fit: contain; display: block;" />
             </div>
         </div>
     
@@ -1572,7 +1572,7 @@ exports[`card snapshots > See You Soon / landscape is unchanged 1`] = `
         </div>
         <div style="width: 45%; height: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -1765,7 +1765,7 @@ exports[`card snapshots > See You Soon / portrait is unchanged 1`] = `
         </div>
         <div style="flex: 1; width: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -2059,7 +2059,7 @@ exports[`card snapshots > Welcome Aboard / portrait is unchanged 1`] = `
 
   </div>
 
-          <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+          <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 55%; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); z-index: 6; pointer-events: none;"></div>
           <!-- Role always sits directly below the name now (was a separate bottom-right block before). -->
           <div style="position: absolute; bottom: 20px; left: 20px; z-index: 10; text-align: left; max-width: 80%;">
@@ -2137,7 +2137,7 @@ exports[`card snapshots > Work Anniversary / portrait is unchanged 1`] = `
         </div>
         <div style="flex: 1; width: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, #22d3ee 0%, #594C99 100%);">
           
-    <img data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
+    <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; z-index: 5; transform: scale(1) translate(0px, 0px); transform-origin: center center;" />
     
   <div style="
     position: absolute;
@@ -2478,7 +2478,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
           <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 12px; width: 100%; padding: 0 30px; z-index: 10; position: relative; box-sizing: border-box;">
              
       <div data-emp-id="emp-fixture-1" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-1" src="https://example.test/photo-1.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-1" src="https://example.test/photo-1.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>1 Sobrenome
@@ -2488,7 +2488,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
       </div>
     
       <div data-emp-id="emp-fixture-2" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-2" src="https://example.test/photo-2.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-2" src="https://example.test/photo-2.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>2 Sobrenome
@@ -2498,7 +2498,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
       </div>
     
       <div data-emp-id="emp-fixture-3" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-3" src="https://example.test/photo-3.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-3" src="https://example.test/photo-3.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>3 Sobrenome
@@ -2508,7 +2508,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
       </div>
     
       <div data-emp-id="emp-fixture-4" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-4" src="https://example.test/photo-4.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-4" src="https://example.test/photo-4.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>4 Sobrenome
@@ -2518,7 +2518,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
       </div>
     
       <div data-emp-id="emp-fixture-5" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-5" src="https://example.test/photo-5.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-5" src="https://example.test/photo-5.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>5 Sobrenome
@@ -2528,7 +2528,7 @@ exports[`card snapshots > group See You Soon is unchanged 1`] = `
       </div>
     
       <div data-emp-id="emp-fixture-6" data-pan-ratio="0.4000" style="width: 144.00px; height: 144.00px; position: relative; overflow: hidden; background: linear-gradient(to bottom, #f1f1f1 0%, rgba(241,241,241,0) 80%), linear-gradient(135deg, #22d3ee 0%, #594C99 100%); box-shadow: 0 8px 20px rgba(0,0,0,0.2); flex-shrink: 0;">
-        <img data-pannable="emp-fixture-6" src="https://example.test/photo-6.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
+        <img alt="" data-pannable="emp-fixture-6" src="https://example.test/photo-6.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; "/>
         <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; pointer-events: none; box-sizing: border-box; padding: 55px 12px 12px; background: linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0) 100%);">
           <p class="akira-font" style="font-size: 16px; line-height: 1.08; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.55);">
             Pessoa<br/>6 Sobrenome
@@ -2751,7 +2751,7 @@ exports[`card snapshots > month birthday card is unchanged 1`] = `
 
           <div style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 12px; width: 100%; padding: 0 30px; z-index: 10; position: relative; box-sizing: border-box;">
             <div style="width: 30%; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, #594C99 0%, #22d3ee 100%); overflow: hidden; flex-shrink: 0;">
-                <img src="https://example.test/photo-1.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="https://example.test/photo-1.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;">
                     <p class="akira-font" style="font-size: 6px; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         Pessoa<br/>1 Sobrenome
@@ -2765,7 +2765,7 @@ exports[`card snapshots > month birthday card is unchanged 1`] = `
             </div>
           
             <div style="width: 30%; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, #594C99 0%, #22d3ee 100%); overflow: hidden; flex-shrink: 0;">
-                <img src="https://example.test/photo-2.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="https://example.test/photo-2.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;">
                     <p class="akira-font" style="font-size: 6px; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         Pessoa<br/>2 Sobrenome
@@ -2779,7 +2779,7 @@ exports[`card snapshots > month birthday card is unchanged 1`] = `
             </div>
           
             <div style="width: 30%; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, #594C99 0%, #22d3ee 100%); overflow: hidden; flex-shrink: 0;">
-                <img src="https://example.test/photo-3.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="https://example.test/photo-3.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;">
                     <p class="akira-font" style="font-size: 6px; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         Pessoa<br/>3 Sobrenome
@@ -2793,7 +2793,7 @@ exports[`card snapshots > month birthday card is unchanged 1`] = `
             </div>
           
             <div style="width: 30%; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, #594C99 0%, #22d3ee 100%); overflow: hidden; flex-shrink: 0;">
-                <img src="https://example.test/photo-4.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="https://example.test/photo-4.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;">
                     <p class="akira-font" style="font-size: 6px; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         Pessoa<br/>4 Sobrenome
@@ -2807,7 +2807,7 @@ exports[`card snapshots > month birthday card is unchanged 1`] = `
             </div>
           
             <div style="width: 30%; aspect-ratio: 1; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0) 80%), linear-gradient(90deg, #594C99 0%, #22d3ee 100%); overflow: hidden; flex-shrink: 0;">
-                <img src="https://example.test/photo-5.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
+                <img alt="" src="https://example.test/photo-5.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block;"/>
                 <div style="position: absolute; bottom: 22px; left: 12px; z-index: 10; pointer-events: none; max-width: 90%;">
                     <p class="akira-font" style="font-size: 6px; color: #ffffff; margin: 0; text-align: left; letter-spacing: 0.5px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         Pessoa<br/>5 Sobrenome

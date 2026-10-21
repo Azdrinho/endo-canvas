@@ -158,10 +158,10 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
         <div className={`absolute z-50 mt-2 p-4 rounded-2xl shadow-2xl border w-[320px] left-0 md:left-auto md:right-0 ${isDarkMode ? 'bg-[#1e1e1e] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-1">
-              <button type="button" onClick={handlePrevYear} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Ano Anterior">
+              <button type="button" onClick={handlePrevYear} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Ano Anterior" aria-label="Ano Anterior">
                 &laquo;
               </button>
-              <button type="button" onClick={handlePrevMonth} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Mês Anterior">
+              <button type="button" onClick={handlePrevMonth} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Mês Anterior" aria-label="Mês Anterior">
                 <ChevronLeft size={16} />
               </button>
             </div>
@@ -171,10 +171,10 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
             </span>
 
             <div className="flex items-center gap-1">
-              <button type="button" onClick={handleNextMonth} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Próximo Mês">
+              <button type="button" onClick={handleNextMonth} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Próximo Mês" aria-label="Próximo Mês">
                 <ChevronRight size={16} />
               </button>
-              <button type="button" onClick={handleNextYear} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Próximo Ano">
+              <button type="button" onClick={handleNextYear} className={`p-1 rounded-md ${isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`} title="Próximo Ano" aria-label="Próximo Ano">
                 &raquo;
               </button>
             </div>
@@ -593,7 +593,7 @@ export const EmployeeEditor: React.FC<EmployeeEditorProps> = ({
                                       <button 
                                           onClick={() => handleDeleteTask(item.id)}
                                           className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer"
-                                          title="Excluir tarefa"
+                                          title="Excluir tarefa" aria-label="Excluir tarefa"
                                       >
                                           <Trash2 size={16} />
                                       </button>
