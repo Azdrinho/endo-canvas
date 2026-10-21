@@ -12,7 +12,14 @@ import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from '.
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { EndoCanvasLogo } from './components/EndoCanvasLogo';
-import { toPng, toJpeg } from 'html-to-image';
+import {
+  captureCardHtml,
+  captureNode,
+  inlineRemoteImages,
+  neutralizeBackdropFilters,
+  withCorsSafePhotos,
+  withOffscreenContainer,
+} from './services/cardExport';
 
 // xlsx, jspdf and jszip are each large enough to dominate the entry bundle,
 // and none of them is reachable until the user presses import or export. They
@@ -2569,422 +2576,171 @@ export default function App() {
       reader.readAsDataURL(file);
   };
 
+  // The three exporters below share their rendering half, which lives in
+  // services/cardExport.ts. They differ only in where the pixels go.
+
+  const monthFileStem = () => `Aniversariantes_${MONTHS[selectedMonthIndex]}`;
+
+  /** The month's cards, with any CORS-blocked photo routed via the proxy. */
+  const prepareMonthEmployees = async (): Promise<Employee[] | null> => {
+    const monthEmployees = Array.isArray(currentCanvasData) ? currentCanvasData : [];
+    if (!isMonthView || monthEmployees.length === 0) return null;
+    const preflightToastId = toast.loading('Executando pré-teste de CORS e validando imagens para exportação...');
+    const prepared = await withCorsSafePhotos(monthEmployees);
+    toast.success('Teste de compatibilidade de imagens concluído com sucesso!', { id: preflightToastId });
+    return prepared;
+  };
+
+  const renderMonthPages = async (
+    employeesToRender: Employee[],
+    progressLabel: (done: number, total: number) => string,
+  ) => withOffscreenContainer(async (container) => {
+    const pages: { employee: Employee; dataUrl: string; width: number; height: number }[] = [];
+    for (let i = 0; i < employeesToRender.length; i++) {
+      const emp = employeesToRender[i];
+      const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
+      const captured = await captureCardHtml(container, html);
+      if (captured) pages.push({ employee: emp, ...captured });
+      toast.info(progressLabel(i + 1, employeesToRender.length));
+    }
+    return pages;
+  });
+
   const handleDownloadImage = async () => {
     setIsDownloading(true);
     try {
-        const node = document.getElementById('capture-target');
-        if (!node) throw new Error("Capture target not found");
+      const node = document.getElementById('capture-target');
+      if (!node) throw new Error('Capture target not found');
 
+      const dataUrl = await withOffscreenContainer(async (container) => {
         const clone = node.cloneNode(true) as HTMLElement;
-        clone.style.transform = 'none'; // Reset scale for capture
-        
-        // Only remove rounded corners for the main container to prevent clipping issues, leave inner elements intact
-        clone.style.borderRadius = '0';
-        
-        // REMOVE SIGNATURE TEXT ONLY FOR EXPORT
+        clone.style.transform = 'none'; // the canvas zoom must not reach the file
+        clone.style.borderRadius = '0'; // rounding the outer box clips the capture
+
         if (selectedTemplate === TemplateType.NEWSLETTER && !includeTextInExport) {
-             const textElements = clone.querySelectorAll('.signature-text-remove');
-             textElements.forEach(el => {
-                 (el as HTMLElement).style.opacity = '0';
-             });
+          clone.querySelectorAll('.signature-text-remove').forEach(el => {
+            (el as HTMLElement).style.opacity = '0';
+          });
         }
 
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.zIndex = '-1';
         container.appendChild(clone);
-        document.body.appendChild(container);
-
-        // --- INLINE IMAGES (Robust CORS Handling) ---
-        // 1. Process <img> tags
-        const imgElements = Array.from(clone.querySelectorAll('img'));
-        const imgPromises = imgElements.map(async (img) => {
-            if (img.src && !img.src.startsWith('data:')) {
-                try {
-                    // Force fetch with CORS
-                    const res = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
-                    const blob = await res.blob();
-                    return new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            img.src = reader.result as string;
-                            img.srcset = ''; 
-                            resolve(null);
-                        };
-                        reader.onerror = () => resolve(null); // Resolve even on error to keep going
-                        reader.readAsDataURL(blob);
-                    });
-                } catch (e) {
-                    console.warn('Failed to inline img:', img.src, e);
-                    img.crossOrigin = "anonymous"; // Fallback
-                    return Promise.resolve();
-                }
-            }
-            return Promise.resolve();
-        });
-
-        // 2. Process background-images (Crucial for New Provider template)
-        const allElements = Array.from(clone.querySelectorAll('*')) as HTMLElement[];
-        allElements.push(clone);
-        const bgPromises = allElements.map(async (el) => {
-             const style = el.getAttribute('style') || '';
-             
-             // Workaround for backdrop-filter bugs in html-to-image (blur bleeding out of radius)
-             if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
-                 el.style.backdropFilter = 'none';
-                 el.style.setProperty('-webkit-backdrop-filter', 'none');
-                 if (el.style.background && el.style.background.includes('rgba')) {
-                     el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
-                         let op = parseFloat(a);
-                         return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
-                     });
-                 }
-             }
-
-             // Look for url(...)
-             const match = style.match(/url\(['"]?(http[^'"]+)['"]?\)/);
-             if (match && match[1]) {
-                 const url = match[1];
-                 try {
-                     const res = await fetch(url, { mode: 'cors', cache: 'no-cache' });
-                     const blob = await res.blob();
-                     return new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            const newDataUrl = reader.result as string;
-                            // Replace only the specific URL found, preserving other style props
-                            el.style.backgroundImage = `url('${newDataUrl}')`;
-                            resolve(null);
-                        };
-                        reader.onerror = () => resolve(null);
-                        reader.readAsDataURL(blob);
-                     });
-                 } catch (e) {
-                     console.warn('Failed to inline bg:', url, e);
-                     return Promise.resolve();
-                 }
-             }
-             return Promise.resolve();
-        });
-
-        await Promise.all([...imgPromises, ...bgPromises]);
-
-        await document.fonts.ready;
-        // Wait a tick for DOM updates
+        neutralizeBackdropFilters(clone);
+        await inlineRemoteImages(clone);
+        // Lets the swapped-in data URLs decode before the capture reads them.
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const options = {
-             quality: 1.0,
-             pixelRatio: 2,
-             cacheBust: false,
-             skipAutoScale: true
+        return {
+          url: await captureNode(clone, { format: exportFormat === 'jpeg' ? 'jpeg' : 'png' }),
+          width: clone.offsetWidth,
+          height: clone.offsetHeight,
         };
+      });
 
-        let dataUrl = '';
-        if (exportFormat === 'jpeg') {
-            dataUrl = await toJpeg(clone, options);
-        } else {
-            dataUrl = await toPng(clone, options);
-        }
+      const baseFilename = isMonthView
+        ? `endo-month-${MONTHS[selectedMonthIndex].toLowerCase()}-${Date.now()}`
+        : `endo-canvas-${selectedTemplate.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
 
-        const baseFilename = isMonthView 
-            ? `endo-month-${MONTHS[selectedMonthIndex].toLowerCase()}-${Date.now()}`
-            : `endo-canvas-${selectedTemplate.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+      if (exportFormat === 'pdf') {
+        const JsPDF = await loadJsPDF();
+        const pdf = new JsPDF({
+          orientation: dataUrl.width > dataUrl.height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [dataUrl.width, dataUrl.height],
+        });
+        pdf.addImage(dataUrl.url, 'PNG', 0, 0, dataUrl.width, dataUrl.height);
+        pdf.save(`${baseFilename}.pdf`);
+      } else {
+        const link = document.createElement('a');
+        link.download = `${baseFilename}.${exportFormat === 'jpeg' ? 'jpg' : 'png'}`;
+        link.href = dataUrl.url;
+        link.click();
+      }
 
-        if (exportFormat === 'pdf') {
-            const JsPDF = await loadJsPDF();
-            const pdf = new JsPDF({
-                orientation: clone.offsetWidth > clone.offsetHeight ? 'landscape' : 'portrait',
-                unit: 'px',
-                format: [clone.offsetWidth, clone.offsetHeight]
-            });
-            pdf.addImage(dataUrl, 'PNG', 0, 0, clone.offsetWidth, clone.offsetHeight);
-            pdf.save(`${baseFilename}.pdf`);
-        } else {
-            const link = document.createElement('a');
-            link.download = `${baseFilename}.${exportFormat === 'jpeg' ? 'jpg' : 'png'}`;
-            link.href = dataUrl;
-            link.click();
-        }
-
-        document.body.removeChild(container);
-        toast.success(`Exportado com sucesso (${exportFormat.toUpperCase()})!`);
+      toast.success(`Exportado com sucesso (${exportFormat.toUpperCase()})!`);
     } catch (err) {
-      console.error("Download failed:", err);
-      toast.error("Não foi possível gerar a imagem. Verifique se as imagens externas permitem CORS.");
+      console.error('Download failed:', err);
+      toast.error('Não foi possível gerar a imagem. Verifique se as imagens externas permitem CORS.');
     } finally {
       setIsDownloading(false);
     }
   };
 
   const handleBatchExport = async () => {
-    // Export the SAME set shown in the month preview (filtered by the selected
-    // month), not the search-only `filteredEmployees`. Otherwise the ZIP named
-    // e.g. "Aniversariantes_MAIO" would contain every employee.
-    const monthEmployees = Array.isArray(currentCanvasData) ? currentCanvasData : [];
-    if (!isMonthView || monthEmployees.length === 0) return;
-
     setIsDownloading(true);
-    const preflightToastId = toast.loading("Executando pré-teste de CORS e validando imagens para exportação...");
-    
     try {
-        const checkImageCors = async (url: string): Promise<boolean> => {
-          if (!url) return true;
-          if (url.startsWith('data:')) return true;
-          if (!url.startsWith('http')) return true;
-          try {
-            const response = await fetch(url, { method: 'HEAD', mode: 'cors' });
-            return response.ok;
-          } catch (err) {
-            return false;
-          }
-        };
+      const employeesToRender = await prepareMonthEmployees();
+      if (!employeesToRender) return;
+      toast.info(`Iniciando exportação em lote de ${employeesToRender.length} cartões...`);
 
-        // Preflight CORS validation & silent self-healing routing
-        const sanitizedEmployees = await Promise.all(monthEmployees.map(async (emp) => {
-            if (emp.photoUrl) {
-                const isCorsPermissive = await checkImageCors(emp.photoUrl);
-                if (!isCorsPermissive) {
-                    console.warn(`Compatibilidade: Roteando foto de ${emp.name} via proxy seguro devido a CORS restritivo.`);
-                    return {
-                        ...emp,
-                        photoUrl: `https://images.weserv.nl/?url=${encodeURIComponent(emp.photoUrl)}`
-                    };
-                }
-            }
-            return emp;
-        }));
+      const pages = await renderMonthPages(employeesToRender, (done, total) => `Gerando ${done}/${total}...`);
 
-        toast.success("Teste de compatibilidade de imagens concluído com sucesso!", { id: preflightToastId });
-        toast.info(`Iniciando exportação em lote de ${sanitizedEmployees.length} cartões...`);
+      const JSZipCtor = await loadJSZip();
+      const zip = new JSZipCtor();
+      const folder = zip.folder(monthFileStem());
+      for (const page of pages) {
+        const safeName = page.employee.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        folder?.file(
+          `${safeName}_${MONTHS[selectedMonthIndex]}.png`,
+          page.dataUrl.replace(/^data:image\/(png|jpeg);base64,/, ''),
+          { base64: true },
+        );
+      }
 
-        const JSZipCtor = await loadJSZip();
-        const zip = new JSZipCtor();
-        const folder = zip.folder(`Aniversariantes_${MONTHS[selectedMonthIndex]}`);
-        
-        // We need to render each employee temporarily to capture them
-        // This is a simplified approach: we generate the HTML for each and use a hidden container
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.zIndex = '-1';
-        document.body.appendChild(container);
+      const blobUrl = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${monthFileStem()}.zip`;
+      link.click();
+      // Released so a blob is not leaked on every export.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
-        for (let i = 0; i < sanitizedEmployees.length; i++) {
-            const emp = sanitizedEmployees[i];
-            const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
-            
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = html;
-            const node = wrapper.firstElementChild as HTMLElement;
-            if (!node) continue;
-            
-            // Only remove rounded corners for the main container to prevent clipping issues, leave inner elements intact
-            node.style.borderRadius = '0';
-            
-            // Workaround for backdrop-filter bugs in html-to-image
-            const allNodes = Array.from(node.querySelectorAll('*')) as HTMLElement[];
-            allNodes.push(node);
-            allNodes.forEach(el => {
-                const style = el.getAttribute('style') || '';
-                if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
-                    el.style.backdropFilter = 'none';
-                    el.style.setProperty('-webkit-backdrop-filter', 'none');
-                    if (el.style.background && el.style.background.includes('rgba')) {
-                         el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
-                             let op = parseFloat(a);
-                             return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
-                         });
-                    }
-                }
-            });
-            
-            container.innerHTML = '';
-            container.appendChild(node);
-            
-            // Wait for images to load
-            const imgElements = Array.from(node.querySelectorAll('img'));
-            await Promise.all(imgElements.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                });
-            }));
-            
-            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for rendering
-
-            const dataUrl = await toPng(node, {
-                quality: 1.0,
-                pixelRatio: 2,
-                cacheBust: false,
-                skipAutoScale: true
-            });
-            
-            const base64Data = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, "");
-            folder?.file(`${emp.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${MONTHS[selectedMonthIndex]}.png`, base64Data, {base64: true});
-            
-            toast.info(`Gerando ${i + 1}/${sanitizedEmployees.length}...`);
-        }
-        
-        document.body.removeChild(container);
-        
-        const content = await zip.generateAsync({type: "blob"});
-        const blobUrl = URL.createObjectURL(content);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `Aniversariantes_${MONTHS[selectedMonthIndex]}.zip`;
-        link.click();
-        // Release the object URL to avoid leaking a blob on every export.
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-
-        toast.success("Exportação em lote concluída!");
+      toast.success('Exportação em lote concluída!');
     } catch (err) {
-        console.error("Batch export failed:", err);
-        toast.error("Falha na exportação em lote.");
+      console.error('Batch export failed:', err);
+      toast.error('Falha na exportação em lote.');
     } finally {
-        setIsDownloading(false);
+      setIsDownloading(false);
     }
   };
 
-  // Same render/CORS-sanitize pipeline as handleBatchExport above, but
-  // collects every card as a page in ONE PDF instead of individual PNGs in a
-  // ZIP — useful for printing or sharing the whole month as a single file
-  // (e.g. for an internal presentation) rather than juggling N images.
+  // Same pipeline as handleBatchExport, collected as pages of one PDF instead
+  // of separate PNGs in a ZIP — for printing or sharing the whole month as a
+  // single file rather than juggling N images.
   const handleBatchExportPDF = async () => {
-    const monthEmployees = Array.isArray(currentCanvasData) ? currentCanvasData : [];
-    if (!isMonthView || monthEmployees.length === 0) return;
-
     setIsDownloading(true);
-    const preflightToastId = toast.loading("Executando pré-teste de CORS e validando imagens para exportação...");
-
     try {
-        const checkImageCors = async (url: string): Promise<boolean> => {
-          if (!url) return true;
-          if (url.startsWith('data:')) return true;
-          if (!url.startsWith('http')) return true;
-          try {
-            const response = await fetch(url, { method: 'HEAD', mode: 'cors' });
-            return response.ok;
-          } catch (err) {
-            return false;
-          }
-        };
+      const employeesToRender = await prepareMonthEmployees();
+      if (!employeesToRender) return;
+      toast.info(`Gerando PDF com ${employeesToRender.length} cartões...`);
 
-        const sanitizedEmployees = await Promise.all(monthEmployees.map(async (emp) => {
-            if (emp.photoUrl) {
-                const isCorsPermissive = await checkImageCors(emp.photoUrl);
-                if (!isCorsPermissive) {
-                    return {
-                        ...emp,
-                        photoUrl: `https://images.weserv.nl/?url=${encodeURIComponent(emp.photoUrl)}`
-                    };
-                }
-            }
-            return emp;
-        }));
+      // Every card is rendered before the PDF is touched. Interleaving
+      // jsPDF's addPage/addImage with the awaits above intermittently
+      // corrupted its PNG decoder ("wrong PNG signature") on pages after the
+      // first, seemingly because its image handling is not safe to call while
+      // adjacent async work is in flight.
+      const pages = await renderMonthPages(employeesToRender, (done, total) => `Gerando ${done}/${total}...`);
 
-        toast.success("Teste de compatibilidade de imagens concluído com sucesso!", { id: preflightToastId });
-        toast.info(`Gerando PDF com ${sanitizedEmployees.length} cartões...`);
-
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.zIndex = '-1';
-        document.body.appendChild(container);
-
-        // Phase 1: render every card to a PNG data URL first — nothing but
-        // this awaits per card. Interleaving jsPDF's addPage/addImage calls
-        // into this same loop (as the initial version did) intermittently
-        // corrupted the PDF's PNG decoder ("wrong PNG signature") on pages
-        // after the first, seemingly from jsPDF's internal image handling
-        // not being safe to call while adjacent async work is in flight.
-        const pages: { dataUrl: string; width: number; height: number }[] = [];
-
-        for (let i = 0; i < sanitizedEmployees.length; i++) {
-            const emp = sanitizedEmployees[i];
-            const html = generateCardCanvas(emp, config, selectedTemplate, orientation, language, hideIconsForExport, {}, providerFormat, signatureDepartment);
-
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = html;
-            const node = wrapper.firstElementChild as HTMLElement;
-            if (!node) continue;
-
-            node.style.borderRadius = '0';
-
-            const allNodes = Array.from(node.querySelectorAll('*')) as HTMLElement[];
-            allNodes.push(node);
-            allNodes.forEach(el => {
-                const style = el.getAttribute('style') || '';
-                if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
-                    el.style.backdropFilter = 'none';
-                    el.style.setProperty('-webkit-backdrop-filter', 'none');
-                    if (el.style.background && el.style.background.includes('rgba')) {
-                         el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
-                             let op = parseFloat(a);
-                             return `rgba(${r}, ${g}, ${b}, ${Math.min(op + 0.35, 0.95)})`;
-                         });
-                    }
-                }
-            });
-
-            container.innerHTML = '';
-            container.appendChild(node);
-
-            const imgElements = Array.from(node.querySelectorAll('img'));
-            await Promise.all(imgElements.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                });
-            }));
-
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            const dataUrl = await toPng(node, {
-                quality: 1.0,
-                pixelRatio: 2,
-                cacheBust: false,
-                skipAutoScale: true
-            });
-
-            pages.push({ dataUrl, width: node.offsetWidth, height: node.offsetHeight });
-            toast.info(`Gerando ${i + 1}/${sanitizedEmployees.length}...`);
+      const JsPDF = await loadJsPDF();
+      let pdf: InstanceType<typeof JsPDF> | null = null;
+      for (const page of pages) {
+        const orientationForPage = page.width > page.height ? 'landscape' : 'portrait';
+        if (!pdf) {
+          pdf = new JsPDF({ orientation: orientationForPage, unit: 'px', format: [page.width, page.height] });
+        } else {
+          pdf.addPage([page.width, page.height], orientationForPage);
         }
+        pdf.addImage(page.dataUrl, 'PNG', 0, 0, page.width, page.height);
+      }
 
-        document.body.removeChild(container);
-
-        // Phase 2: build the actual PDF, synchronously, from the already-
-        // rendered pages — no awaits between addPage/addImage calls.
-        const JsPDF = await loadJsPDF();
-        let pdf: InstanceType<typeof JsPDF> | null = null;
-        for (const page of pages) {
-            if (!pdf) {
-                pdf = new JsPDF({
-                    orientation: page.width > page.height ? 'landscape' : 'portrait',
-                    unit: 'px',
-                    format: [page.width, page.height]
-                });
-            } else {
-                pdf.addPage([page.width, page.height], page.width > page.height ? 'landscape' : 'portrait');
-            }
-            pdf.addImage(page.dataUrl, 'PNG', 0, 0, page.width, page.height);
-        }
-
-        if (pdf) {
-            pdf.save(`Aniversariantes_${MONTHS[selectedMonthIndex]}.pdf`);
-            toast.success("PDF consolidado gerado com sucesso!");
-        }
+      if (pdf) {
+        pdf.save(`${monthFileStem()}.pdf`);
+        toast.success('PDF consolidado gerado com sucesso!');
+      }
     } catch (err) {
-        console.error("Batch PDF export failed:", err);
-        toast.error("Falha na exportação em PDF.");
+      console.error('Batch PDF export failed:', err);
+      toast.error('Falha na exportação em PDF.');
     } finally {
-        setIsDownloading(false);
+      setIsDownloading(false);
     }
   };
 
