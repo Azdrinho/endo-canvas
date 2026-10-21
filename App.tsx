@@ -4,9 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
-import JSZip from 'jszip';
-import { jsPDF } from 'jspdf';
-import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat, ProviderGridConfig } from './types';
+import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat, ProviderGridConfig, BrandKey } from './types';
 import { generateCardCanvas, applyActivationTextFit, FAREWELL_GROUP_MAX } from './services/emailTemplate';
 import { generateBackground } from './services/magnificService'; 
 import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, fetchActivationImages, addActivationImage, deleteActivationImage, uploadActivationImageToStorage, uploadEmployeePhoto } from './services/supabase';
@@ -14,8 +12,15 @@ import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from '.
 import { EmployeeManager } from './components/EmployeeManager';
 import { SalsaLogo } from './components/SalsaLogo';
 import { EndoCanvasLogo } from './components/EndoCanvasLogo';
-import * as XLSX from 'xlsx';
 import { toPng, toJpeg } from 'html-to-image';
+
+// xlsx, jspdf and jszip are each large enough to dominate the entry bundle,
+// and none of them is reachable until the user presses import or export. They
+// are loaded on demand instead, behind these helpers so the dynamic import
+// lives in one place per library and the call sites stay readable.
+const loadXLSX = () => import('xlsx');
+const loadJsPDF = () => import('jspdf').then(m => m.jsPDF);
+const loadJSZip = () => import('jszip').then(m => m.default);
 import { 
   Layout, 
   Trash2, 
@@ -562,6 +567,10 @@ function SliderRow({ label, icon, value, min, max, step, onChange, suffix = '', 
 // "Modo Grupo" toggle. Job Change has always been unbounded; Farewell caps at
 // FAREWELL_GROUP_MAX, which the generator enforces too so the card can never
 // be handed more people than it can render legibly.
+const BRAND_KEYS: readonly BrandKey[] = ['technology', 'studio', 'omni', 'gator', 'consulting'];
+const asBrandKey = (value: unknown): BrandKey | null =>
+  typeof value === 'string' && (BRAND_KEYS as readonly string[]).includes(value) ? (value as BrandKey) : null;
+
 const GROUP_CAPABLE_TEMPLATES: TemplateType[] = [TemplateType.JOB_CHANGE, TemplateType.FAREWELL];
 const supportsGroupMode = (t: TemplateType) => GROUP_CAPABLE_TEMPLATES.includes(t);
 const groupLimitFor = (t: TemplateType) => (t === TemplateType.FAREWELL ? FAREWELL_GROUP_MAX : Infinity);
@@ -1012,10 +1021,13 @@ export default function App() {
   // Feedback template, and applies it automatically the next time the field
   // is unset — instead of always silently defaulting back to "technology"
   // and making you re-pick the brand you actually use.
-  const [lastUsedBrand, setLastUsedBrand] = useState<string | null>(() => {
-    try { return localStorage.getItem('end-last-brand'); } catch { return null; }
+  const [lastUsedBrand, setLastUsedBrand] = useState<BrandKey | null>(() => {
+    // Validated rather than trusted: localStorage is editable by hand and
+    // survives across versions, so a stale or hand-edited value would
+    // otherwise flow straight into the logo picker as an unknown brand.
+    try { return asBrandKey(localStorage.getItem('end-last-brand')); } catch { return null; }
   });
-  const recordLastUsedBrand = useCallback((brand: string) => {
+  const recordLastUsedBrand = useCallback((brand: BrandKey) => {
     setLastUsedBrand(brand);
     try { localStorage.setItem('end-last-brand', brand); } catch { /* ignore quota errors */ }
   }, []);
@@ -2123,16 +2135,6 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportDropdown, showLogoDropdown]);
 
-  const updatePhotoPosition = useCallback((axis: 'x' | 'y', value: number) => {
-      setEmployeesWithHistory(prev => {
-          const emp = prev.find(e => e.id === selectedEmployee.id);
-          if (!emp) return prev;
-          const current = emp.photoPosition || { x: 0, y: 0 };
-          const newPos = { ...current, [axis]: value };
-          return prev.map(e => e.id === selectedEmployee.id ? { ...e, photoPosition: newPos } : e);
-      });
-  }, [selectedEmployee.id, setEmployeesWithHistory]);
-
   const removeEmployee = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEmployeesWithHistory(prev => {
@@ -2484,7 +2486,7 @@ export default function App() {
              // Workaround for backdrop-filter bugs in html-to-image (blur bleeding out of radius)
              if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
                  el.style.backdropFilter = 'none';
-                 el.style.webkitBackdropFilter = 'none';
+                 el.style.setProperty('-webkit-backdrop-filter', 'none');
                  if (el.style.background && el.style.background.includes('rgba')) {
                      el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
                          let op = parseFloat(a);
@@ -2544,7 +2546,8 @@ export default function App() {
             : `endo-canvas-${selectedTemplate.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
 
         if (exportFormat === 'pdf') {
-            const pdf = new jsPDF({
+            const JsPDF = await loadJsPDF();
+            const pdf = new JsPDF({
                 orientation: clone.offsetWidth > clone.offsetHeight ? 'landscape' : 'portrait',
                 unit: 'px',
                 format: [clone.offsetWidth, clone.offsetHeight]
@@ -2609,7 +2612,8 @@ export default function App() {
         toast.success("Teste de compatibilidade de imagens concluído com sucesso!", { id: preflightToastId });
         toast.info(`Iniciando exportação em lote de ${sanitizedEmployees.length} cartões...`);
 
-        const zip = new JSZip();
+        const JSZipCtor = await loadJSZip();
+        const zip = new JSZipCtor();
         const folder = zip.folder(`Aniversariantes_${MONTHS[selectedMonthIndex]}`);
         
         // We need to render each employee temporarily to capture them
@@ -2640,7 +2644,7 @@ export default function App() {
                 const style = el.getAttribute('style') || '';
                 if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
                     el.style.backdropFilter = 'none';
-                    el.style.webkitBackdropFilter = 'none';
+                    el.style.setProperty('-webkit-backdrop-filter', 'none');
                     if (el.style.background && el.style.background.includes('rgba')) {
                          el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
                              let op = parseFloat(a);
@@ -2770,7 +2774,7 @@ export default function App() {
                 const style = el.getAttribute('style') || '';
                 if (style.includes('backdrop-filter') || style.includes('-webkit-backdrop-filter')) {
                     el.style.backdropFilter = 'none';
-                    el.style.webkitBackdropFilter = 'none';
+                    el.style.setProperty('-webkit-backdrop-filter', 'none');
                     if (el.style.background && el.style.background.includes('rgba')) {
                          el.style.background = el.style.background.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, (match, r, g, b, a) => {
                              let op = parseFloat(a);
@@ -2809,10 +2813,11 @@ export default function App() {
 
         // Phase 2: build the actual PDF, synchronously, from the already-
         // rendered pages — no awaits between addPage/addImage calls.
-        let pdf: InstanceType<typeof jsPDF> | null = null;
+        const JsPDF = await loadJsPDF();
+        let pdf: InstanceType<typeof JsPDF> | null = null;
         for (const page of pages) {
             if (!pdf) {
-                pdf = new jsPDF({
+                pdf = new JsPDF({
                     orientation: page.width > page.height ? 'landscape' : 'portrait',
                     unit: 'px',
                     format: [page.width, page.height]
@@ -2995,9 +3000,10 @@ export default function App() {
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (evt) => {
+      reader.onload = async (evt) => {
           try {
               const bstr = evt.target?.result;
+              const XLSX = await loadXLSX();
               const wb = XLSX.read(bstr, { type: 'binary' });
               const wsname = wb.SheetNames[0];
               const ws = wb.Sheets[wsname];
@@ -3155,7 +3161,7 @@ export default function App() {
                     icon={selectedTemplate === TemplateType.NEW_PROVIDER ? <Settings size={22} /> : selectedTemplate === TemplateType.ACTIVATION ? <Type size={22} /> : <Users size={22} />}
                     onClick={() => {
                         setActiveTab('DATA');
-                        if (selectedTemplate === TemplateType.HIRING || selectedTemplate === TemplateType.BABY || selectedTemplate === TemplateType.ACTIVATION) {
+                        if (selectedTemplate === TemplateType.ACTIVATION) {
                             setSidebarDataView('DETAIL');
                         } else {
                             setSidebarDataView('LIST');
@@ -4204,7 +4210,7 @@ export default function App() {
                                setActiveTab('IMAGES');
                                setOrientation('portrait');
                            } else if (t.id === TemplateType.NEW_PROVIDER) {
-                               if (activeTab === 'DATA') setActiveTab('TEMPLATES');
+                               // (no tab change: the picker already lives in TEMPLATES)
                            } else if (selectedEmployeeId === 'hiring-generic' || selectedEmployeeId === 'baby-generic' || selectedEmployeeId === 'gaming-generic') {
                                const firstRealEmployee = employees.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
                                if (firstRealEmployee) {

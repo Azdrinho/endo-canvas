@@ -1,9 +1,11 @@
 import React from 'react';
 
+import type { BrandKey } from '../types';
+
 interface SalsaLogoProps {
   variant: 'light' | 'dark';
   className?: string;
-  brand?: 'technology' | 'studio' | 'omni' | 'gator' | 'consulting';
+  brand?: BrandKey;
 }
 
 export const LOGO_TECHNOLOGY = `<g xmlns="http://www.w3.org/2000/svg" id="Salsa_Technology">
@@ -433,7 +435,7 @@ export const SalsaLogo: React.FC<SalsaLogoProps> = ({ variant, className, brand 
   let rawContent = LOGO_TECHNOLOGY;
   if (brand === 'studio') {
     rawContent = LOGO_STUDIO;
-  } else if (brand === 'omni' || brand === 'safe') {
+  } else if (brand === 'omni') {
     rawContent = LOGO_OMNI;
   } else if (brand === 'gator') {
     rawContent = LOGO_GATOR;

@@ -2,6 +2,7 @@
 
 import { Employee, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat } from '../types';
 import { LOGO_CONTENT, LOGO_TECHNOLOGY, LOGO_STUDIO, LOGO_OMNI, LOGO_GATOR, LOGO_CONSULTING } from '../components/SalsaLogo';
+import { sanitizeEmployee, sanitizeConfig, sanitizeLinks, sanitizePlainText } from './sanitize';
 
 // --- STYLES ---
 
@@ -3218,7 +3219,17 @@ export const generateHiringTemplate = (employee: Employee, config: CanvasConfig)
 
 // --- MAIN GENERATOR ---
 
-export const generateCardCanvas = (data: Employee | Employee[], config: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, links?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq', department?: string, opts?: { isMonthNamesOnly?: boolean, welcomeVariant?: 'light' | 'dark' }): string => {
+export const generateCardCanvas = (rawData: Employee | Employee[], rawConfig: CanvasConfig, type: TemplateType, orientation: Orientation = 'portrait', language: Language = 'en', isExportMode: boolean = false, rawLinks?: { [key: string]: string }, providerFormat: ProviderFormat = 'post-sq', rawDepartment?: string, opts?: { isMonthNamesOnly?: boolean, welcomeVariant?: 'light' | 'dark' }): string => {
+  // Single choke point for untrusted input. Every generator below builds its
+  // markup by interpolating these values into a template string that ends up
+  // in dangerouslySetInnerHTML, so they are made safe here, once, rather than
+  // at each of the ~40 interpolation sites -- where a template added later
+  // would inevitably forget. See services/sanitize.ts for what survives.
+  const data = Array.isArray(rawData) ? rawData.map(sanitizeEmployee) : sanitizeEmployee(rawData);
+  const config = sanitizeConfig(rawConfig);
+  const links = sanitizeLinks(rawLinks);
+  const department = rawDepartment === undefined ? undefined : sanitizePlainText(rawDepartment);
+
   let cardHtml = '';
   
   if (Array.isArray(data)) {

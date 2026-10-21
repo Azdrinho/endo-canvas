@@ -158,6 +158,9 @@ export enum TemplateType {
 
 export type ProviderFormat = 'pr-small' | 'pr-large' | 'post-sq' | 'post-portrait' | 'post-story' | 'banner-small' | 'banner-large';
 
+/** The Salsa sub-brands a card can be stamped with. */
+export type BrandKey = 'technology' | 'studio' | 'omni' | 'gator' | 'consulting';
+
 export type Orientation = 'portrait' | 'landscape';
 
 export type Language = 'en' | 'pt' | 'es';
