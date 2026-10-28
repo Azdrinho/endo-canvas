@@ -902,47 +902,57 @@ export default function App() {
         const genericBaby = INITIAL_EMPLOYEES.find(e => e.id === 'baby-generic');
         const genericGaming = INITIAL_EMPLOYEES.find(e => e.id === 'gaming-generic');
         
-        let remoteData = data.filter(e => {
-          if (e.id === 'gaming-generic' || e.id === 'baby-generic' || e.id === 'hiring-generic') {
-            deleteEmployee(e.id).catch(console.error);
-            return false;
+        // The three template records used to be deleted from the database
+        // here, on every single load. Together with upsertEmployee refusing
+        // to write them, that made it impossible for a configured Baby,
+        // Hiring or HR Feedback card to live anywhere but one browser's
+        // localStorage. They are kept now, and the remote copy wins over the
+        // local one so everyone opens the same cards.
+        //
+        // Resolved once and used for both the state and the undo baseline.
+        // Those were built separately before, and the baseline fell back to
+        // the hardcoded seed instead of to what had actually been loaded --
+        // so one Ctrl+Z right after opening the app reverted a configured
+        // template card to its factory defaults.
+        const resolved = (() => {
+          const byId = new Map(data.map(e => [e.id, e]));
+          const seeds: [string, Employee | undefined][] = [
+            ['hiring-generic', genericHiring],
+            ['baby-generic', genericBaby],
+            ['gaming-generic', genericGaming],
+          ];
+          for (const [id, seed] of seeds) {
+            const local = employeesRef.current.find(e => e.id === id);
+            const remote = byId.get(id);
+            if (!remote) {
+              const fallback = local || seed;
+              if (fallback) byId.set(id, fallback);
+              continue;
+            }
+            // A remote template record is merged over the local one rather
+            // than replacing it. Before the template_settings migration has
+            // run, the row carries only the column-backed fields, so letting
+            // it win outright would wipe the configuration that until now
+            // only localStorage was holding. Remote still wins for every key
+            // it actually defines, which after the migration is all of them.
+            if (local) {
+              const defined = Object.fromEntries(
+                Object.entries(remote).filter(([, value]) => value !== undefined));
+              byId.set(id, { ...local, ...defined } as Employee);
+            }
           }
-          return true;
-        });
-
-        setEmployees(prev => {
-          const dbMap = new Map(remoteData.map(e => [e.id, e]));
-          
-          if (!dbMap.has('hiring-generic')) {
-            dbMap.set('hiring-generic', prev.find(e => e.id === 'hiring-generic') || genericHiring!);
-          }
-          if (!dbMap.has('baby-generic')) {
-            dbMap.set('baby-generic', prev.find(e => e.id === 'baby-generic') || genericBaby!);
-          }
-          if (!dbMap.has('gaming-generic')) {
-            dbMap.set('gaming-generic', prev.find(e => e.id === 'gaming-generic') || genericGaming!);
-          }
-          
-          return Array.from(dbMap.values());
-        });
-
-        // Re-seed the undo baseline to the freshly synced remote records so
-        // an undo right after load can't wipe them back to the demo seed.
-        const historyBaseline = (() => {
-          const m = new Map(remoteData.map(e => [e.id, e]));
-          if (!m.has('hiring-generic')) m.set('hiring-generic', genericHiring!);
-          if (!m.has('baby-generic')) m.set('baby-generic', genericBaby!);
-          if (!m.has('gaming-generic')) m.set('gaming-generic', genericGaming!);
-          return Array.from(m.values());
+          return Array.from(byId.values());
         })();
-        setHistory([historyBaseline]);
+
+        setEmployees(resolved);
+        setHistory([resolved]);
         setHistoryIndex(0);
 
-        const firstRealEmployee = remoteData.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
+        const firstRealEmployee = resolved.find(e => e.id !== 'hiring-generic' && e.id !== 'baby-generic' && e.id !== 'gaming-generic');
         if (firstRealEmployee) {
           setSelectedEmployeeId(firstRealEmployee.id);
-        } else if (remoteData.length > 0) {
-          setSelectedEmployeeId(remoteData[0].id);
+        } else if (resolved.length > 0) {
+          setSelectedEmployeeId(resolved[0].id);
         }
       }
     });

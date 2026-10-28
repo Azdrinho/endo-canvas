@@ -35,69 +35,134 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
     return [];
   }
 
-  return data.map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    role: row.role,
-    previousRole: row.previous_role,
-    photoUrl: row.photo_url,
-    dateStr: row.date_str,
-    admissionDate: row.admission_date,
-    gameThumbnails: row.game_thumbnails || [],
-    photoScale: parseFloat(row.photo_scale) || 1,
-    photoPosition: { 
-        x: parseFloat(row.photo_position_x) || 0, 
-        y: parseFloat(row.photo_position_y) || 0 
-    },
-    // Calculate tenure on the fly or store it? The frontend calculates it.
-    tenure: '', // Will be calculated by frontend helper
-    birthDate: row.birth_date,
-    description: row.description,
-    socials: row.socials,
-    department: row.department,
-    status: row.status,
-    managerId: row.manager_id,
-    onboardingChecklist: row.onboarding_checklist,
-    offboardingChecklist: row.offboarding_checklist,
-    providerLogo: row.provider_logo,
-    providerLogoScale: row.provider_logo_scale,
-    providerGridConfig: row.provider_grid_config
-  }));
+  return data.map(rowToEmployee);
+};
+
+// --- ROW <-> EMPLOYEE -------------------------------------------------------
+//
+// The table has a column per field for the ones it was designed around. Every
+// control added since then -- the whole New Provider panel, the HR Feedback
+// text and image settings, the Hiring titles -- had no column, so it was
+// written nowhere: configure a card, reopen it on another machine, and the
+// work is gone. That is not a bug in any one of those features; it is a bug
+// in having to remember to add a column each time one is built.
+//
+// So anything without a dedicated column round-trips through a single jsonb
+// column, `template_settings`. New controls need no migration. The fields
+// below keep their own columns because they predate this and other things
+// read them.
+const COLUMN_BACKED_FIELDS = [
+  'id', 'name', 'role', 'previousRole', 'photoUrl', 'dateStr', 'admissionDate',
+  'gameThumbnails', 'photoScale', 'photoPosition', 'birthDate', 'description',
+  'socials', 'department', 'status', 'managerId', 'onboardingChecklist',
+  'offboardingChecklist', 'providerLogo', 'providerLogoScale', 'providerGridConfig',
+] as const;
+
+const columnBacked = new Set<string>(COLUMN_BACKED_FIELDS);
+
+/** Everything the table has no column for, as one plain object. */
+const templateSettingsOf = (employee: Employee): Record<string, unknown> => {
+  const settings: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(employee)) {
+    if (columnBacked.has(key) || value === undefined) continue;
+    settings[key] = value;
+  }
+  return settings;
+};
+
+export const employeeToRow = (employee: Employee): Record<string, unknown> => ({
+  id: employee.id,
+  name: employee.name,
+  role: employee.role,
+  previous_role: employee.previousRole,
+  photo_url: employee.photoUrl,
+  date_str: employee.dateStr,
+  admission_date: employee.admissionDate,
+  game_thumbnails: employee.gameThumbnails,
+  photo_scale: employee.photoScale,
+  photo_position_x: employee.photoPosition?.x || 0,
+  photo_position_y: employee.photoPosition?.y || 0,
+  birth_date: employee.birthDate,
+  description: employee.description,
+  socials: employee.socials,
+  department: employee.department,
+  status: employee.status,
+  manager_id: employee.managerId,
+  onboarding_checklist: employee.onboardingChecklist,
+  offboarding_checklist: employee.offboardingChecklist,
+  provider_logo: employee.providerLogo,
+  provider_logo_scale: employee.providerLogoScale,
+  provider_grid_config: employee.providerGridConfig,
+  template_settings: templateSettingsOf(employee),
+  updated_at: new Date().toISOString(),
+});
+
+export const rowToEmployee = (row: any): Employee => ({
+  // Spread first, so a dedicated column always wins over a stale copy an
+  // older build may have left inside the blob.
+  ...(row.template_settings && typeof row.template_settings === 'object' ? row.template_settings : {}),
+  id: row.id,
+  name: row.name,
+  role: row.role,
+  previousRole: row.previous_role,
+  photoUrl: row.photo_url,
+  dateStr: row.date_str,
+  admissionDate: row.admission_date,
+  gameThumbnails: row.game_thumbnails || [],
+  photoScale: parseFloat(row.photo_scale) || 1,
+  photoPosition: {
+    x: parseFloat(row.photo_position_x) || 0,
+    y: parseFloat(row.photo_position_y) || 0,
+  },
+  birthDate: row.birth_date,
+  description: row.description,
+  socials: row.socials,
+  department: row.department,
+  status: row.status,
+  managerId: row.manager_id,
+  onboardingChecklist: row.onboarding_checklist,
+  offboardingChecklist: row.offboarding_checklist,
+  providerLogo: row.provider_logo,
+  providerLogoScale: row.provider_logo_scale,
+  providerGridConfig: row.provider_grid_config,
+});
+
+// PostgREST reports an unknown column as PGRST204; the message names it.
+const isMissingColumnError = (error: { code?: string; message?: string }, column: string): boolean =>
+  error?.code === 'PGRST204' || (error?.message || '').includes(column);
+
+let warnedAboutSettingsColumn = false;
+const warnOnceAboutMissingSettingsColumn = () => {
+  if (warnedAboutSettingsColumn) return;
+  warnedAboutSettingsColumn = true;
+  console.warn(
+    '[supabase] The employees table has no template_settings column yet, so template ' +
+    'configuration (New Provider, HR Feedback, Hiring, Baby) is still only saved in this ' +
+    'browser. Run the migration at the bottom of supabase_schema.sql to fix that.',
+  );
 };
 
 export const upsertEmployee = async (employee: Employee) => {
-  if (employee.id === 'hiring-generic' || employee.id === 'baby-generic' || employee.id === 'gaming-generic') {
-    return [employee];
-  }
+  // The three template records (hiring-generic, baby-generic,
+  // gaming-generic) used to return here without writing anything, so every
+  // setting on the Baby, Hiring and HR Feedback cards lived in one browser's
+  // localStorage and nowhere else. They are ordinary rows now; the editor
+  // still keeps them out of the employee list by id.
 
-  const { data, error } = await supabase
-    .from('employees')
-    .upsert({
-      id: employee.id,
-      name: employee.name,
-      role: employee.role,
-      previous_role: employee.previousRole,
-      photo_url: employee.photoUrl,
-      date_str: employee.dateStr,
-      admission_date: employee.admissionDate,
-      game_thumbnails: employee.gameThumbnails,
-      photo_scale: employee.photoScale,
-      photo_position_x: employee.photoPosition?.x || 0,
-      photo_position_y: employee.photoPosition?.y || 0,
-      birth_date: employee.birthDate,
-      description: employee.description,
-      socials: employee.socials,
-      department: employee.department,
-      status: employee.status,
-      manager_id: employee.managerId,
-      onboarding_checklist: employee.onboardingChecklist,
-      offboarding_checklist: employee.offboardingChecklist,
-      provider_logo: employee.providerLogo,
-      provider_logo_scale: employee.providerLogoScale,
-      provider_grid_config: employee.providerGridConfig,
-      updated_at: new Date().toISOString()
-    })
-    .select();
+  const row = employeeToRow(employee);
+  let { data, error } = await supabase.from('employees').upsert(row).select();
+
+  // The template_settings column arrives with a migration (see
+  // supabase_schema.sql). Until that has been run, PostgREST rejects the
+  // whole write because of the unknown column -- which would mean this
+  // change breaks saving outright on a database that has not been migrated
+  // yet. Retry without it instead: the card keeps saving exactly what it
+  // saved before, and starts saving the rest the moment the column exists.
+  if (error && isMissingColumnError(error, 'template_settings')) {
+    warnOnceAboutMissingSettingsColumn();
+    const { template_settings, ...withoutSettings } = row;
+    ({ data, error } = await supabase.from('employees').upsert(withoutSettings).select());
+  }
 
   if (error) {
     console.error('Error upserting employee:', error);

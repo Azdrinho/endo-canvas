@@ -56,3 +56,25 @@ create policy "Allow public access" on public.employees
 -- Storage -> Policies for each bucket and restrict them to `authenticated`
 -- the same way; tightening this table alone still leaves the uploaded images
 -- world-readable and world-deletable.
+
+-- ---------------------------------------------------------------------------
+-- MIGRATION: template_settings
+-- ---------------------------------------------------------------------------
+-- Run this once, in Supabase -> SQL Editor. It is additive and safe on a live
+-- database: nothing is dropped and no existing row changes.
+--
+-- Why: this table has a column per field only for the ones it was designed
+-- around. Every control built since then -- the whole New Provider panel
+-- (sphere blur, per-sphere offsets, background asset, Gator logo transform,
+-- composition scale, logo box radius...), the HR Feedback text and image
+-- settings, the Hiring titles -- had no column, so it was never written
+-- anywhere. Configure a card, open the app on another machine, and the work
+-- is gone. Those fields now round-trip through this one jsonb column, so a
+-- control added later needs no further migration.
+
+alter table public.employees
+  add column if not exists template_settings jsonb default '{}'::jsonb;
+
+-- Until this runs, the app detects the missing column, keeps saving
+-- everything it saved before, and warns once in the console. After it runs,
+-- the template settings start persisting on the next edit.
