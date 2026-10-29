@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { Employee, ViewMode, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat, ProviderGridConfig, BrandKey } from './types';
 import { generateCardCanvas, applyActivationTextFit, FAREWELL_GROUP_MAX } from './services/emailTemplate';
+import { sanitizeRichText } from './services/sanitize';
 import { generateBackground } from './services/magnificService'; 
 import { supabase, fetchEmployees, upsertEmployee, deleteEmployee, fetchHiringImages, addHiringImage, deleteHiringImage, uploadHiringImageToStorage, fetchBabyImages, addBabyImage, deleteBabyImage, uploadBabyImageToStorage, fetchActivationImages, addActivationImage, deleteActivationImage, uploadActivationImageToStorage, uploadEmployeePhoto } from './services/supabase';
 import { convertFileToWebP, convertDataUrlToWebP, convertUrlToWebPBlob } from './services/imageConverter';
@@ -1584,7 +1585,12 @@ export default function App() {
       const target = e.target as HTMLElement;
       const field = target.getAttribute('data-field');
       if (field && target.hasAttribute('contenteditable')) {
-        const value = isRichTextField(field) ? target.innerHTML : target.innerText;
+        // Sanitized on the way in, not only on the way out. Otherwise a
+        // wrapper pasted from another app stays in the database forever and
+        // keeps imposing its own styling -- a Teams <span style="font-weight:
+        // normal"> around a name quietly un-bolds it on every template that
+        // renders the name whole.
+        const value = isRichTextField(field) ? sanitizeRichText(target.innerHTML) : target.innerText;
         // Skip the update (and the re-render + dangerouslySetInnerHTML replace it
         // would trigger) when nothing actually changed — e.g. just clicking into
         // the field and back out without editing. A no-op write here would still
@@ -1595,8 +1601,31 @@ export default function App() {
         updateEmployee(selectedEmployee.id, field as keyof Employee, value);
       }
     };
+    // Paste plain text, never the source's markup. Copying a name out of
+    // Teams, Word or Outlook carries that app's whole wrapper with it --
+    // <span data-teams> around a <mark> with its own CSS classes, in the
+    // case that broke the Baby card. Even sanitized, that leaves styling
+    // nobody asked for sitting in the field, and any template that slices
+    // the value (first name / last name) then cuts it mid-tag. Formatting
+    // comes from the toolbar on the selection, which is the only place that
+    // produces markup this app understands.
+    const handlePaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target?.getAttribute?.('data-field') || !target.hasAttribute('contenteditable')) return;
+      const text = e.clipboardData?.getData('text/plain');
+      if (text === undefined) return;
+      e.preventDefault();
+      // insertText keeps it a single undoable step and respects the caret,
+      // unlike rewriting innerHTML by hand.
+      document.execCommand('insertText', false, text);
+    };
+
     document.addEventListener('focusout', handleBlur);
-    return () => document.removeEventListener('focusout', handleBlur);
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('focusout', handleBlur);
+      document.removeEventListener('paste', handlePaste);
+    };
   }, [selectedEmployee.id, updateEmployee, isRichTextField]);
 
   // Clicking the title or paragraph directly on the card (General Disclosure /

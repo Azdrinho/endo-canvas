@@ -2,7 +2,7 @@
 
 import { Employee, TemplateType, CanvasConfig, Orientation, Language, ProviderFormat } from '../types';
 import { LOGO_CONTENT, LOGO_TECHNOLOGY, LOGO_STUDIO, LOGO_OMNI, LOGO_GATOR, LOGO_CONSULTING } from '../components/SalsaLogo';
-import { sanitizeEmployee, sanitizeConfig, sanitizeLinks, sanitizePlainText } from './sanitize';
+import { sanitizeEmployee, sanitizeConfig, sanitizeLinks, sanitizePlainText, toPlainText } from './sanitize';
 
 // --- STYLES ---
 
@@ -1169,7 +1169,7 @@ const generateMonthGroupTemplate = (employees: Employee[], config: CanvasConfig,
       employees.forEach((emp: Employee) => {
           const day = emp.dateStr.split('/')[0] || '';
           const month = emp.dateStr.split('/')[1] || '';
-          const nameParts = emp.name.split(' ');
+          const nameParts = toPlainText(emp.name).split(' ');
           const firstName = nameParts[0];
           const lastName = nameParts.slice(1).join(' ');
           const fullName = `${firstName} ${lastName}`;
@@ -1302,7 +1302,7 @@ const generateMonthGroupLandscapeTemplate = (employees: Employee[], config: Canv
       employees.forEach(emp => {
           const day = emp.dateStr.split('/')[0] || '';
           const month = emp.dateStr.split('/')[1] || '';
-          const nameParts = emp.name.split(' ');
+          const nameParts = toPlainText(emp.name).split(' ');
           const firstName = nameParts[0];
           const lastName = nameParts.slice(1).join(' ');
           const fullName = `${firstName} ${lastName}`;
@@ -1397,7 +1397,7 @@ const generateLandscapeTemplate = (
   const nameLen = employee.name.length;
   // Scientific text fitting based on canvas.measureText for precise size calculation
   let nameFontSize = '24px';
-  const nameParts = employee.name.split(' ');
+  const nameParts = toPlainText(employee.name).split(' ');
   const firstName = nameParts[0] || '';
   const restName = nameParts.slice(1).join(' ') || '';
 
@@ -1538,7 +1538,7 @@ const generatePortraitTemplate = (
   const nameLen = employee.name.length;
   // Scientific text fitting based on canvas.measureText for precise size calculation
   let nameFontSize = '24px';
-  const nameParts = employee.name.split(' ');
+  const nameParts = toPlainText(employee.name).split(' ');
   const firstName = nameParts[0] || '';
   const restName = nameParts.slice(1).join(' ') || '';
 
@@ -1668,8 +1668,8 @@ const generateBirthdayCardTemplate = (
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
   const posY = employee.photoPosition?.y || 0;
-  const firstName = employee.name.split(' ')[0] || '';
-  const restName = employee.name.split(' ').slice(1).join(' ') || '';
+  const firstName = toPlainText(employee.name).split(' ')[0] || '';
+  const restName = toPlainText(employee.name).split(' ').slice(1).join(' ') || '';
 
   const rawTitle = TEXTS.BIRTHDAY[language]; // may contain <br/>
   const titleLines = rawTitle.split('<br/>');
@@ -1802,8 +1802,8 @@ const generateAnniversaryCardTemplate = (
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
   const posY = employee.photoPosition?.y || 0;
-  const firstName = employee.name.split(' ')[0] || '';
-  const restName = employee.name.split(' ').slice(1).join(' ') || '';
+  const firstName = toPlainText(employee.name).split(' ')[0] || '';
+  const restName = toPlainText(employee.name).split(' ').slice(1).join(' ') || '';
 
   const tenureText = formatTenure(employee.tenure || '1 ANO', language).toUpperCase();
   // Split into number and label for two separate lines
@@ -1945,8 +1945,8 @@ const generateJobChangeCardTemplate = (
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
   const posY = employee.photoPosition?.y || 0;
-  const firstName = employee.name.split(' ')[0] || '';
-  const restName = employee.name.split(' ').slice(1).join(' ') || '';
+  const firstName = toPlainText(employee.name).split(' ')[0] || '';
+  const restName = toPlainText(employee.name).split(' ').slice(1).join(' ') || '';
 
   const rawTitle = TEXTS.NEW_ROLE[language]; // may contain <br/>
   const titleLines = rawTitle.split('<br/>');
@@ -2115,8 +2115,8 @@ const generateFarewellCardTemplate = (
   const scale = employee.photoScale || 1;
   const posX = employee.photoPosition?.x || 0;
   const posY = employee.photoPosition?.y || 0;
-  const firstName = employee.name.split(' ')[0] || '';
-  const restName = employee.name.split(' ').slice(1).join(' ') || '';
+  const firstName = toPlainText(employee.name).split(' ')[0] || '';
+  const restName = toPlainText(employee.name).split(' ').slice(1).join(' ') || '';
 
   const rawTitle = TEXTS.FAREWELL[language]; // may contain <br/>
   const titleLines = rawTitle.split('<br/>');
@@ -2337,8 +2337,8 @@ const generateFarewellGroupTemplate = (
 
   let gridItems = '';
   people.forEach((emp) => {
-    const firstName = emp.name.split(' ')[0] || '';
-    const restName = emp.name.split(' ').slice(1).join(' ');
+    const firstName = toPlainText(emp.name).split(' ')[0] || '';
+    const restName = toPlainText(emp.name).split(' ').slice(1).join(' ');
     const longestNameLine = Math.max(firstName.length, restName.length);
     let nameSize = baseNameSize;
     if (longestNameLine > 9) nameSize -= 1;
@@ -2429,8 +2429,8 @@ const generateWelcomeTemplate = (
   const posY = employee.photoPosition?.y || 0;
 
   const roleLabel = (employee.role || '').toUpperCase();
-  const firstName = employee.name.split(' ')[0] || '';
-  const restName = employee.name.split(' ').slice(1).join(' ') || '';
+  const firstName = toPlainText(employee.name).split(' ')[0] || '';
+  const restName = toPlainText(employee.name).split(' ').slice(1).join(' ') || '';
 
   // Name font sizing: same scientific canvas-measurement approach used by the
   // shared renderers, just against the larger full-bleed panel width (this
@@ -2573,8 +2573,8 @@ const generateSignatureTemplate = (employee: Employee, config: CanvasConfig, hid
   const noise = getNoiseOverlay();
   
   // Banner Version Only (Dimensions 600x150)
-  const firstName = employee.name.split(' ')[0];
-  const lastName = employee.name.split(' ').slice(1).join(' ');
+  const firstName = toPlainText(employee.name).split(' ')[0];
+  const lastName = toPlainText(employee.name).split(' ').slice(1).join(' ');
   const fullName = firstName + ' ' + lastName;
 
   let titleSize = '34px';
@@ -2723,7 +2723,7 @@ const generateJobChangeGroupTemplate = (employees: Employee[], config: CanvasCon
   const ARROW_DOWN_SVG = `<svg width="10" height="10" viewBox="0 0 270 270" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(41, 41) rotate(225 94.1 94.2)"><polygon points="165.23 0 165.23 50.7 87.09 50.7 188.21 152.7 152.4 188.48 50.7 87.09 50.7 165.23 0 165.23 0 0 165.23 0" fill="#ffffff"/></g></svg>`;
 
   employees.forEach(emp => {
-      const nameParts = emp.name.split(' ');
+      const nameParts = toPlainText(emp.name).split(' ');
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(' ');
       const fullName = `${firstName} ${lastName}`;
@@ -2829,7 +2829,7 @@ export const generateBabyTemplate = (employee: Employee, config: CanvasConfig, l
   const logo = getPepperLogoHtml('position: absolute; top: 15px; left: 15px; width: 20px; height: 28px; z-index: 60;');
 
   const welcomeText = employee.role || TEXTS.BABY_TITLE[language] || 'SEJA BEM-VINDO(A)';
-  const babyName = employee.name ? employee.name.split(' ')[0].toUpperCase() : 'NOME';
+  const babyName = employee.name ? toPlainText(employee.name).split(' ')[0].toUpperCase() : 'NOME';
   
   const defaultDesc = language === 'pt' 
     ? 'Hoje é dia de celebrar a vida de quem acabou de chegar ao mundo! Filho da nossa Nome e do papai Nome.<br/><br/>Que esse novo capítulo seja repleto de amor, risos e memórias preciosas.<br/><br/><b>Parabéns!</b>'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeEmployee, sanitizeLinks, sanitizePlainText, sanitizeRichText, sanitizeUrl } from '../services/sanitize';
+import { sanitizeEmployee, sanitizeLinks, sanitizePlainText, sanitizeRichText, sanitizeUrl, toPlainText } from '../services/sanitize';
 import { employee } from './fixtures';
 
 // These guard the fix for stored XSS through the shared employee table. The
@@ -92,5 +92,40 @@ describe('sanitizeLinks', () => {
   it('drops entries whose URL is unsafe rather than emptying them', () => {
     expect(sanitizeLinks({ linkedin: 'https://in.test/a', evil: 'javascript:alert(1)' }))
       .toEqual({ linkedin: 'https://in.test/a' });
+  });
+});
+
+// Pasting a name out of Microsoft Teams brought the whole Teams wrapper with
+// it and broke the Baby card: the template takes name.split(' ')[0], which on
+// '<span style="...">Emanuel</span>' is '<span' -- an unclosed tag that
+// swallowed the rest of the card, leaving the photo panel missing entirely.
+describe('text pasted from another app', () => {
+  const TEAMS = '<span data-teams="true" style="font-weight: normal;">'
+    + '<mark class="___aqhil00 ftuyjzj ff5vbop">Emanu</mark>el</span>';
+
+  it('keeps no data-* attributes from the source app', () => {
+    expect(sanitizeRichText(TEAMS)).not.toMatch(/data-teams/);
+  });
+
+  it('keeps no foreign class names', () => {
+    expect(sanitizeRichText(TEAMS)).not.toMatch(/___aqhil00/);
+  });
+
+  it('still reads as the name the user pasted', () => {
+    expect(toPlainText(sanitizeRichText(TEAMS))).toBe('Emanuel');
+  });
+
+  it('survives being split into first and last name', () => {
+    // The actual failure: this used to produce '<SPAN'.
+    expect(toPlainText(sanitizeRichText(TEAMS)).split(' ')[0].toUpperCase()).toBe('EMANUEL');
+  });
+
+  it('leaves a plain name untouched', () => {
+    expect(toPlainText('Amanda Santos')).toBe('Amanda Santos');
+    expect(toPlainText('Amanda Santos'.split(' ')[0])).toBe('Amanda');
+  });
+
+  it('reads the text out of formatting the toolbar legitimately produced', () => {
+    expect(toPlainText('<b>Maria</b> <i>Silva</i>')).toBe('Maria Silva');
   });
 });

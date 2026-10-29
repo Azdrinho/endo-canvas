@@ -28,6 +28,10 @@ const ALLOWED_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'span', 'font', 'br', 
 // `style` carries the colors the toolbar sets. DOMPurify parses and filters the
 // declarations itself, dropping expression()/url() style payloads.
 const ALLOWED_ATTR = ['style', 'color', 'face'];
+// DOMPurify keeps data-* attributes by default. Nothing on a card reads one,
+// and pasting from Teams or Word drags in piles of them (data-teams,
+// data-ccp-props...), so they are dropped with everything else.
+const ALLOW_DATA_ATTR = false;
 
 /**
  * Sanitize a value that is allowed to carry inline formatting markup.
@@ -38,10 +42,28 @@ export const sanitizeRichText = (value: string | undefined | null): string => {
   return DOMPurify.sanitize(value, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
+    ALLOW_DATA_ATTR,
     // Keep the text of anything stripped, so a name wrapped in a disallowed
     // tag still shows the name instead of vanishing from the card.
     KEEP_CONTENT: true,
   });
+};
+
+/**
+ * The readable text of a value that may carry formatting markup.
+ *
+ * Templates that split a name into first and last cannot do that on markup:
+ * `'<span style="...">Emanuel</span>'.split(' ')[0]` is `'<span'`, an
+ * unclosed tag that swallows the rest of the card when it is interpolated.
+ * That is not hypothetical -- pasting a name from Teams did exactly that.
+ * Anywhere a value is sliced rather than rendered whole, it goes through
+ * here first; values rendered whole keep their formatting.
+ */
+export const toPlainText = (value: string | undefined | null): string => {
+  if (!value) return '';
+  if (!/[<&]/.test(value)) return value; // the common case, untouched
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
 };
 
 /**
