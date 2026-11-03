@@ -1,28 +1,32 @@
 import React from 'react';
-import type { Template, RenderContext, Person } from './types';
-import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale, space } from '../design/brand';
+import type { Template, RenderContext, Person, Format, BrandKey, ThemeId, Locale } from './types';
+import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale } from '../design/brand';
 import { BrandMark } from '../design/BrandMark';
 import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
 import { EditableText, EditablePhoto } from './kit/Editable';
+import { Mark, Oversize, cutShape, frameFor, groupRhythm } from './kit/Layout';
 
 // --- MOMENTOS ---------------------------------------------------------------
 //
-// One template where the old build had three — Welcome Aboard, See You Soon
-// and Job Change — plus separate group variants of two of them, which is five
-// near-identical renderers. They differ in exactly one thing: the words. So
-// they are one template with a `moment` switch.
+// One template where the old build had five renderers (welcome, farewell,
+// job change, plus two group variants). They differed only in wording and
+// had already drifted apart visually.
 //
-// That is not only less code. Those five drifted apart over time: the group
-// farewell card faded its band into the body colour while the group job-change
-// card faded into white, leaving a grey seam in dark mode on one and not the
-// other. Sharing the renderer makes that class of difference impossible.
+// Second pass, after an audit measured 26 collisions in the first one. The
+// group layout had placed an absolutely positioned band, computed its height
+// from whatever the grid left over, and dropped the headline inside it — so
+// the moment a fourth person arrived the band shrank, the headline climbed,
+// and it ran straight through the brand mark. Every one of those 26 was that
+// single structural mistake.
 //
-// The layout adapts to how many people are on it rather than being a separate
-// card: one person gets a split composition, several get a band and a grid.
+// It is a flow layout now: a header row and a grid, stacked. Nothing is
+// positioned against the card's edges, so nothing can be pushed into
+// anything else. The composition got bolder at the same time — the group is
+// no longer a uniform contact sheet but a hero tile with a rhythm beside it.
 
 const MAX_PEOPLE = 12;
 
-const momentPhrase = (moment: string, locale: RenderContext['locale']) => {
+const momentPhrase = (moment: string, locale: Locale) => {
   switch (moment) {
     case 'farewell': return t(COPY.farewell, locale);
     case 'promotion': return t(COPY.newRole, locale);
@@ -30,79 +34,266 @@ const momentPhrase = (moment: string, locale: RenderContext['locale']) => {
   }
 };
 
-const render = (ctx: RenderContext) => {
-  const { v, format, theme, brand, locale, people, exporting } = ctx;
-  const shortEdge = Math.min(format.width, format.height);
-  const type = typeScale(shortEdge);
-  const sp = space(shortEdge);
-  const b = BRANDS[brand];
-  const paper = paperFor(theme);
-  const ink = inkFor(theme);
-  const muted = mutedFor(theme);
+interface Shared {
+  ctx: RenderContext;
+  format: Format;
+  brand: BrandKey;
+  theme: ThemeId;
+  phrase: string;
+  softness: number;
+}
 
+const render = (ctx: RenderContext) => {
+  const { v, format, theme, brand, locale, people } = ctx;
+  const paper = paperFor(theme);
   const moment = v<string>('moment');
+  const phrase = (v<string>('phrase') || momentPhrase(moment, locale)).trim();
   const softness = v<number>('softness');
-  const phrase = v<string>('phrase') || momentPhrase(moment, locale);
   const roster = people.slice(0, MAX_PEOPLE);
-  const isGroup = roster.length > 1;
-  const isWide = format.width > format.height;
+  const shared: Shared = { ctx, format, brand, theme, phrase, softness };
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      {isGroup
-        ? <GroupLayout {...{ ctx, phrase, softness, roster, shortEdge, type, sp, b, paper, ink, muted, isWide }} />
-        : <SoloLayout {...{ ctx, phrase, softness, person: roster[0], shortEdge, type, sp, b, paper, ink, muted, isWide, moment }} />}
+      {roster.length > 1
+        ? <GroupLayout {...shared} roster={roster} />
+        : <SoloLayout {...shared} person={roster[0]} moment={moment} />}
     </div>
   );
 };
 
 // --- ONE PERSON -------------------------------------------------------------
+// Same device as the birthday card so the family reads as one system: the
+// phrase set oversized and cropped by the frame, with the portrait in a hard
+// cut sitting over it.
 
-const SoloLayout: React.FC<any> = ({ ctx, phrase, softness, person, shortEdge, type, sp, b, ink, muted, isWide, moment }) => {
-  const { format, brand, exporting, v } = ctx as RenderContext;
-  // The gradient panel takes the lead on a wide card and the base on a tall
-  // one, so the portrait always gets the larger, better-proportioned area.
-  const panel = isWide ? 0.46 : 0.42;
+const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
+  ctx, format, brand, theme, phrase, softness, person, moment,
+}) => {
+  const { v, exporting } = ctx;
+  const F = frameFor(format, 'top-left');
+  const type = typeScale(F.short);
+  const b = BRANDS[brand];
+  const paper = paperFor(theme);
+  const ink = inkFor(theme);
+  const muted = mutedFor(theme);
+
+  const lines = phrase.split('\n');
+  const lead = lines[0];
+  const tail = lines.slice(1).join(' ');
+
+  const longest = [...lines].sort((a, x) => x.length - a.length)[0] || lead;
+  const display = Math.round((format.width / Math.max(longest.length, 5)) * 1.62);
+  const headlineTop = F.content.top;
+  const headlineH = Math.round(display * 0.82 * lines.length);
+
+  const cutW = Math.round(F.content.width * (F.isWide ? 0.38 : 0.58));
+  const cutH = Math.round(format.height * (F.isWide ? 0.70 : 0.50));
+  const cutLeft = F.isWide ? format.width - F.margin - cutW : Math.round((format.width - cutW) / 2);
+  const cutTop = Math.round(Math.min(
+    headlineTop + headlineH * 0.66,
+    format.height - F.margin - cutH,
+  ));
 
   return (
     <>
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.9 }}>
+        <GradientField brand={brand} angle={F.isWide ? 110 : 150} sweep={false}>
+          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
+        </GradientField>
+      </div>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0,
+          background: `linear-gradient(${F.isWide ? 100 : 172}deg, ${paper} 8%, ${paper}D0 36%, transparent 80%)`,
+        }}
+      />
+
+      <Oversize
+        size={display}
+        style={{
+          left: -display * 0.06, top: headlineTop, zIndex: 2,
+          fontFamily: FONT_DISPLAY, fontWeight: 700, color: ink,
+        }}
+      >
+        {lead.toUpperCase()}{tail ? `\n${tail.toUpperCase()}` : ''}
+      </Oversize>
+
+      <EditableText
+        field="phrase"
+        value={v<string>('phrase')}
+        exporting={exporting}
+        placeholder="SEJA BEM-VINDO"
+        style={{
+          position: 'absolute', zIndex: 6,
+          left: F.content.left, top: F.content.top,
+          width: F.content.width * 0.45, minHeight: type.subtitle,
+          fontFamily: FONT_DISPLAY, fontSize: type.subtitle,
+          color: 'transparent', caretColor: ink, opacity: exporting ? 0 : 1,
+        }}
+      />
+
       <EditablePhoto
         personIndex={0}
         url={person.photoUrl}
         zoom={person.photoZoom}
         offset={person.photoOffset}
         exporting={exporting}
-        frame={{
-          width: isWide ? format.width * (1 - panel) : format.width,
-          height: isWide ? format.height : format.height * (1 - panel),
-        }}
+        frame={{ width: cutW, height: cutH }}
         style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          width: isWide ? `${(1 - panel) * 100}%` : '100%',
-          height: isWide ? '100%' : `${(1 - panel) * 100}%`,
+          position: 'absolute', zIndex: 4,
+          left: cutLeft, top: cutTop, width: cutW, height: cutH,
+          boxShadow: `0 ${Math.round(F.short * 0.03)}px ${Math.round(F.short * 0.09)}px rgba(0,0,0,0.42)`,
+          ...cutShape(v<string>('cut') as never, Math.round(cutW * 0.5)),
         }}
       />
 
       <div style={{
-        position: 'absolute',
-        left: 0,
-        bottom: 0,
-        width: isWide ? `${panel * 100}%` : '100%',
-        height: isWide ? '100%' : `${panel * 100}%`,
-        zIndex: 2,
+        position: 'absolute', zIndex: 5,
+        left: F.margin, bottom: F.margin,
+        maxWidth: F.isWide ? cutLeft - F.margin - F.short * 0.04 : F.content.width,
       }}>
-        <GradientField brand={brand} angle={isWide ? 155 : 120}>
-          <Spheres brand={brand} shortEdge={shortEdge} softness={softness} variant="corners" scale={0.75} />
-          <Grain opacity={0.06} />
-        </GradientField>
+        <EditableText
+          field="person:0:name"
+          value={person.name}
+          exporting={exporting}
+          placeholder="Nome da pessoa"
+          style={{
+            fontFamily: FONT_DISPLAY, fontWeight: 700,
+            fontSize: type.title, lineHeight: 0.96, letterSpacing: '-0.015em',
+            color: ink, textTransform: 'uppercase',
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018), marginTop: Math.round(F.short * 0.014) }}>
+          <span style={{ width: Math.round(F.short * 0.05), height: 3, background: b.accent, flexShrink: 0 }} />
+          <EditableText
+            field="person:0:role"
+            value={person.role}
+            exporting={exporting}
+            placeholder="Cargo"
+            style={{
+              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.caption,
+              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
+            }}
+          />
+        </div>
 
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 2,
-          padding: sp.gutter,
-          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: sp.tight,
-        }}>
+        {moment === 'promotion' && v<boolean>('showPrevious') && v<string>('previousRole') && (
+          <EditableText
+            field="previousRole"
+            value={v<string>('previousRole')}
+            exporting={exporting}
+            placeholder="Cargo anterior"
+            style={{
+              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.micro,
+              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
+              textDecoration: 'line-through', marginTop: Math.round(F.short * 0.01),
+              opacity: 0.75,
+            }}
+          />
+        )}
+      </div>
+
+      <Grain opacity={0.05} />
+      <Mark brand={brand} format={format} slot="top-left" color={ink} />
+    </>
+  );
+};
+
+// --- SEVERAL PEOPLE ---------------------------------------------------------
+
+const GroupLayout: React.FC<Shared & { roster: Person[] }> = ({
+  ctx, format, brand, theme, phrase, softness, roster,
+}) => {
+  const { exporting, v } = ctx;
+  const F = frameFor(format, 'top-left');
+  const type = typeScale(F.short);
+  const b = BRANDS[brand];
+  const paper = paperFor(theme);
+  const ink = inkFor(theme);
+  const gap = Math.round(F.short * 0.022);
+  const radius = Math.round(F.short * 0.028);
+
+  // A real flow: the header takes the space its content needs and the grid
+  // takes the rest. Nothing is positioned against an edge, so nothing can be
+  // pushed into anything else however many people arrive.
+  const headerH = Math.round(type.headline * (phrase.includes('\n') ? 2.0 : 1.25) + F.short * 0.09);
+  const gridH = format.height - F.margin * 2 - headerH;
+  const rhythm = groupRhythm(roster.length, F.content.width, gridH, gap);
+
+  const tile = (person: Person, index: number, w: number, h: number) => (
+    <div
+      key={person.id}
+      style={{ position: 'relative', width: w, height: h, borderRadius: radius, overflow: 'hidden', background: `${b.to}22` }}
+    >
+      <EditablePhoto
+        personIndex={index}
+        url={person.photoUrl}
+        zoom={person.photoZoom}
+        offset={person.photoOffset}
+        exporting={exporting}
+        frame={{ width: w, height: h }}
+        style={{ position: 'absolute', inset: 0 }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 34%, transparent 58%)',
+        }}
+      />
+      <div style={{
+        position: 'absolute', left: Math.round(w * 0.065), right: Math.round(w * 0.065),
+        bottom: Math.round(w * 0.06), zIndex: 2,
+      }}>
+        <EditableText
+          field={`person:${index}:name`}
+          value={person.name}
+          exporting={exporting}
+          placeholder="Nome"
+          style={{
+            fontFamily: FONT_DISPLAY, fontWeight: 700,
+            fontSize: Math.round(Math.min(w, h) * 0.088), lineHeight: 1.04,
+            color: '#FFFFFF', textTransform: 'uppercase',
+          }}
+        />
+        <EditableText
+          field={`person:${index}:role`}
+          value={person.role}
+          exporting={exporting}
+          placeholder="Cargo"
+          style={{
+            fontFamily: FONT_TEXT, fontWeight: 400,
+            fontSize: Math.round(Math.min(w, h) * 0.052), lineHeight: 1.25,
+            color: 'rgba(255,255,255,0.84)', textTransform: 'uppercase',
+            letterSpacing: '0.1em', marginTop: Math.round(w * 0.012),
+            maxHeight: Math.round(Math.min(w, h) * 0.052) * 2.6, overflow: 'hidden',
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.85 }}>
+        <GradientField brand={brand} angle={128} sweep={false}>
+          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="arc" scale={1.15} />
+        </GradientField>
+      </div>
+      <div
+        aria-hidden
+        style={{ position: 'absolute', inset: 0, background: `linear-gradient(176deg, transparent 0%, ${paper}E6 52%, ${paper} 72%)` }}
+      />
+
+      {/* Header and grid in one column. */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 3,
+        padding: F.margin,
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <header style={{ height: headerH, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <BrandMark brand={brand} width={F.short * 0.17} color={ink} />
           <EditableText
             field="phrase"
             value={phrase}
@@ -110,167 +301,35 @@ const SoloLayout: React.FC<any> = ({ ctx, phrase, softness, person, shortEdge, t
             placeholder="SEJA BEM-VINDO"
             style={{
               fontFamily: FONT_DISPLAY, fontWeight: 700,
-              fontSize: type.display, lineHeight: 0.94, letterSpacing: '-0.025em',
-              color: b.onGradient, whiteSpace: 'pre-line',
+              fontSize: type.headline, lineHeight: 0.92, letterSpacing: '-0.03em',
+              color: ink, whiteSpace: 'pre-line',
             }}
           />
+        </header>
 
-          <div style={{ height: Math.max(2, shortEdge * 0.004), width: shortEdge * 0.1, background: 'rgba(255,255,255,0.75)', margin: `${sp.tight}px 0` }} />
-
-          <EditableText
-            field="person:0:name"
-            value={person.name}
-            exporting={exporting}
-            placeholder="Nome da pessoa"
-            style={{
-              fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: type.subtitle,
-              color: b.onGradient, textTransform: 'uppercase', lineHeight: 1.05,
-            }}
-          />
-          <EditableText
-            field="person:0:role"
-            value={person.role}
-            exporting={exporting}
-            placeholder="Cargo"
-            style={{
-              fontFamily: FONT_TEXT, fontWeight: 300, fontSize: type.caption,
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.85)',
-            }}
-          />
-
-          {moment === 'promotion' && v<boolean>('showPrevious') && (
-            <EditableText
-              field="previousRole"
-              value={v<string>('previousRole')}
-              exporting={exporting}
-              placeholder="Cargo anterior"
-              style={{
-                fontFamily: FONT_TEXT, fontWeight: 300, fontSize: type.micro,
-                letterSpacing: '0.1em', textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.6)', textDecoration: 'line-through',
-                marginTop: sp.hair,
-              }}
-            />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', gap, alignItems: 'stretch' }}>
+          {rhythm.kind === 'hero' ? (
+            <>
+              {tile(roster[0], 0, rhythm.heroW, gridH)}
+              <div style={{ display: 'flex', flexDirection: 'column', gap, flex: 1 }}>
+                {roster.slice(1).map((p, i) => tile(p, i + 1, rhythm.restW, rhythm.restH))}
+              </div>
+            </>
+          ) : (
+            <div style={{
+              display: 'grid', width: '100%',
+              gridTemplateColumns: `repeat(${rhythm.columns}, 1fr)`,
+              gridAutoRows: `${rhythm.tileH}px`,
+              gap,
+            }}>
+              {roster.map((p, i) => tile(p, i, rhythm.tileW, rhythm.tileH))}
+            </div>
           )}
         </div>
       </div>
 
-      <BrandMark
-        brand={brand}
-        width={shortEdge * 0.18}
-        color={b.onGradient}
-        style={{ position: 'absolute', left: sp.gutter, top: sp.gutter, zIndex: 4 }}
-      />
-      <span style={{ display: 'none' }}>{ink}{muted}</span>
-    </>
-  );
-};
-
-// --- SEVERAL PEOPLE ---------------------------------------------------------
-
-const GroupLayout: React.FC<any> = ({ ctx, phrase, softness, roster, shortEdge, type, sp, b, paper, ink, muted }) => {
-  const { format, brand, exporting } = ctx as RenderContext;
-
-  // Columns chosen so a tile never falls below a size where the name stops
-  // fitting; the card grows downward instead of shrinking the faces.
-  const count = roster.length;
-  const columns = count <= 2 ? count : count <= 6 ? 3 : 4;
-  const gap = sp.tight;
-  const gridWidth = format.width - sp.gutter * 2;
-  const tile = (gridWidth - gap * (columns - 1)) / columns;
-  const rows = Math.ceil(count / columns);
-  const bandHeight = format.height - sp.gutter * 2 - rows * tile - (rows - 1) * gap - sp.block;
-
-  return (
-    <>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.max(bandHeight, shortEdge * 0.22) }}>
-        <GradientField brand={brand} angle={120}>
-          <Spheres brand={brand} shortEdge={shortEdge} softness={softness} variant="arc" scale={0.7} />
-          <Grain opacity={0.06} />
-        </GradientField>
-
-        <BrandMark
-          brand={brand}
-          width={shortEdge * 0.16}
-          color={b.onGradient}
-          style={{ position: 'absolute', left: sp.gutter, top: sp.gutter, zIndex: 3 }}
-        />
-
-        <EditableText
-          field="phrase"
-          value={phrase}
-          exporting={exporting}
-          placeholder="SEJA BEM-VINDO"
-          style={{
-            position: 'absolute', zIndex: 3,
-            left: sp.gutter, right: sp.gutter, bottom: sp.block,
-            fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.headline, lineHeight: 0.96, letterSpacing: '-0.025em',
-            color: b.onGradient, whiteSpace: 'pre-line',
-          }}
-        />
-      </div>
-
-      <div style={{
-        position: 'absolute',
-        left: sp.gutter, right: sp.gutter, bottom: sp.gutter,
-        display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap,
-        zIndex: 2,
-      }}>
-        {roster.map((person: Person, i: number) => (
-          <div key={person.id} style={{ position: 'relative', height: tile, borderRadius: Math.round(shortEdge * 0.02), overflow: 'hidden', background: paper }}>
-            <EditablePhoto
-              personIndex={i}
-              url={person.photoUrl}
-              zoom={person.photoZoom}
-              offset={person.photoOffset}
-              exporting={exporting}
-              frame={{ width: tile, height: tile }}
-              style={{ position: 'absolute', inset: 0 }}
-            />
-            <div
-              aria-hidden
-              style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.25) 38%, transparent 62%)',
-              }}
-            />
-            {/* Editable on the tile, like everywhere else. These were plain
-                text at first, which left no way at all to type a name once a
-                card had more than one person on it. */}
-            <div style={{ position: 'absolute', left: sp.tight, right: sp.tight, bottom: sp.tight, zIndex: 2 }}>
-              <EditableText
-                field={`person:${i}:name`}
-                value={person.name}
-                exporting={exporting}
-                placeholder="Nome"
-                style={{
-                  fontFamily: FONT_DISPLAY, fontWeight: 700,
-                  fontSize: Math.round(tile * 0.095), lineHeight: 1.08,
-                  color: '#FFFFFF', textTransform: 'uppercase',
-                }}
-              />
-              <EditableText
-                field={`person:${i}:role`}
-                value={person.role}
-                exporting={exporting}
-                placeholder="Cargo"
-                style={{
-                  fontFamily: FONT_TEXT, fontWeight: 300,
-                  fontSize: Math.round(tile * 0.062), lineHeight: 1.2,
-                  color: 'rgba(255,255,255,0.82)', textTransform: 'uppercase',
-                  letterSpacing: '0.08em', marginTop: 2,
-                  maxHeight: Math.round(tile * 0.062) * 2.4, overflow: 'hidden',
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <span style={{ display: 'none' }}>{ink}{muted}</span>
+      <Grain opacity={0.045} />
+      <span style={{ display: 'none' }}>{v<string>('moment')}</span>
     </>
   );
 };
@@ -295,7 +354,16 @@ export const milestone: Template = {
     { kind: 'text', id: 'phrase', label: 'Frase', default: '', group: 'Conteúdo', hint: 'Vazio usa a frase do momento e do idioma.' },
     { kind: 'toggle', id: 'showPrevious', label: 'Mostrar cargo anterior', default: true, group: 'Conteúdo', hint: 'Só aparece no momento Promoção.' },
     { kind: 'text', id: 'previousRole', label: 'Cargo anterior', default: '', group: 'Conteúdo' },
-    { kind: 'number', id: 'softness', label: 'Desfoque das esferas', default: 0.3, min: 0, max: 1, step: 0.01, group: 'Composição' },
+    {
+      kind: 'select', id: 'cut', label: 'Recorte da foto', default: 'arch', group: 'Composição',
+      options: [
+        { value: 'arch', label: 'Arco' },
+        { value: 'circle', label: 'Círculo' },
+        { value: 'blade', label: 'Lâmina' },
+        { value: 'none', label: 'Reto' },
+      ],
+    },
+    { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.4, min: 0, max: 1, step: 0.01, group: 'Composição' },
   ],
   render,
 };
