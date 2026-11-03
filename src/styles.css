@@ -1,0 +1,103 @@
+/* The editor's base styles. The cards themselves are styled entirely in their
+   own components, so nothing here can leak into a card and change how an
+   exported image looks — which is how the old build ended up with a card that
+   rendered differently depending on which page it was previewed on. */
+
+@font-face {
+  font-family: 'Orkney';
+  src: url('https://db.onlinewebfonts.com/t/5c4f936f2dfe6a0c4ff6c2bac09ee3bc.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Orkney';
+  src: url('https://db.onlinewebfonts.com/t/1aab5ed24c6a9f95b69de27350a83559.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Orkney';
+  src: url('https://db.onlinewebfonts.com/t/03b490987dd0b510b4c52d7f34412eae.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Orkney';
+  src: url('https://db.onlinewebfonts.com/t/575518fd5bf34166a0ab1de79e997d1a.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: #0e0e10;
+  color: #f2f2f4;
+  font-family: 'Orkney', 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* Placeholder text for the fields edited directly on the card. Drawn with a
+   pseudo-element so it is never part of the value, and therefore never
+   exported or saved. */
+/* Gated on the attribute, which the card only carries while it is editable.
+   An exported card has no data-placeholder, so there is no path by which
+   placeholder copy can reach a finished image. */
+[data-editable='text'][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* A quiet hint that text on the card can be edited, shown only on hover and
+   only while editing — the exported copy renders with affordances off. */
+[data-editable='text']:not([contenteditable='false']):hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+  border-radius: 2px;
+}
+
+[data-editable='photo']:not(:active):hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a30;
+  border-radius: 999px;
+  border: 3px solid #151518;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a42;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

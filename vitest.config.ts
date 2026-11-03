@@ -7,6 +7,6 @@ export default defineConfig({
     // generators already handle (they catch and fall back to a fixed size) --
     // that fallback is deterministic, which is what a snapshot wants.
     environment: 'jsdom',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
   },
 });
