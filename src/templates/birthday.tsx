@@ -2,28 +2,25 @@ import React from 'react';
 import type { Template, RenderContext } from './types';
 import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale } from '../design/brand';
 import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
-import { EditableText, EditablePhoto } from './kit/Editable';
-import { Mark, Oversize, cutShape, frameFor } from './kit/Layout';
+import { EditableText } from './kit/Editable';
+import { Subject } from './kit/Subject';
+import { Mark, Oversize, frameFor } from './kit/Layout';
 
 // --- ANIVERSÁRIO ------------------------------------------------------------
 //
-// Second pass. The first was a gradient wedge with the greeting sitting in
-// the empty half of it — a sticker on a photo. The type and the portrait
-// never met, which is what made it read as flat and safe.
+// Third pass. The second put the headline edge to edge and dropped an arch
+// across the middle of it, so a word was bisected and the type looked jammed
+// into the corner rather than placed. Two rules came out of that:
 //
-// This one is built on three things:
+//   * The margin is a margin. Type sits inside it. Bleeding past the edge is
+//     a decision taken for one element on one side, never the default for
+//     everything.
+//   * The subject overlaps the headline's baseline band, off to one side —
+//     never across the middle of a word. A cutout stands in the same space
+//     as the type and occludes it; a framed photo tucks under the last line.
 //
-//   1. The greeting is set enormous and runs off both edges, so the card
-//      reads as a crop of something larger rather than a slide with a
-//      heading on it.
-//   2. The portrait sits in a hard arch that overlaps that type. The
-//      occlusion is the depth — it is what puts the person in front of the
-//      words instead of next to them.
-//   3. Extreme scale contrast: a display word in the hundreds of pixels
-//      against a 16px kicker, with nothing in between competing.
-//
-// The date becomes a graphic element in its own right rather than a label:
-// set as a large numeral pair on the brand accent, anchored to the arch.
+// The card reads as mark, kicker, headline, then the figure standing on the
+// name: four beats down one diagonal, rather than four stacked boxes.
 
 const render = (ctx: RenderContext) => {
   const { v, format, theme, brand, locale, people, exporting } = ctx;
@@ -35,130 +32,105 @@ const render = (ctx: RenderContext) => {
   const muted = mutedFor(theme);
 
   const person = people[0];
-  const drop = v<number>('drop');
-  const softness = v<number>('softness');
+  const cutout = Boolean(person.cutout);
   const bleed = v<number>('bleed');
-  const cut = v<string>('cut');
+  const scale = v<number>('subjectScale');
+  const softness = v<number>('softness');
 
   const raw = (v<string>('greeting') || t(COPY.birthday, locale)).trim();
-  const lines = raw.split('\n');
-  const headline = lines[lines.length - 1] || raw;
-  const kicker = lines.length > 1 ? lines.slice(0, -1).join(' ') : '';
+  const parts = raw.split('\n');
+  const headline = (parts.length > 1 ? parts.slice(1).join(' ') : parts[0]).trim();
+  const kicker = parts.length > 1 ? parts[0].trim() : '';
 
-  // The portrait column. Narrower and taller than a half-split, so the arch
-  // reads as an object placed on the card rather than as one of two panels.
-  const archW = Math.round(F.content.width * (F.isWide ? 0.40 : 0.62));
-  const archH = Math.round(format.height * (F.isWide ? 0.74 : 0.56));
-  const archLeft = F.isWide
-    ? Math.round(format.width - F.margin - archW)
-    : Math.round((format.width - archW) / 2 + F.content.width * 0.06);
-  // Display size is driven by the longest word, so a long greeting bleeds
-  // rather than shrinking — the bleed is the point.
+  // Sized to the content box, not to the card. Above 1 the user has asked
+  // for it to run past the right edge; it never runs past the left.
   const longest = headline.split(' ').reduce((a, w) => (w.length > a.length ? w : a), '');
-  const display = Math.round((format.width / Math.max(longest.length, 5)) * 1.72 * bleed);
+  const display = Math.round((F.content.width / Math.max(longest.length, 5)) * 1.78 * bleed);
 
-  // Explicit vertical flow instead of three things each positioned from the
-  // frame edge and trusting the others to miss. The first pass had the
-  // kicker landing on the headline and the date landing on it too.
-  const kickerH = kicker ? Math.round(type.subtitle * 1.25) : 0;
+  const kickerH = kicker ? Math.round(type.subtitle * 1.5) : 0;
   const headlineTop = F.content.top + kickerH;
-  const headlineH = Math.round(display * 0.82);
+  const lineH = Math.round(display * 0.82);
+  const headlineLines = headline.split(' ').length > 1 && !F.isWide ? 2 : 1;
+  const headlineBottom = headlineTop + lineH * headlineLines;
 
-  // Anchored to the headline rather than to the card's bottom edge, so the
-  // overlap is always the type's lower third -- that occlusion is where the
-  // depth comes from -- at every format. Declared after the headline
-  // metrics it depends on, which the first version was not: it read
-  // `display` above its own definition and took the whole app down.
-  const archTop = Math.round(Math.min(
-    headlineTop + headlineH * 0.72 + format.height * 0.05 * (drop - 0.5) * 2,
-    format.height - F.margin - archH,
-  ));
+  // The figure stands on the card's base line and reaches up into the
+  // headline's last line. A wide card gives it the right third, a tall one
+  // the right half.
+  const subjectH = Math.round(format.height * (F.isWide ? 0.78 : 0.62) * scale);
+  const subjectW = Math.round(F.content.width * (F.isWide ? 0.40 : 0.62) * scale);
+  const subjectLeft = Math.round(format.width - F.margin - subjectW + (cutout ? subjectW * 0.10 : 0));
+  const subjectTop = cutout
+    ? format.height - subjectH
+    : Math.round(Math.min(headlineBottom - lineH * 0.2, format.height - F.margin - subjectH));
+
+  const nameMaxWidth = Math.round(
+    (cutout ? subjectLeft + subjectW * 0.2 : subjectLeft) - F.margin - F.short * 0.03,
+  );
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      {/* Brand light, not a brand rectangle: a soft mass of gradient behind
-          the subject instead of a panel beside them. */}
       <div style={{ position: 'absolute', inset: 0, opacity: 0.92 }}>
-        <GradientField brand={brand} angle={F.isWide ? 115 : 150} sweep={false}>
-          <Spheres brand={brand} shortEdge={F.short} softness={0.55 + softness * 0.45} variant="orbit" scale={1.35} />
+        <GradientField brand={brand} angle={F.isWide ? 112 : 152} sweep={false}>
+          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
         </GradientField>
       </div>
       <div
         aria-hidden
         style={{
           position: 'absolute', inset: 0,
-          background: theme === 'dark'
-            ? `linear-gradient(${F.isWide ? 100 : 170}deg, ${paper} 6%, ${paper}D9 34%, transparent 78%)`
-            : `linear-gradient(${F.isWide ? 100 : 170}deg, ${paper} 6%, ${paper}CC 34%, transparent 78%)`,
+          background: `linear-gradient(${F.isWide ? 98 : 172}deg, ${paper} 4%, ${paper}D4 32%, transparent 76%)`,
         }}
       />
-
-      {/* The oversized greeting, cropped by both edges. */}
-      <Oversize
-        size={display}
-        style={{
-          left: -display * 0.07,
-          top: headlineTop,
-          fontFamily: FONT_DISPLAY,
-          fontWeight: 700,
-          color: ink,
-          opacity: theme === 'dark' ? 0.97 : 0.95,
-          zIndex: 2,
-        }}
-      >
-        {headline.toUpperCase()}
-      </Oversize>
 
       {kicker && (
         <div style={{
           position: 'absolute', zIndex: 3,
           left: F.content.left, top: F.content.top,
           fontFamily: FONT_DISPLAY, fontWeight: 700,
-          fontSize: type.subtitle, letterSpacing: '0.04em',
+          fontSize: type.subtitle, letterSpacing: '0.06em',
           color: b.accent, textTransform: 'uppercase',
         }}>{kicker}</div>
       )}
 
-      {/* Hidden field so the greeting stays editable even though it is drawn
-          as two separate pieces above. */}
+      <Oversize
+        size={display}
+        style={{
+          left: F.content.left, top: headlineTop,
+          // Wraps inside the content box, and reaches past the right edge
+          // only when the bleed control has been pushed above 1.
+          width: F.content.width * Math.max(1, bleed),
+          whiteSpace: headlineLines > 1 ? 'pre-wrap' : 'pre',
+          fontFamily: FONT_DISPLAY, fontWeight: 700, color: ink,
+          zIndex: 2,
+        }}
+      >
+        {headline.toUpperCase()}
+      </Oversize>
+
       <EditableText
         field="greeting"
         value={v<string>('greeting')}
         exporting={exporting}
         placeholder="FELIZ ANIVERSÁRIO"
         style={{
-          position: 'absolute', zIndex: 6,
+          position: 'absolute', zIndex: 7,
           left: F.content.left, top: F.content.top,
-          width: F.content.width * 0.5, minHeight: type.subtitle,
+          width: F.content.width * 0.42, minHeight: type.subtitle,
           fontFamily: FONT_DISPLAY, fontSize: type.subtitle,
-          color: 'transparent', caretColor: ink,
-          opacity: exporting ? 0 : 1,
+          color: 'transparent', caretColor: ink, opacity: exporting ? 0 : 1,
         }}
       />
 
-      {/* The portrait, over the type. */}
-      <EditablePhoto
-        personIndex={0}
-        url={person.photoUrl}
-        zoom={person.photoZoom}
-        offset={person.photoOffset}
+      <Subject
+        person={person}
+        index={0}
         exporting={exporting}
-        frame={{ width: archW, height: archH }}
-        style={{
-          position: 'absolute', zIndex: 4,
-          left: archLeft, top: archTop, width: archW, height: archH,
-          boxShadow: `0 ${Math.round(F.short * 0.03)}px ${Math.round(F.short * 0.09)}px rgba(0,0,0,0.42)`,
-          ...cutShape(cut as never, Math.round(archW * 0.5)),
-        }}
+        short={F.short}
+        cut={v<string>('cut') as never}
+        box={{ left: subjectLeft, top: subjectTop, width: subjectW, height: subjectH }}
       />
 
-      {/* Name block, hung off the arch's base line. */}
-      <div style={{
-        position: 'absolute', zIndex: 5,
-        left: F.isWide ? F.content.left : F.margin,
-        bottom: F.margin,
-        maxWidth: F.isWide ? archLeft - F.content.left - F.short * 0.04 : F.content.width,
-      }}>
+      <div style={{ position: 'absolute', zIndex: 5, left: F.margin, bottom: F.margin, maxWidth: nameMaxWidth }}>
         <EditableText
           field="person:0:name"
           value={person.name}
@@ -166,27 +138,25 @@ const render = (ctx: RenderContext) => {
           placeholder="Nome da pessoa"
           style={{
             fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.title, lineHeight: 0.96, letterSpacing: '-0.015em',
+            fontSize: type.title, lineHeight: 0.94, letterSpacing: '-0.015em',
             color: ink, textTransform: 'uppercase',
           }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018), marginTop: Math.round(F.short * 0.014) }}>
-          <span style={{ width: Math.round(F.short * 0.05), height: 3, background: b.accent, flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018), marginTop: Math.round(F.short * 0.016) }}>
+          <span style={{ width: Math.round(F.short * 0.045), height: 3, background: b.accent, flexShrink: 0 }} />
           <EditableText
             field="person:0:role"
             value={person.role}
             exporting={exporting}
             placeholder="Cargo"
             style={{
-              fontFamily: FONT_TEXT, fontWeight: 400,
-              fontSize: type.caption, letterSpacing: '0.16em',
-              color: muted, textTransform: 'uppercase',
+              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.caption,
+              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
             }}
           />
         </div>
       </div>
 
-      {/* The date as a graphic element, not a label. */}
       {v<boolean>('showDate') && (
         <EditableText
           field="dateLabel"
@@ -195,11 +165,10 @@ const render = (ctx: RenderContext) => {
           placeholder="12/06"
           style={{
             position: 'absolute', zIndex: 6,
-            right: F.margin,
-            bottom: F.margin,
+            right: F.margin, top: F.content.top,
             fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.headline, lineHeight: 0.8, letterSpacing: '-0.03em',
-            color: b.accent,
+            fontSize: type.title, lineHeight: 0.9, letterSpacing: '-0.02em',
+            color: b.accent, textAlign: 'right',
           }}
         />
       )}
@@ -213,7 +182,7 @@ const render = (ctx: RenderContext) => {
 export const birthday: Template = {
   id: 'birthday',
   name: 'Aniversário',
-  tagline: 'Tipografia sangrada com o retrato por cima',
+  tagline: 'Pôster com a pessoa em pé sobre o nome',
   family: 'pessoas',
   formats: ['post-square', 'post-portrait', 'story', 'landscape'],
   groups: ['Conteúdo', 'Composição'],
@@ -229,10 +198,11 @@ export const birthday: Template = {
         { value: 'blade', label: 'Lâmina' },
         { value: 'none', label: 'Reto' },
       ],
+      hint: 'Ignorado quando a foto já está com o fundo recortado.',
     },
-    { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 1, min: 0.7, max: 1.5, step: 0.01, group: 'Composição', hint: 'Acima de 1 o título corta nas bordas de propósito.' },
-    { kind: 'number', id: 'drop', label: 'Altura do retrato', default: 0.5, min: 0, max: 1, step: 0.01, group: 'Composição' },
-    { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.4, min: 0, max: 1, step: 0.01, group: 'Composição' },
+    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.7, max: 1.35, step: 0.01, group: 'Composição' },
+    { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 1, min: 1, max: 1.45, step: 0.01, group: 'Composição', hint: 'Acima de 1 o título avança pela borda direita.' },
+    { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
   ],
   render,
 };

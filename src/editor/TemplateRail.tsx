@@ -1,40 +1,63 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useEditor } from '../store/editor';
 import { TEMPLATES, FAMILY_LABELS } from '../templates/registry';
-import { BRANDS } from '../design/brand';
-import { UI } from './controls';
-import type { Template } from '../templates/types';
+import { FORMATS, defaultsFor, emptyPerson, type FieldValue, type RenderContext, type Template } from '../templates/types';
+import { C, MOTION, R, S, T } from './ui';
 
-// The template picker. Each entry draws its own miniature from the real
-// template at a tiny scale, so a thumbnail can never go stale against the
-// card it represents — the old build used ten hand-uploaded PNGs that had
-// stopped matching their templates months ago.
+// The template picker.
+//
+// The thumbnails used to be two white bars on a gradient — a drawing of a
+// card rather than the card. The old build was worse still: ten hand-exported
+// PNGs that had stopped matching their templates months earlier. Each entry
+// now renders the real template, at real size, scaled down, so a preview is
+// incapable of going stale.
 
-const Thumb: React.FC<{ template: Template; active: boolean }> = ({ template, active }) => {
+const PREVIEW_W = 172;
+
+const Preview: React.FC<{ template: Template; active: boolean }> = ({ template, active }) => {
   const brand = useEditor(s => s.card.brand);
-  const b = BRANDS[brand];
+  const theme = useEditor(s => s.card.theme);
+  const locale = useEditor(s => s.card.locale);
+
+  const format = FORMATS[template.formats[0]];
+  const scale = PREVIEW_W / format.width;
+  const height = Math.round(format.height * scale);
+
+  const ctx: RenderContext = useMemo(() => {
+    const values = defaultsFor(template);
+    return {
+      v: (<T2 extends FieldValue>(id: string) => values[id] as T2),
+      format,
+      theme,
+      brand,
+      locale,
+      people: [{ ...emptyPerson('preview'), name: 'Nome Sobrenome', role: 'Cargo' }],
+      // Affordances off: a preview is not editable, and a placeholder or a
+      // hover outline inside a 172px thumbnail is just noise.
+      exporting: true,
+    };
+  }, [template, format, theme, brand, locale]);
+
   return (
     <div
       aria-hidden
       style={{
-        position: 'relative', height: 58, borderRadius: 9, overflow: 'hidden',
-        background: `linear-gradient(135deg, ${b.from}, ${b.to})`,
-        border: active ? `1px solid rgba(255,255,255,0.5)` : `1px solid ${UI.line}`,
+        position: 'relative', width: '100%', height,
+        borderRadius: R.lg, overflow: 'hidden',
+        boxShadow: active
+          ? `0 0 0 1.5px ${C.accent}, 0 8px 22px -8px rgba(0,0,0,0.7)`
+          : `0 0 0 1px ${C.edge}, 0 4px 14px -8px rgba(0,0,0,0.6)`,
+        transition: 'box-shadow 180ms',
       }}
     >
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(60% 60% at 25% 20%, rgba(255,255,255,0.35), transparent 65%)',
-      }} />
-      <div style={{
-        position: 'absolute', left: 9, bottom: 8, right: 9,
-        height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.75)',
-      }} />
-      <div style={{
-        position: 'absolute', left: 9, bottom: 16, width: '45%',
-        height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.45)',
-      }} />
+        width: format.width, height: format.height,
+        transform: `scale(${scale})`, transformOrigin: 'top left',
+        pointerEvents: 'none',
+      }}>
+        {template.render(ctx)}
+      </div>
     </div>
   );
 };
@@ -42,26 +65,24 @@ const Thumb: React.FC<{ template: Template; active: boolean }> = ({ template, ac
 export const TemplateRail: React.FC = () => {
   const templateId = useEditor(s => s.card.templateId);
   const setTemplate = useEditor(s => s.setTemplate);
-
   const families = [...new Set(TEMPLATES.map(t => t.family))];
 
   return (
     <nav
       aria-label="Templates"
       style={{
-        width: 212, flexShrink: 0, height: '100%', overflowY: 'auto',
-        background: UI.panel, borderRight: `1px solid ${UI.line}`,
-        padding: '18px 14px 40px',
+        width: 204, flexShrink: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden',
+        background: C.panel, borderRight: `1px solid ${C.edge}`,
+        padding: `${S.lg}px ${S.lg}px ${S.xxxl}px`,
       }}
     >
       {families.map(family => (
-        <div key={family} style={{ marginBottom: 22 }}>
-          <h3 style={{
-            margin: '0 0 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-            textTransform: 'uppercase', color: UI.muted,
-          }}>{FAMILY_LABELS[family]}</h3>
+        <div key={family} style={{ marginBottom: S.xl }}>
+          <h3 style={{ margin: `0 0 ${S.md}px`, color: C.muted, ...T.label }}>
+            {FAMILY_LABELS[family]}
+          </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S.md }}>
             {TEMPLATES.filter(t => t.family === family).map(t => {
               const active = t.id === templateId;
               return (
@@ -71,6 +92,7 @@ export const TemplateRail: React.FC = () => {
                   onClick={() => setTemplate(t.id)}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.985 }}
+                  transition={MOTION.snappy}
                   aria-pressed={active}
                   style={{
                     position: 'relative', textAlign: 'left', padding: 0,
@@ -78,26 +100,15 @@ export const TemplateRail: React.FC = () => {
                     fontFamily: 'inherit',
                   }}
                 >
-                  <Thumb template={t} active={active} />
-                  <div style={{ padding: '7px 2px 0' }}>
-                    <div style={{ fontSize: 12.5, fontWeight: active ? 700 : 500, color: active ? UI.ink : 'rgba(242,242,244,0.78)' }}>
-                      {t.name}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: UI.muted, lineHeight: 1.35, marginTop: 1 }}>
-                      {t.tagline}
-                    </div>
+                  <Preview template={t} active={active} />
+                  <div style={{ padding: `${S.sm}px 2px 0` }}>
+                    <div style={{
+                      color: active ? C.ink : C.inkSoft,
+                      fontWeight: active ? 700 : 500,
+                      ...T.control,
+                    }}>{t.name}</div>
+                    <div style={{ color: C.faint, marginTop: 1, ...T.hint }}>{t.tagline}</div>
                   </div>
-
-                  {active && (
-                    <motion.div
-                      layoutId="template-active"
-                      style={{
-                        position: 'absolute', left: -14, top: 4, bottom: 4, width: 3,
-                        borderRadius: 2, background: UI.accent,
-                      }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    />
-                  )}
                 </motion.button>
               );
             })}

@@ -114,6 +114,13 @@ export interface Person {
   dateLabel?: string;
   previousRole?: string;
   tenure?: string;
+  /**
+   * The photo is a subject on a transparent background. A cutout is not
+   * placed in a frame: it stands free, bleeding off the card edge and
+   * overlapping the typography, which is where the depth in these layouts
+   * comes from. A framed photo can only ever sit beside the type.
+   */
+  cutout?: boolean;
 }
 
 export const emptyPerson = (id = 'p1'): Person => ({
@@ -123,6 +130,7 @@ export const emptyPerson = (id = 'p1'): Person => ({
   photoUrl: '',
   photoZoom: 1,
   photoOffset: { x: 0, y: 0 },
+  cutout: false,
 });
 
 /** A saved card: which template, at what format, with which values. */

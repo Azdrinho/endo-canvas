@@ -15,6 +15,16 @@ import { space } from '../../design/brand';
 // exclude it. A template cannot place anything into that slot by accident,
 // because it never receives those coordinates.
 
+/**
+ * Page margin, as a fraction of the short edge.
+ *
+ * Was 0.072, which on a 1080 card is 78px — at that scale a headline set in
+ * the hundreds of pixels reads as jammed against the edge rather than as
+ * deliberately placed. Bleeding past the edge is a composition decision a
+ * template makes on purpose, for one element; it is not what a margin is.
+ */
+export const MARGIN_RATIO = 0.095;
+
 export interface Frame {
   /** Usable area, already inset by the margin and clear of the mark. */
   content: { top: number; right: number; bottom: number; left: number; width: number; height: number };
@@ -30,8 +40,8 @@ export type MarkSlot = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
 export const frameFor = (format: Format, slot: MarkSlot = 'top-left', markWidth?: number): Frame => {
   const short = Math.min(format.width, format.height);
-  const margin = Math.round(short * 0.072);
-  const mw = markWidth ?? short * 0.17;
+  const margin = Math.round(short * MARGIN_RATIO);
+  const mw = markWidth ?? short * 0.16;
   const mh = mw * 0.45;
   // The band the mark occupies, plus breathing room beneath it.
   const reserved = mh + Math.round(short * 0.035);
@@ -65,8 +75,8 @@ export const Mark: React.FC<{
   width?: number;
 }> = ({ brand, format, slot = 'top-left', color = '#FFFFFF', width }) => {
   const short = Math.min(format.width, format.height);
-  const margin = Math.round(short * 0.072);
-  const w = width ?? short * 0.17;
+  const margin = Math.round(short * MARGIN_RATIO);
+  const w = width ?? short * 0.16;
   const pos: React.CSSProperties = { position: 'absolute', zIndex: 40 };
   if (slot.startsWith('top')) pos.top = margin; else pos.bottom = margin;
   if (slot.endsWith('left')) pos.left = margin; else pos.right = margin;

@@ -125,6 +125,10 @@ interface EditablePhotoProps {
   style?: React.CSSProperties;
   /** Shown when there is no photo yet. */
   onPick?: () => void;
+  /** `contain` for a cutout, so the figure is never cropped by its box. */
+  objectFit?: 'cover' | 'contain';
+  /** A cutout is anchored to the bottom of its box so it stands on a line. */
+  anchor?: 'center' | 'bottom';
 }
 
 /**
@@ -138,6 +142,7 @@ interface EditablePhotoProps {
  */
 export const EditablePhoto: React.FC<EditablePhotoProps> = ({
   personIndex, url, zoom, offset, exporting, frame, radius, style, onPick,
+  objectFit = 'cover', anchor = 'center',
 }) => {
   const setPerson = useEditor(s => s.setPerson);
   const commit = useEditor(s => s.commit);
@@ -231,11 +236,14 @@ export const EditablePhoto: React.FC<EditablePhotoProps> = ({
             inset: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit,
+            objectPosition: anchor === 'bottom' ? 'center bottom' : 'center',
             // Translate before scale, in percentages, so the crop is
             // identical at any rendered size.
             transform: `scale(${zoom}) translate(${offset.x * 100}%, ${offset.y * 100}%)`,
-            transformOrigin: 'center',
+            // A cutout grows upward from where it stands; a framed photo
+            // scales about its middle.
+            transformOrigin: anchor === 'bottom' ? 'center bottom' : 'center',
             userSelect: 'none',
           }}
         />

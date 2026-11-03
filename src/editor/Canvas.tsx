@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useEditor } from '../store/editor';
 import { getTemplate } from '../templates/registry';
 import { FORMATS, coerceValues, type FieldValue, type RenderContext } from '../templates/types';
-import { UI } from './controls';
+import { C, ELEVATION, R, S, T } from './controls';
 
 /**
  * The card, rendered at its true output size.
@@ -126,9 +126,10 @@ export const Canvas: React.FC = () => {
       style={{
         position: 'relative', flex: 1, minWidth: 0, height: '100%',
         overflow: 'hidden',
-        background: UI.shell,
-        backgroundImage: 'radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)',
-        backgroundSize: '22px 22px',
+        // A soft vignette rather than the dot grid every design tool
+        // ships with. The card is the only bright thing on screen, so the
+        // backdrop falls away from it instead of competing with a pattern.
+        background: 'radial-gradient(130% 110% at 50% 38%, #17171C 0%, #0A0A0C 72%)',
         cursor: panning ? 'grabbing' : 'default',
       }}
     >
@@ -149,7 +150,7 @@ export const Canvas: React.FC = () => {
         transition={panning ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 30 }}
         style={{
           transformOrigin: 'center',
-          boxShadow: '0 40px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.07)',
+          boxShadow: ELEVATION.card,
         }}
       >
         <CardSurface />
@@ -168,12 +169,12 @@ const ZoomBadge: React.FC = () => {
   return (
     <div
       style={{
-        position: 'absolute', left: 16, bottom: 16,
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '6px 12px', borderRadius: 999,
-        background: 'rgba(20,20,24,0.78)', backdropFilter: 'blur(14px)',
-        border: `1px solid ${UI.line}`, color: UI.muted,
-        fontSize: 11, fontVariantNumeric: 'tabular-nums', pointerEvents: 'none',
+        position: 'absolute', left: S.lg, bottom: S.lg,
+        display: 'flex', alignItems: 'center', gap: S.sm + 2,
+        padding: `${S.xs + 2}px ${S.md}px`, borderRadius: R.pill,
+        background: 'rgba(16,16,20,0.72)', backdropFilter: 'blur(18px)',
+        border: `1px solid ${C.edge}`, color: C.muted,
+        pointerEvents: 'none', ...T.value,
       }}
     >
       <span>{Math.round(zoom * 100)}%</span>
