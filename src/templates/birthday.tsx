@@ -25,7 +25,15 @@ import { FitText } from './kit/FitText';
 
 const render = (ctx: RenderContext) => {
   const { v, format, theme, brand, locale, people, exporting } = ctx;
-  const F = frameFor(format, 'top-left');
+  // The mark sits bottom-right on the person cards.
+  //
+  // Top-left it reserved 116px of the card's head, which pushed the headline
+  // down to y=219 on a 1080 square — straight into the centred figure's face,
+  // so the second line was covered through its middle and the phrase stopped
+  // reading. Moved to the foot, the headline starts at the margin and the
+  // figure's head reaches only the last line's lower edge, which is the
+  // overlap that reads as depth rather than as censorship.
+  const F = frameFor(format, 'bottom-right');
   const type = typeScale(F.short);
   const b = BRANDS[brand];
   const paper = paperFor(theme);
@@ -38,13 +46,12 @@ const render = (ctx: RenderContext) => {
   const scale = v<number>('subjectScale');
   const softness = v<number>('softness');
 
-  const raw = (v<string>('greeting') || t(COPY.birthday, locale)).trim();
-  const parts = raw.split('\n');
-  const headline = (parts.length > 1 ? parts.slice(1).join(' ') : parts[0]).trim();
-  const kicker = parts.length > 1 ? parts[0].trim() : '';
-
-  const kickerH = kicker ? Math.round(type.subtitle * 1.5) : 0;
-  const headlineTop = F.content.top + kickerH;
+  // One phrase, one size, set over as many lines as it needs. The previous
+  // version pulled the first word out as a small accent kicker, which left
+  // "FELIZ" floating above "ANIVERSÁRIO" at a quarter of its size and read
+  // as a stray label rather than as part of the greeting.
+  const headline = (v<string>('greeting') || t(COPY.birthday, locale)).replace(/\s*\n\s*/g, ' ').trim();
+  const headlineTop = F.content.top;
   // The headline gets a band, and FitText measures the string to fill it
   // without exceeding it. The previous version guessed a size from the
   // character count, which on a landscape card produced a headline twice the
@@ -52,19 +59,25 @@ const render = (ctx: RenderContext) => {
   const headlineBand = Math.round(F.content.height * (F.isWide ? 0.46 : 0.40));
   const headlineBottom = headlineTop + headlineBand;
 
-  // The figure stands on the card's base line and reaches up into the
-  // headline's last line. A wide card gives it the right third, a tall one
-  // the right half.
-  const subjectH = Math.round(format.height * (F.isWide ? 0.78 : 0.62) * scale);
-  const subjectW = Math.round(F.content.width * (F.isWide ? 0.40 : 0.62) * scale);
-  const subjectLeft = Math.round(format.width - F.margin - subjectW + (cutout ? subjectW * 0.10 : 0));
+  // The subject is the subject: centred, large, standing on the card's base
+  // line and in front of the headline. Off to one side at a third of the
+  // height it was competing with the type instead of leading it.
+  // Sized so the head clears the headline's last line rather than sitting
+  // across the middle of it: the figure is meant to stand in front of the
+  // phrase, not to censor it.
+  const subjectH = Math.round(format.height * (F.isWide ? 0.84 : 0.72) * scale);
+  const subjectW = Math.round(subjectH * (F.isWide ? 0.78 : 0.86));
+  const subjectLeft = Math.round((format.width - subjectW) / 2);
   const subjectTop = cutout
     ? format.height - subjectH
     : Math.round(Math.min(headlineBottom - headlineBand * 0.18, format.height - F.margin - subjectH));
 
-  const nameMaxWidth = Math.round(
-    (cutout ? subjectLeft + subjectW * 0.2 : subjectLeft) - F.margin - F.short * 0.03,
-  );
+  // Measured against the content box, not against the subject's box. Tied to
+  // the subject it collapsed to about 60px once the figure was centred, and
+  // "ALBUQUERQUE" broke across two lines mid-word. The figure's actual body
+  // fills roughly the middle half of its box, so the name sits in front of
+  // the clear part of it and reads as layering.
+  const nameMaxWidth = Math.round(F.content.width * 0.47);
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
@@ -81,23 +94,13 @@ const render = (ctx: RenderContext) => {
         }}
       />
 
-      {kicker && (
-        <div style={{
-          position: 'absolute', zIndex: 3,
-          left: F.content.left, top: F.content.top,
-          fontFamily: FONT_DISPLAY, fontWeight: 700,
-          fontSize: type.subtitle, letterSpacing: '0.06em',
-          color: b.accent, textTransform: 'uppercase',
-        }}>{kicker}</div>
-      )}
-
       <FitText
         text={headline.toUpperCase()}
         family={FONT_DISPLAY}
         color={ink}
         width={Math.round(F.content.width * bleed)}
         maxHeight={headlineBand}
-        maxLines={F.isWide ? 1 : 2}
+        maxLines={2}
         style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
       />
 
@@ -149,26 +152,24 @@ const render = (ctx: RenderContext) => {
             }}
           />
         </div>
+
+        {v<boolean>('showDate') && (
+          <EditableText
+            field="dateLabel"
+            value={v<string>('dateLabel')}
+            exporting={exporting}
+            placeholder="12/06"
+            style={{
+              display: 'inline-block', marginTop: Math.round(F.short * 0.022),
+              fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: type.caption,
+              letterSpacing: '0.08em', color: b.accent,
+            }}
+          />
+        )}
       </div>
 
-      {v<boolean>('showDate') && (
-        <EditableText
-          field="dateLabel"
-          value={v<string>('dateLabel')}
-          exporting={exporting}
-          placeholder="12/06"
-          style={{
-            position: 'absolute', zIndex: 6,
-            right: F.margin, top: F.content.top,
-            fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.title, lineHeight: 0.9, letterSpacing: '-0.02em',
-            color: b.accent, textAlign: 'right',
-          }}
-        />
-      )}
-
       <Grain opacity={0.05} />
-      <Mark brand={brand} format={format} slot="top-left" color={ink} />
+      <Mark brand={brand} format={format} slot="bottom-right" color={ink} />
     </div>
   );
 };
@@ -194,7 +195,7 @@ export const birthday: Template = {
       ],
       hint: 'Ignorado quando a foto já está com o fundo recortado.',
     },
-    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.7, max: 1.35, step: 0.01, group: 'Composição' },
+    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
     { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 1, min: 1, max: 1.45, step: 0.01, group: 'Composição', hint: 'Acima de 1 o título avança pela borda direita.' },
     { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
   ],

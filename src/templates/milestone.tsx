@@ -72,7 +72,15 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
   ctx, format, brand, theme, phrase, softness, person, moment,
 }) => {
   const { v, exporting } = ctx;
-  const F = frameFor(format, 'top-left');
+  // The mark sits at the foot on the person cards.
+  //
+  // Top-left it reserved 116px of the card's head, which pushed the headline
+  // down to y=219 on a 1080 square -- straight into the centred figure's
+  // face, so the second line was covered through its middle and the phrase
+  // stopped reading. At the foot, the headline starts at the margin and the
+  // figure's head reaches only the last line's lower edge: that overlap
+  // reads as depth rather than as censorship.
+  const F = frameFor(format, 'bottom-right');
   const type = typeScale(F.short);
   const b = BRANDS[brand];
   const paper = paperFor(theme);
@@ -90,9 +98,12 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
   // a landscape card with both words running off the edges.
   const headlineBand = Math.round(F.content.height * (F.isWide ? 0.44 : 0.38));
 
-  const subjectW = Math.round(F.content.width * (F.isWide ? 0.38 : 0.58));
-  const subjectH = Math.round(format.height * (F.isWide ? 0.76 : 0.56));
-  const subjectLeft = Math.round(format.width - F.margin - subjectW + (cutout ? subjectW * 0.1 : 0));
+  // Centred, large, standing on the base line and in front of the phrase —
+  // but sized so the head clears the phrase's last line instead of sitting
+  // across the middle of it.
+  const subjectH = Math.round(format.height * (F.isWide ? 0.84 : 0.72) * v<number>('subjectScale'));
+  const subjectW = Math.round(subjectH * (F.isWide ? 0.78 : 0.86));
+  const subjectLeft = Math.round((format.width - subjectW) / 2);
   const subjectTop = cutout
     ? format.height - subjectH
     : Math.round(Math.min(headlineTop + headlineBand * 0.82, format.height - F.margin - subjectH));
@@ -118,7 +129,7 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
         color={ink}
         width={F.content.width}
         maxHeight={headlineBand}
-        maxLines={F.isWide ? 1 : 2}
+        maxLines={2}
         style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
       />
 
@@ -148,7 +159,7 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
       <div style={{
         position: 'absolute', zIndex: 5,
         left: F.margin, bottom: F.margin,
-        maxWidth: (cutout ? subjectLeft + subjectW * 0.2 : subjectLeft) - F.margin - F.short * 0.03,
+        maxWidth: Math.round(F.content.width * 0.47),
       }}>
         <EditableText
           field="person:0:name"
@@ -192,7 +203,7 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
       </div>
 
       <Grain opacity={0.05} />
-      <Mark brand={brand} format={format} slot="top-left" color={ink} />
+      <Mark brand={brand} format={format} slot="bottom-right" color={ink} />
     </>
   );
 };
@@ -360,6 +371,7 @@ export const milestone: Template = {
         { value: 'none', label: 'Reto' },
       ],
     },
+    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
     { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.4, min: 0, max: 1, step: 0.01, group: 'Composição' },
   ],
   render,
