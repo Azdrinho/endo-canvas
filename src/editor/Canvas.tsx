@@ -76,7 +76,14 @@ export const Canvas: React.FC = () => {
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    const measure = () => fitToStage({ width: el.clientWidth, height: el.clientHeight });
+    // The rail and the inspector float over the canvas, so the card is
+    // fitted to the gap left between them rather than to the whole window.
+    const PANELS = 212 + 292 + 16 * 4;
+    const CHROME = 52 + 76 + 16 * 4;
+    const measure = () => fitToStage({
+      width: Math.max(240, el.clientWidth - PANELS),
+      height: Math.max(240, el.clientHeight - CHROME),
+    });
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
@@ -124,8 +131,7 @@ export const Canvas: React.FC = () => {
       onPointerUp={endPan}
       onPointerLeave={endPan}
       style={{
-        position: 'relative', flex: 1, minWidth: 0, height: '100%',
-        overflow: 'hidden',
+        position: 'absolute', inset: 0, overflow: 'hidden',
         // A soft vignette rather than the dot grid every design tool
         // ships with. The card is the only bright thing on screen, so the
         // backdrop falls away from it instead of competing with a pattern.

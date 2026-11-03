@@ -89,9 +89,8 @@ export const Inspector: React.FC = () => {
     <aside
       aria-label="Propriedades"
       style={{
-        width: 288, flexShrink: 0, height: '100%', overflowY: 'auto',
-        background: UI.panel, borderLeft: `1px solid ${UI.line}`,
-        padding: '18px 16px 40px',
+        width: 292, flexShrink: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden',
+        padding: '16px 16px 32px',
       }}
     >
       <Section title="Marca">

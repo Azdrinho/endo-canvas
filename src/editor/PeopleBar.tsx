@@ -55,9 +55,12 @@ export const PeopleBar: React.FC = () => {
 
   return (
     <div style={{
-      flexShrink: 0, height: 92, display: 'flex', alignItems: 'center', gap: 10,
-      padding: '0 16px', background: UI.panel, borderTop: `1px solid ${UI.line}`,
-      overflowX: 'auto',
+      height: 76, display: 'flex', alignItems: 'center', gap: 10,
+      padding: '0 14px', borderRadius: 18, maxWidth: '62vw', overflowX: 'auto',
+      background: 'rgba(18,18,22,0.82)',
+      backdropFilter: 'blur(28px) saturate(140%)',
+      WebkitBackdropFilter: 'blur(28px) saturate(140%)',
+      boxShadow: '0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.07)',
     }}>
       <input ref={fileInput} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
 
@@ -153,8 +156,12 @@ const SoloBar: React.FC<{ onPick: () => void }> = ({ onPick }) => {
 
   return (
     <div style={{
-      flexShrink: 0, height: 72, display: 'flex', alignItems: 'center', gap: 12,
-      padding: '0 16px', background: UI.panel, borderTop: `1px solid ${UI.line}`,
+      height: 64, display: 'flex', alignItems: 'center', gap: 12,
+      padding: '0 14px', borderRadius: 18,
+      background: 'rgba(18,18,22,0.82)',
+      backdropFilter: 'blur(28px) saturate(140%)',
+      WebkitBackdropFilter: 'blur(28px) saturate(140%)',
+      boxShadow: '0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.07)',
     }}>
       <input ref={fileInput} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
 

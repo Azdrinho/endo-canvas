@@ -26,9 +26,12 @@ export const Toolbar: React.FC<{ onExport: () => void; exporting: boolean }> = (
   return (
     <header
       style={{
-        height: 56, flexShrink: 0, display: 'flex', alignItems: 'center',
-        gap: 14, padding: '0 14px',
-        background: UI.panel, borderBottom: `1px solid ${UI.line}`,
+        height: 52, display: 'flex', alignItems: 'center', gap: 14,
+        padding: '0 8px 0 16px', borderRadius: 16,
+        background: 'rgba(18,18,22,0.82)',
+        backdropFilter: 'blur(28px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(140%)',
+        boxShadow: '0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.07)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, minWidth: 190 }}>

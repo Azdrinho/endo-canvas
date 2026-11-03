@@ -4,7 +4,8 @@ import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale } from '../design/b
 import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
 import { EditableText } from './kit/Editable';
 import { Subject } from './kit/Subject';
-import { Mark, Oversize, frameFor } from './kit/Layout';
+import { Mark, frameFor } from './kit/Layout';
+import { FitText } from './kit/FitText';
 
 // --- ANIVERSÁRIO ------------------------------------------------------------
 //
@@ -42,16 +43,14 @@ const render = (ctx: RenderContext) => {
   const headline = (parts.length > 1 ? parts.slice(1).join(' ') : parts[0]).trim();
   const kicker = parts.length > 1 ? parts[0].trim() : '';
 
-  // Sized to the content box, not to the card. Above 1 the user has asked
-  // for it to run past the right edge; it never runs past the left.
-  const longest = headline.split(' ').reduce((a, w) => (w.length > a.length ? w : a), '');
-  const display = Math.round((F.content.width / Math.max(longest.length, 5)) * 1.78 * bleed);
-
   const kickerH = kicker ? Math.round(type.subtitle * 1.5) : 0;
   const headlineTop = F.content.top + kickerH;
-  const lineH = Math.round(display * 0.82);
-  const headlineLines = headline.split(' ').length > 1 && !F.isWide ? 2 : 1;
-  const headlineBottom = headlineTop + lineH * headlineLines;
+  // The headline gets a band, and FitText measures the string to fill it
+  // without exceeding it. The previous version guessed a size from the
+  // character count, which on a landscape card produced a headline twice the
+  // width of the card.
+  const headlineBand = Math.round(F.content.height * (F.isWide ? 0.46 : 0.40));
+  const headlineBottom = headlineTop + headlineBand;
 
   // The figure stands on the card's base line and reaches up into the
   // headline's last line. A wide card gives it the right third, a tall one
@@ -61,7 +60,7 @@ const render = (ctx: RenderContext) => {
   const subjectLeft = Math.round(format.width - F.margin - subjectW + (cutout ? subjectW * 0.10 : 0));
   const subjectTop = cutout
     ? format.height - subjectH
-    : Math.round(Math.min(headlineBottom - lineH * 0.2, format.height - F.margin - subjectH));
+    : Math.round(Math.min(headlineBottom - headlineBand * 0.18, format.height - F.margin - subjectH));
 
   const nameMaxWidth = Math.round(
     (cutout ? subjectLeft + subjectW * 0.2 : subjectLeft) - F.margin - F.short * 0.03,
@@ -92,20 +91,15 @@ const render = (ctx: RenderContext) => {
         }}>{kicker}</div>
       )}
 
-      <Oversize
-        size={display}
-        style={{
-          left: F.content.left, top: headlineTop,
-          // Wraps inside the content box, and reaches past the right edge
-          // only when the bleed control has been pushed above 1.
-          width: F.content.width * Math.max(1, bleed),
-          whiteSpace: headlineLines > 1 ? 'pre-wrap' : 'pre',
-          fontFamily: FONT_DISPLAY, fontWeight: 700, color: ink,
-          zIndex: 2,
-        }}
-      >
-        {headline.toUpperCase()}
-      </Oversize>
+      <FitText
+        text={headline.toUpperCase()}
+        family={FONT_DISPLAY}
+        color={ink}
+        width={Math.round(F.content.width * bleed)}
+        maxHeight={headlineBand}
+        maxLines={F.isWide ? 1 : 2}
+        style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
+      />
 
       <EditableText
         field="greeting"

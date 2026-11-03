@@ -4,7 +4,9 @@ import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale } from '../design/b
 import { BrandMark } from '../design/BrandMark';
 import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
 import { EditableText, EditablePhoto } from './kit/Editable';
-import { Mark, Oversize, cutShape, frameFor, groupRhythm } from './kit/Layout';
+import { Mark, frameFor, groupRhythm } from './kit/Layout';
+import { FitText } from './kit/FitText';
+import { Subject } from './kit/Subject';
 
 // --- MOMENTOS ---------------------------------------------------------------
 //
@@ -81,18 +83,19 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
   const lead = lines[0];
   const tail = lines.slice(1).join(' ');
 
-  const longest = [...lines].sort((a, x) => x.length - a.length)[0] || lead;
-  const display = Math.round((format.width / Math.max(longest.length, 5)) * 1.62);
+  const cutout = Boolean(person.cutout);
   const headlineTop = F.content.top;
-  const headlineH = Math.round(display * 0.82 * lines.length);
+  // A band the headline is fitted into, rather than a size guessed from the
+  // character count — which is what put "WELCOME ABOARD" twice the width of
+  // a landscape card with both words running off the edges.
+  const headlineBand = Math.round(F.content.height * (F.isWide ? 0.44 : 0.38));
 
-  const cutW = Math.round(F.content.width * (F.isWide ? 0.38 : 0.58));
-  const cutH = Math.round(format.height * (F.isWide ? 0.70 : 0.50));
-  const cutLeft = F.isWide ? format.width - F.margin - cutW : Math.round((format.width - cutW) / 2);
-  const cutTop = Math.round(Math.min(
-    headlineTop + headlineH * 0.66,
-    format.height - F.margin - cutH,
-  ));
+  const subjectW = Math.round(F.content.width * (F.isWide ? 0.38 : 0.58));
+  const subjectH = Math.round(format.height * (F.isWide ? 0.76 : 0.56));
+  const subjectLeft = Math.round(format.width - F.margin - subjectW + (cutout ? subjectW * 0.1 : 0));
+  const subjectTop = cutout
+    ? format.height - subjectH
+    : Math.round(Math.min(headlineTop + headlineBand * 0.82, format.height - F.margin - subjectH));
 
   return (
     <>
@@ -109,15 +112,15 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
         }}
       />
 
-      <Oversize
-        size={display}
-        style={{
-          left: -display * 0.06, top: headlineTop, zIndex: 2,
-          fontFamily: FONT_DISPLAY, fontWeight: 700, color: ink,
-        }}
-      >
-        {lead.toUpperCase()}{tail ? `\n${tail.toUpperCase()}` : ''}
-      </Oversize>
+      <FitText
+        text={[lead, tail].filter(Boolean).join(' ').toUpperCase()}
+        family={FONT_DISPLAY}
+        color={ink}
+        width={F.content.width}
+        maxHeight={headlineBand}
+        maxLines={F.isWide ? 1 : 2}
+        style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
+      />
 
       <EditableText
         field="phrase"
@@ -133,25 +136,19 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
         }}
       />
 
-      <EditablePhoto
-        personIndex={0}
-        url={person.photoUrl}
-        zoom={person.photoZoom}
-        offset={person.photoOffset}
+      <Subject
+        person={person}
+        index={0}
         exporting={exporting}
-        frame={{ width: cutW, height: cutH }}
-        style={{
-          position: 'absolute', zIndex: 4,
-          left: cutLeft, top: cutTop, width: cutW, height: cutH,
-          boxShadow: `0 ${Math.round(F.short * 0.03)}px ${Math.round(F.short * 0.09)}px rgba(0,0,0,0.42)`,
-          ...cutShape(v<string>('cut') as never, Math.round(cutW * 0.5)),
-        }}
+        short={F.short}
+        cut={v<string>('cut') as never}
+        box={{ left: subjectLeft, top: subjectTop, width: subjectW, height: subjectH }}
       />
 
       <div style={{
         position: 'absolute', zIndex: 5,
         left: F.margin, bottom: F.margin,
-        maxWidth: F.isWide ? cutLeft - F.margin - F.short * 0.04 : F.content.width,
+        maxWidth: (cutout ? subjectLeft + subjectW * 0.2 : subjectLeft) - F.margin - F.short * 0.03,
       }}>
         <EditableText
           field="person:0:name"
@@ -217,7 +214,10 @@ const GroupLayout: React.FC<Shared & { roster: Person[] }> = ({
   // A real flow: the header takes the space its content needs and the grid
   // takes the rest. Nothing is positioned against an edge, so nothing can be
   // pushed into anything else however many people arrive.
-  const headerH = Math.round(type.headline * (phrase.includes('\n') ? 2.0 : 1.25) + F.short * 0.09);
+  // Fixed share of the card rather than derived from a font size, so the
+  // header cannot grow into the grid as the phrase changes.
+  const headerH = Math.round(format.height * 0.26);
+  const phraseBand = Math.round(headerH * 0.58);
   const gridH = format.height - F.margin * 2 - headerH;
   const rhythm = groupRhythm(roster.length, F.content.width, gridH, gap);
 
@@ -294,16 +294,13 @@ const GroupLayout: React.FC<Shared & { roster: Person[] }> = ({
       }}>
         <header style={{ height: headerH, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <BrandMark brand={brand} width={F.short * 0.17} color={ink} />
-          <EditableText
-            field="phrase"
-            value={phrase}
-            exporting={exporting}
-            placeholder="SEJA BEM-VINDO"
-            style={{
-              fontFamily: FONT_DISPLAY, fontWeight: 700,
-              fontSize: type.headline, lineHeight: 0.92, letterSpacing: '-0.03em',
-              color: ink, whiteSpace: 'pre-line',
-            }}
+          <FitText
+            text={phrase.replace(/\n/g, ' ').toUpperCase()}
+            family={FONT_DISPLAY}
+            color={ink}
+            width={F.content.width}
+            maxHeight={phraseBand}
+            maxLines={2}
           />
         </header>
 

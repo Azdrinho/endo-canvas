@@ -71,9 +71,8 @@ export const TemplateRail: React.FC = () => {
     <nav
       aria-label="Templates"
       style={{
-        width: 204, flexShrink: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden',
-        background: C.panel, borderRight: `1px solid ${C.edge}`,
-        padding: `${S.lg}px ${S.lg}px ${S.xxxl}px`,
+        width: 212, flexShrink: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden',
+        padding: `${S.lg}px ${S.lg}px ${S.xxl}px`,
       }}
     >
       {families.map(family => (
