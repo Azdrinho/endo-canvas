@@ -17,6 +17,14 @@ import { Mark, frameFor } from './Layout';
 
 export type Composition = 'typewall' | 'edge';
 
+/** Mix a hex colour towards black. `amount` 0 = unchanged, 1 = black. */
+const shade = (hex: string, amount: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+  const f = 1 - Math.max(0, Math.min(1, amount));
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * f).toString(16).padStart(2, '0');
+  return `#${ch(16)}${ch(8)}${ch(0)}`;
+};
+
 /**
  * Fields every person card needs. Spread into a template's own list so the
  * two cannot drift apart, which is how the group farewell card ended up
@@ -32,6 +40,7 @@ export const personPosterFields: FieldSpec[] = [
   },
   { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
   { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 0.12, min: 0, max: 0.7, step: 0.01, group: 'Composição', hint: 'Quanto o texto passa das bordas. No muro de texto isso é proposital — é o que deixa as letras cortadas.' },
+  { kind: 'number', id: 'wallLines', label: 'Linhas do muro', default: 4, min: 2, max: 6, step: 1, group: 'Composição', hint: 'Só no muro de texto. A frase se repete até preencher.' },
   { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
   {
     kind: 'select', id: 'cut', label: 'Recorte da foto', default: 'arch', group: 'Composição',
@@ -76,20 +85,28 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
   const softness = v<number>('softness');
   const bleed = v<number>('bleed');
 
+  // The wall is dark type on a bright gradient, like the reference: mixing
+  // the brand's far end down to ~35% gives a shade that belongs to the
+  // gradient instead of a neutral black sitting on top of it.
+  const wallInk = shade(b.to, 0.62);
+  const wallMuted = `${wallInk}B8`;
+
   const backdrop = (
     <>
-      <div style={{ position: 'absolute', inset: 0, opacity: 0.92 }}>
-        <GradientField brand={brand} angle={F.isWide ? 112 : 152} sweep={false}>
+      <div style={{ position: 'absolute', inset: 0, opacity: mode === 'edge' ? 0.92 : 1 }}>
+        <GradientField brand={brand} angle={F.isWide ? 112 : 152} sweep={mode !== 'edge'}>
           <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
         </GradientField>
       </div>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(${F.isWide ? 98 : 172}deg, ${paper}F2 2%, ${paper}99 38%, transparent 78%)`,
-        }}
-      />
+      {mode === 'edge' && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute', inset: 0,
+            background: `linear-gradient(${F.isWide ? 98 : 172}deg, ${paper}F2 2%, ${paper}99 38%, transparent 78%)`,
+          }}
+        />
+      )}
     </>
   );
 
@@ -112,7 +129,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
     />
   );
 
-  const nameBlock = (align: 'left' | 'center', width: number) => (
+  const nameBlock = (align: 'left' | 'center', width: number, nameColor: string = ink, roleColor: string = muted) => (
     <div style={{ width, textAlign: align, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start' }}>
       <EditableText
         field="person:0:name"
@@ -122,7 +139,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         style={{
           fontFamily: FONT_DISPLAY, fontWeight: 700,
           fontSize: type.subtitle, lineHeight: 1.0, letterSpacing: '0.01em',
-          color: ink, textTransform: 'uppercase',
+          color: nameColor, textTransform: 'uppercase',
         }}
       />
       <EditableText
@@ -132,7 +149,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         placeholder="Cargo"
         style={{
           fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.micro,
-          letterSpacing: '0.22em', color: muted, textTransform: 'uppercase',
+          letterSpacing: '0.22em', color: roleColor, textTransform: 'uppercase',
           marginTop: Math.round(F.short * 0.012),
         }}
       />
@@ -198,12 +215,29 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
   }
 
   // --- B: wall of type ---------------------------------------------------
-  // The phrase is the background: set as large as it goes, stacked, running
-  // past both side edges on purpose, with the figure standing inside it.
+  //
+  // The phrase IS the background. Not a headline sitting on a gradient: a
+  // stack of rows that each span the full card width, bleeding past both
+  // side edges, set dark against a bright gradient so the type reads as a
+  // printed wall with the person standing in front of it.
+  //
+  // A short phrase ("SEJA BEM-VINDO" is two words) would otherwise make two
+  // lines and leave two thirds of the card empty, so the words repeat until
+  // the wall is full — which is also what the reference does.
+  const rows = Math.round(v<number>('wallLines'));
   const wallWidth = Math.round(format.width * (1 + bleed));
   const wallLeft = Math.round((format.width - wallWidth) / 2);
-  const captionH = Math.round(F.short * 0.14);
-  const subjectH = Math.round(format.height * 0.88 * scale);
+  // The wall stops short of the foot of the card: the name and the mark need
+  // clean gradient to sit on, and on top of the letters they were unreadable.
+  const captionH = Math.round(F.short * 0.15);
+  const wallH = format.height - captionH;
+  const rowH = wallH / rows;
+  const words = phrase.replace(/\n/g, ' ').toUpperCase().split(/\s+/).filter(Boolean);
+  const stream = words.length ? Array.from({ length: Math.ceil(rows / words.length) }, () => words).flat() : [''];
+  const lines = Array.from({ length: rows }, (_, i) =>
+    stream.slice(Math.floor((i * stream.length) / rows), Math.floor(((i + 1) * stream.length) / rows)).join(' ') || stream[0]);
+
+  const subjectH = Math.round(wallH * 0.98 * scale);
   const subjectW = Math.round(subjectH * 0.62);
 
   return (
@@ -216,19 +250,27 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
       <div
         data-bleed="1"
         style={{
-          position: 'absolute', left: wallLeft, top: F.margin,
-          width: wallWidth, zIndex: 2, pointerEvents: 'none',
+          position: 'absolute', left: wallLeft, top: 0, width: wallWidth, height: wallH,
+          overflow: 'hidden',
+          zIndex: 2, pointerEvents: 'none', display: 'flex', flexDirection: 'column',
         }}
       >
-        <FitText
-          text={phrase.replace(/\n/g, ' ').toUpperCase()}
-          family={FONT_DISPLAY}
-          color={ink}
-          width={wallWidth}
-          maxHeight={format.height - F.margin - captionH}
-          maxLines={4}
-          lineHeight={0.82}
-        />
+        {lines.map((line, i) => (
+          // Each row gets an equal slice of the height and its own size, so
+          // every row reaches both edges. Letters overrun their row and
+          // touch the next one, which is the look, not a bug.
+          <div key={i} style={{ height: rowH, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
+            <FitText
+              text={line}
+              family={FONT_DISPLAY}
+              color={wallInk}
+              width={wallWidth}
+              maxSize={rowH * 1.9}
+              maxLines={1}
+              lineHeight={1}
+            />
+          </div>
+        ))}
       </div>
 
       <Subject
@@ -239,7 +281,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         cut={v<string>('cut') as never}
         box={{
           left: Math.round((format.width - subjectW) / 2),
-          top: cutout ? format.height - subjectH : Math.round(format.height * 0.18),
+          top: cutout ? wallH - subjectH : Math.round(format.height * 0.14),
           width: subjectW,
           height: subjectH,
         }}
@@ -247,15 +289,16 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
       />
 
       <div style={{
-        position: 'absolute', zIndex: 6, left: F.margin, right: F.margin, bottom: F.margin,
-        display: 'flex', justifyContent: 'center',
+        position: 'absolute', zIndex: 6, left: F.margin, right: F.margin,
+        top: wallH, height: captionH,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {nameBlock('center', F.content.width)}
+        {nameBlock('center', F.content.width, wallInk, wallMuted)}
       </div>
 
       {phraseEditor}
-      <Grain opacity={0.05} />
-      <Mark brand={brand} format={format} slot="bottom-right" color={ink} width={F.short * 0.13} />
+      <Grain opacity={0.07} />
+      <Mark brand={brand} format={format} slot="bottom-right" color={wallInk} width={F.short * 0.13} />
     </div>
   );
 };
