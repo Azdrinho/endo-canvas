@@ -1,205 +1,60 @@
 import React from 'react';
 import type { Template, RenderContext } from './types';
-import { FONT_DISPLAY, FONT_TEXT, BRANDS, COPY, t, typeScale } from '../design/brand';
-import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
+import { BRANDS, COPY, FONT_DISPLAY, t, typeScale } from '../design/brand';
 import { EditableText } from './kit/Editable';
-import { Subject } from './kit/Subject';
-import { Mark, frameFor } from './kit/Layout';
-import { FitText } from './kit/FitText';
+import { PersonPoster, personPosterFields } from './kit/PersonPoster';
+import { frameFor } from './kit/Layout';
 
 // --- ANIVERSÁRIO ------------------------------------------------------------
 //
-// Third pass. The second put the headline edge to edge and dropped an arch
-// across the middle of it, so a word was bisected and the type looked jammed
-// into the corner rather than placed. Two rules came out of that:
-//
-//   * The margin is a margin. Type sits inside it. Bleeding past the edge is
-//     a decision taken for one element on one side, never the default for
-//     everything.
-//   * The subject overlaps the headline's baseline band, off to one side —
-//     never across the middle of a word. A cutout stands in the same space
-//     as the type and occludes it; a framed photo tucks under the last line.
-//
-// The card reads as mark, kicker, headline, then the figure standing on the
-// name: four beats down one diagonal, rather than four stacked boxes.
+// The layout lives in kit/PersonPoster, shared with Momentos: the two had
+// grown near-identical copies of the same composition and only ever differed
+// in their words. This file supplies the greeting and the date.
 
 const render = (ctx: RenderContext) => {
-  const { v, format, theme, brand, locale, people, exporting } = ctx;
-  // The mark sits bottom-right on the person cards.
-  //
-  // Top-left it reserved 116px of the card's head, which pushed the headline
-  // down to y=219 on a 1080 square — straight into the centred figure's face,
-  // so the second line was covered through its middle and the phrase stopped
-  // reading. Moved to the foot, the headline starts at the margin and the
-  // figure's head reaches only the last line's lower edge, which is the
-  // overlap that reads as depth rather than as censorship.
-  const F = frameFor(format, 'bottom-right');
+  const { v, format, brand, locale, exporting } = ctx;
+  const F = frameFor(format, 'top-left');
   const type = typeScale(F.short);
   const b = BRANDS[brand];
-  const paper = paperFor(theme);
-  const ink = inkFor(theme);
-  const muted = mutedFor(theme);
 
-  const person = people[0];
-  const cutout = Boolean(person.cutout);
-  const bleed = v<number>('bleed');
-  const scale = v<number>('subjectScale');
-  const softness = v<number>('softness');
-
-  // One phrase, one size, set over as many lines as it needs. The previous
-  // version pulled the first word out as a small accent kicker, which left
-  // "FELIZ" floating above "ANIVERSÁRIO" at a quarter of its size and read
-  // as a stray label rather than as part of the greeting.
-  const headline = (v<string>('greeting') || t(COPY.birthday, locale)).replace(/\s*\n\s*/g, ' ').trim();
-  const headlineTop = F.content.top;
-  // The headline gets a band, and FitText measures the string to fill it
-  // without exceeding it. The previous version guessed a size from the
-  // character count, which on a landscape card produced a headline twice the
-  // width of the card.
-  const headlineBand = Math.round(F.content.height * (F.isWide ? 0.46 : 0.40));
-  const headlineBottom = headlineTop + headlineBand;
-
-  // The subject is the subject: centred, large, standing on the card's base
-  // line and in front of the headline. Off to one side at a third of the
-  // height it was competing with the type instead of leading it.
-  // Sized so the head clears the headline's last line rather than sitting
-  // across the middle of it: the figure is meant to stand in front of the
-  // phrase, not to censor it.
-  const subjectH = Math.round(format.height * (F.isWide ? 0.84 : 0.72) * scale);
-  const subjectW = Math.round(subjectH * (F.isWide ? 0.78 : 0.86));
-  const subjectLeft = Math.round((format.width - subjectW) / 2);
-  const subjectTop = cutout
-    ? format.height - subjectH
-    : Math.round(Math.min(headlineBottom - headlineBand * 0.18, format.height - F.margin - subjectH));
-
-  // Measured against the content box, not against the subject's box. Tied to
-  // the subject it collapsed to about 60px once the figure was centred, and
-  // "ALBUQUERQUE" broke across two lines mid-word. The figure's actual body
-  // fills roughly the middle half of its box, so the name sits in front of
-  // the clear part of it and reads as layering.
-  const nameMaxWidth = Math.round(F.content.width * 0.47);
+  const phrase = (v<string>('greeting') || t(COPY.birthday, locale)).replace(/\s*\n\s*/g, ' ').trim();
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, opacity: 0.92 }}>
-        <GradientField brand={brand} angle={F.isWide ? 112 : 152} sweep={false}>
-          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
-        </GradientField>
-      </div>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(${F.isWide ? 98 : 172}deg, ${paper} 4%, ${paper}D4 32%, transparent 76%)`,
-        }}
-      />
-
-      <FitText
-        text={headline.toUpperCase()}
-        family={FONT_DISPLAY}
-        color={ink}
-        width={Math.round(F.content.width * bleed)}
-        maxHeight={headlineBand}
-        maxLines={2}
-        tilt={v<number>('tilt')}
-        style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
-      />
-
-      <EditableText
-        field="greeting"
-        value={v<string>('greeting')}
-        exporting={exporting}
-        placeholder="FELIZ ANIVERSÁRIO"
-        style={{
-          position: 'absolute', zIndex: 7,
-          left: F.content.left, top: F.content.top,
-          width: F.content.width * 0.42, minHeight: type.subtitle,
-          fontFamily: FONT_DISPLAY, fontSize: type.subtitle,
-          color: 'transparent', caretColor: ink, opacity: exporting ? 0 : 1,
-        }}
-      />
-
-      <Subject
-        person={person}
-        index={0}
-        exporting={exporting}
-        short={F.short}
-        cut={v<string>('cut') as never}
-        box={{ left: subjectLeft, top: subjectTop, width: subjectW, height: subjectH }}
-      />
-
-      <div style={{ position: 'absolute', zIndex: 5, left: F.margin, bottom: F.margin, maxWidth: nameMaxWidth }}>
+    <PersonPoster
+      ctx={ctx}
+      phrase={phrase}
+      phraseField="greeting"
+      phraseValue={v<string>('greeting')}
+      phrasePlaceholder="FELIZ ANIVERSÁRIO"
+      extra={v<boolean>('showDate') ? (
         <EditableText
-          field="person:0:name"
-          value={person.name}
+          field="dateLabel"
+          value={v<string>('dateLabel')}
           exporting={exporting}
-          placeholder="Nome da pessoa"
+          placeholder="12/06"
           style={{
-            fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.title, lineHeight: 0.94, letterSpacing: '-0.015em',
-            color: ink, textTransform: 'uppercase',
+            fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: type.micro,
+            letterSpacing: '0.18em', color: b.accent,
+            marginTop: Math.round(F.short * 0.016),
           }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018), marginTop: Math.round(F.short * 0.016) }}>
-          <span style={{ width: Math.round(F.short * 0.045), height: 3, background: b.accent, flexShrink: 0 }} />
-          <EditableText
-            field="person:0:role"
-            value={person.role}
-            exporting={exporting}
-            placeholder="Cargo"
-            style={{
-              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.caption,
-              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
-            }}
-          />
-        </div>
-
-        {v<boolean>('showDate') && (
-          <EditableText
-            field="dateLabel"
-            value={v<string>('dateLabel')}
-            exporting={exporting}
-            placeholder="12/06"
-            style={{
-              display: 'inline-block', marginTop: Math.round(F.short * 0.022),
-              fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: type.caption,
-              letterSpacing: '0.08em', color: b.accent,
-            }}
-          />
-        )}
-      </div>
-
-      <Grain opacity={0.05} />
-      <Mark brand={brand} format={format} slot="bottom-right" color={ink} />
-    </div>
+      ) : undefined}
+    />
   );
 };
 
 export const birthday: Template = {
   id: 'birthday',
   name: 'Aniversário',
-  tagline: 'Pôster com a pessoa em pé sobre o nome',
+  tagline: 'Pôster com a pessoa dentro do texto',
   family: 'pessoas',
   formats: ['post-square', 'post-portrait', 'story', 'landscape'],
   groups: ['Conteúdo', 'Composição'],
   fields: [
-    { kind: 'text', id: 'greeting', label: 'Saudação', default: '', group: 'Conteúdo', hint: 'Vazio usa a saudação do idioma. Quebre a linha para criar um kicker acima.' },
+    { kind: 'text', id: 'greeting', label: 'Saudação', default: '', group: 'Conteúdo', hint: 'Vazio usa a saudação do idioma.' },
     { kind: 'toggle', id: 'showDate', label: 'Mostrar data', default: true, group: 'Conteúdo' },
     { kind: 'text', id: 'dateLabel', label: 'Data', default: '12/06', group: 'Conteúdo' },
-    {
-      kind: 'select', id: 'cut', label: 'Recorte da foto', default: 'arch', group: 'Composição',
-      options: [
-        { value: 'arch', label: 'Arco' },
-        { value: 'circle', label: 'Círculo' },
-        { value: 'blade', label: 'Lâmina' },
-        { value: 'none', label: 'Reto' },
-      ],
-      hint: 'Ignorado quando a foto já está com o fundo recortado.',
-    },
-    { kind: 'number', id: 'tilt', label: 'Perspectiva do título', default: 0.35, min: -1, max: 1, step: 0.01, group: 'Composição', hint: 'O lado livre recua; o sinal escolhe qual borda fica fixa.' },
-    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
-    { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 1, min: 1, max: 1.45, step: 0.01, group: 'Composição', hint: 'Acima de 1 o título avança pela borda direita.' },
-    { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
+    ...personPosterFields,
   ],
   render,
 };

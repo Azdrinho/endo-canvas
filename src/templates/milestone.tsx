@@ -5,6 +5,7 @@ import { BrandMark } from '../design/BrandMark';
 import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './kit/Surface';
 import { EditableText, EditablePhoto } from './kit/Editable';
 import { Mark, frameFor, groupRhythm } from './kit/Layout';
+import { PersonPoster, personPosterFields } from './kit/PersonPoster';
 import { FitText } from './kit/FitText';
 import { Subject } from './kit/Subject';
 
@@ -69,143 +70,35 @@ const render = (ctx: RenderContext) => {
 // cut sitting over it.
 
 const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
-  ctx, format, brand, theme, phrase, softness, person, moment,
+  ctx, format, brand, phrase, moment,
 }) => {
   const { v, exporting } = ctx;
-  // The mark sits at the foot on the person cards.
-  //
-  // Top-left it reserved 116px of the card's head, which pushed the headline
-  // down to y=219 on a 1080 square -- straight into the centred figure's
-  // face, so the second line was covered through its middle and the phrase
-  // stopped reading. At the foot, the headline starts at the margin and the
-  // figure's head reaches only the last line's lower edge: that overlap
-  // reads as depth rather than as censorship.
-  const F = frameFor(format, 'bottom-right');
+  const F = frameFor(format, 'top-left');
   const type = typeScale(F.short);
   const b = BRANDS[brand];
-  const paper = paperFor(theme);
-  const ink = inkFor(theme);
-  const muted = mutedFor(theme);
-
-  const lines = phrase.split('\n');
-  const lead = lines[0];
-  const tail = lines.slice(1).join(' ');
-
-  const cutout = Boolean(person.cutout);
-  const headlineTop = F.content.top;
-  // A band the headline is fitted into, rather than a size guessed from the
-  // character count — which is what put "WELCOME ABOARD" twice the width of
-  // a landscape card with both words running off the edges.
-  const headlineBand = Math.round(F.content.height * (F.isWide ? 0.44 : 0.38));
-
-  // Centred, large, standing on the base line and in front of the phrase —
-  // but sized so the head clears the phrase's last line instead of sitting
-  // across the middle of it.
-  const subjectH = Math.round(format.height * (F.isWide ? 0.84 : 0.72) * v<number>('subjectScale'));
-  const subjectW = Math.round(subjectH * (F.isWide ? 0.78 : 0.86));
-  const subjectLeft = Math.round((format.width - subjectW) / 2);
-  const subjectTop = cutout
-    ? format.height - subjectH
-    : Math.round(Math.min(headlineTop + headlineBand * 0.82, format.height - F.margin - subjectH));
 
   return (
-    <>
-      <div style={{ position: 'absolute', inset: 0, opacity: 0.9 }}>
-        <GradientField brand={brand} angle={F.isWide ? 110 : 150} sweep={false}>
-          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
-        </GradientField>
-      </div>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(${F.isWide ? 100 : 172}deg, ${paper} 8%, ${paper}D0 36%, transparent 80%)`,
-        }}
-      />
-
-      <FitText
-        text={[lead, tail].filter(Boolean).join(' ').toUpperCase()}
-        family={FONT_DISPLAY}
-        color={ink}
-        width={F.content.width}
-        maxHeight={headlineBand}
-        maxLines={2}
-        tilt={v<number>('tilt')}
-        style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
-      />
-
-      <EditableText
-        field="phrase"
-        value={v<string>('phrase')}
-        exporting={exporting}
-        placeholder="SEJA BEM-VINDO"
-        style={{
-          position: 'absolute', zIndex: 6,
-          left: F.content.left, top: F.content.top,
-          width: F.content.width * 0.45, minHeight: type.subtitle,
-          fontFamily: FONT_DISPLAY, fontSize: type.subtitle,
-          color: 'transparent', caretColor: ink, opacity: exporting ? 0 : 1,
-        }}
-      />
-
-      <Subject
-        person={person}
-        index={0}
-        exporting={exporting}
-        short={F.short}
-        cut={v<string>('cut') as never}
-        box={{ left: subjectLeft, top: subjectTop, width: subjectW, height: subjectH }}
-      />
-
-      <div style={{
-        position: 'absolute', zIndex: 5,
-        left: F.margin, bottom: F.margin,
-        maxWidth: Math.round(F.content.width * 0.47),
-      }}>
+    <PersonPoster
+      ctx={ctx}
+      phrase={phrase}
+      phraseField="phrase"
+      phraseValue={v<string>('phrase')}
+      phrasePlaceholder="SEJA BEM-VINDO"
+      extra={moment === 'promotion' && v<boolean>('showPrevious') && v<string>('previousRole') ? (
         <EditableText
-          field="person:0:name"
-          value={person.name}
+          field="previousRole"
+          value={v<string>('previousRole')}
           exporting={exporting}
-          placeholder="Nome da pessoa"
+          placeholder="Cargo anterior"
           style={{
-            fontFamily: FONT_DISPLAY, fontWeight: 700,
-            fontSize: type.title, lineHeight: 0.96, letterSpacing: '-0.015em',
-            color: ink, textTransform: 'uppercase',
+            fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.micro,
+            letterSpacing: '0.18em', color: b.accent, textTransform: 'uppercase',
+            textDecoration: 'line-through', opacity: 0.8,
+            marginTop: Math.round(F.short * 0.014),
           }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018), marginTop: Math.round(F.short * 0.014) }}>
-          <span style={{ width: Math.round(F.short * 0.05), height: 3, background: b.accent, flexShrink: 0 }} />
-          <EditableText
-            field="person:0:role"
-            value={person.role}
-            exporting={exporting}
-            placeholder="Cargo"
-            style={{
-              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.caption,
-              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
-            }}
-          />
-        </div>
-
-        {moment === 'promotion' && v<boolean>('showPrevious') && v<string>('previousRole') && (
-          <EditableText
-            field="previousRole"
-            value={v<string>('previousRole')}
-            exporting={exporting}
-            placeholder="Cargo anterior"
-            style={{
-              fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.micro,
-              letterSpacing: '0.16em', color: muted, textTransform: 'uppercase',
-              textDecoration: 'line-through', marginTop: Math.round(F.short * 0.01),
-              opacity: 0.75,
-            }}
-          />
-        )}
-      </div>
-
-      <Grain opacity={0.05} />
-      <Mark brand={brand} format={format} slot="bottom-right" color={ink} />
-    </>
+      ) : undefined}
+    />
   );
 };
 
@@ -364,18 +257,7 @@ export const milestone: Template = {
     { kind: 'text', id: 'phrase', label: 'Frase', default: '', group: 'Conteúdo', hint: 'Vazio usa a frase do momento e do idioma.' },
     { kind: 'toggle', id: 'showPrevious', label: 'Mostrar cargo anterior', default: true, group: 'Conteúdo', hint: 'Só aparece no momento Promoção.' },
     { kind: 'text', id: 'previousRole', label: 'Cargo anterior', default: '', group: 'Conteúdo' },
-    {
-      kind: 'select', id: 'cut', label: 'Recorte da foto', default: 'arch', group: 'Composição',
-      options: [
-        { value: 'arch', label: 'Arco' },
-        { value: 'circle', label: 'Círculo' },
-        { value: 'blade', label: 'Lâmina' },
-        { value: 'none', label: 'Reto' },
-      ],
-    },
-    { kind: 'number', id: 'tilt', label: 'Perspectiva do título', default: 0.35, min: -1, max: 1, step: 0.01, group: 'Composição', hint: 'O lado livre recua; o sinal escolhe qual borda fica fixa.' },
-    { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
-    { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.4, min: 0, max: 1, step: 0.01, group: 'Composição' },
+    ...personPosterFields,
   ],
   render,
 };
