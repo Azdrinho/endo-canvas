@@ -31,6 +31,16 @@ interface FitTextProps {
   letterSpacing?: string;
   /** Wrap into at most this many lines. */
   maxLines?: number;
+  /**
+   * Perspective tilt, -1..1. One number drives the whole 3D angle so the
+   * result stays coherent instead of needing three sliders that can be set
+   * against each other.
+   *
+   * The free edge always recedes, never approaches: receding shrinks the
+   * block inward, so a tilted headline cannot grow past the margins the
+   * layout audit checks. The sign only picks which edge stays pinned.
+   */
+  tilt?: number;
   style?: React.CSSProperties;
   children?: never;
 }
@@ -81,7 +91,7 @@ const wrapInto = (text: string, maxLines: number): string[] => {
 
 export const FitText: React.FC<FitTextProps> = ({
   text, width, maxHeight, maxSize, weight = 700, family, color,
-  lineHeight = 0.86, letterSpacing = '-0.03em', maxLines = 2, style,
+  lineHeight = 0.86, letterSpacing = '-0.03em', maxLines = 2, tilt = 0, style,
 }) => {
   const lines = useMemo(() => wrapInto(text, maxLines), [text, maxLines]);
 
@@ -100,6 +110,14 @@ export const FitText: React.FC<FitTextProps> = ({
     setSize(Math.max(8, Math.floor(next)));
   }, [lines, width, maxSize, maxHeight, lineHeight, weight, family, letterSpacing]);
 
+  const amount = Math.max(-1, Math.min(1, tilt));
+  const perspective = Math.round(width * 1.6);
+  const tilted = amount !== 0 ? {
+    transformOrigin: amount > 0 ? 'left center' : 'right center',
+    transform: `perspective(${perspective}px) rotateY(${-amount * 22}deg) rotateX(${Math.abs(amount) * 6}deg)`,
+    transformStyle: 'preserve-3d' as const,
+  } : undefined;
+
   return (
     <div
       ref={ref}
@@ -112,6 +130,7 @@ export const FitText: React.FC<FitTextProps> = ({
         color,
         // The measurement is of the exact string, so nothing may re-wrap it.
         whiteSpace: 'pre',
+        ...tilted,
         ...style,
       }}
     >

@@ -130,6 +130,7 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
         width={F.content.width}
         maxHeight={headlineBand}
         maxLines={2}
+        tilt={v<number>('tilt')}
         style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
       />
 
@@ -312,6 +313,7 @@ const GroupLayout: React.FC<Shared & { roster: Person[] }> = ({
             width={F.content.width}
             maxHeight={phraseBand}
             maxLines={2}
+        tilt={v<number>('tilt')}
           />
         </header>
 
@@ -371,6 +373,7 @@ export const milestone: Template = {
         { value: 'none', label: 'Reto' },
       ],
     },
+    { kind: 'number', id: 'tilt', label: 'Perspectiva do título', default: 0.35, min: -1, max: 1, step: 0.01, group: 'Composição', hint: 'O lado livre recua; o sinal escolhe qual borda fica fixa.' },
     { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
     { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.4, min: 0, max: 1, step: 0.01, group: 'Composição' },
   ],

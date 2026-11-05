@@ -101,6 +101,7 @@ const render = (ctx: RenderContext) => {
         width={Math.round(F.content.width * bleed)}
         maxHeight={headlineBand}
         maxLines={2}
+        tilt={v<number>('tilt')}
         style={{ position: 'absolute', left: F.content.left, top: headlineTop, zIndex: 2, pointerEvents: 'none' }}
       />
 
@@ -195,6 +196,7 @@ export const birthday: Template = {
       ],
       hint: 'Ignorado quando a foto já está com o fundo recortado.',
     },
+    { kind: 'number', id: 'tilt', label: 'Perspectiva do título', default: 0.35, min: -1, max: 1, step: 0.01, group: 'Composição', hint: 'O lado livre recua; o sinal escolhe qual borda fica fixa.' },
     { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
     { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 1, min: 1, max: 1.45, step: 0.01, group: 'Composição', hint: 'Acima de 1 o título avança pela borda direita.' },
     { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
