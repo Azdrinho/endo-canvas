@@ -190,22 +190,74 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      {/* One shape, not a field of them: the disc is what the figure stands
-          in front of, and the only place the gradient appears. */}
+      {/* The depth is built in layers, back to front: atmosphere, the disc
+          itself with its own lighting, the ring that proves it is a drawn
+          object and not a fill, then the backlight the figure stands in. A
+          flat circle behind a flat cutout is what made this read as a slide
+          rather than as a poster. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', zIndex: 0,
+          left: discCx - discD * 0.72, top: discCy - discD * 0.72,
+          width: discD * 1.44, height: discD * 1.44, borderRadius: '50%',
+          background: `radial-gradient(circle, ${b.from}6B 0%, ${b.to}3D 48%, transparent 72%)`,
+          filter: `blur(${Math.round(F.short * 0.075)}px)`,
+        }}
+      />
+
       <div
         aria-hidden
         style={{
           position: 'absolute', zIndex: 1,
-          left: discCx - discD / 2, top: discCy - discD / 2,
-          width: discD, height: discD, borderRadius: '50%',
-          background: gradient(brand, 155),
+          left: discCx - discD * 0.55, top: discCy - discD * 0.55,
+          width: discD * 1.1, height: discD * 1.1, borderRadius: '50%',
+          border: `${Math.max(1, Math.round(F.short * 0.0018))}px solid ${b.from}4D`,
         }}
       />
+
       <div
         aria-hidden
         style={{
-          position: 'absolute', inset: 0, zIndex: 1,
-          background: `radial-gradient(45% 40% at ${Math.round((discCx / format.width) * 100)}% ${Math.round((discCy / format.height) * 100)}%, ${b.from}2E 0%, transparent 75%)`,
+          position: 'absolute', zIndex: 2,
+          left: discCx - discD / 2, top: discCy - discD / 2,
+          width: discD, height: discD, borderRadius: '50%',
+          background: gradient(brand, 155),
+          boxShadow: `0 ${Math.round(F.short * 0.045)}px ${Math.round(F.short * 0.13)}px rgba(0,0,0,0.45), inset 0 0 ${Math.round(F.short * 0.09)}px ${b.to}80`,
+          overflow: 'hidden',
+        }}
+      >
+        {/* The highlight is what gives the disc a direction of light. */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `radial-gradient(58% 52% at 32% 24%, rgba(255,255,255,0.34) 0%, transparent 62%)`,
+        }} />
+      </div>
+
+      {/* Backlight: the figure separates from the disc because something is
+          lit behind it, not because of an outline. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', zIndex: 3,
+          left: Math.round(discCx - subjectW * 0.62), top: Math.round(format.height - subjectH * 0.92),
+          width: Math.round(subjectW * 1.24), height: Math.round(subjectH * 0.82),
+          background: 'radial-gradient(50% 46% at 50% 36%, rgba(255,255,255,0.30) 0%, transparent 70%)',
+          filter: `blur(${Math.round(F.short * 0.02)}px)`,
+        }}
+      />
+
+      {/* Contact shadow, so the figure stands on the card instead of floating
+          over it. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', zIndex: 3,
+          left: Math.round(discCx - subjectW * 0.42), bottom: Math.round(F.short * 0.012),
+          width: Math.round(subjectW * 0.84), height: Math.round(F.short * 0.045),
+          borderRadius: '50%',
+          background: 'radial-gradient(closest-side, rgba(0,0,0,0.55) 0%, transparent 100%)',
+          filter: `blur(${Math.round(F.short * 0.012)}px)`,
         }}
       />
 
@@ -230,6 +282,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
           maxHeight={Math.round(format.height * 0.34)}
           maxLines={wide ? 2 : 3}
           lineHeight={0.88}
+          style={{ textShadow: `0 ${Math.round(F.short * 0.016)}px ${Math.round(F.short * 0.05)}px rgba(0,0,0,0.45)` }}
         />
       </div>
 
@@ -243,16 +296,48 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         zIndex={4}
       />
 
-      <div style={{ position: 'absolute', zIndex: 6, left: F.margin, bottom: F.margin }}>
+      <div style={{
+        position: 'absolute', zIndex: 6, left: F.margin, bottom: F.margin,
+        display: 'flex', gap: Math.round(F.short * 0.022),
+      }}>
+        <span aria-hidden style={{ width: Math.max(2, Math.round(F.short * 0.004)), background: b.accent, borderRadius: 99 }} />
         {nameBlock(Math.round(format.width * (wide ? 0.34 : 0.46)))}
       </div>
+
+      {/* Set up the right edge: the kind of mark a designer leaves and a
+          generator never does. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', zIndex: 6,
+          right: Math.round(F.margin * 0.38), bottom: F.margin,
+          writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+          display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.016),
+          fontFamily: FONT_TEXT, fontWeight: 700, fontSize: Math.round(type.micro * 0.82),
+          letterSpacing: '0.34em', color: `${ink}8A`, textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ height: Math.round(F.short * 0.06), width: 1, background: `${ink}59` }} />
+        {b.label}
+      </div>
+
+      {/* Vignette, drawn last over everything but the grain: it is what pulls
+          the eye back to the centre of the frame. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, zIndex: 7, pointerEvents: 'none',
+          background: `radial-gradient(78% 68% at 56% 48%, transparent 38%, rgba(0,0,0,0.42) 100%)`,
+        }}
+      />
 
       <PhraseEditor
         field={phraseField} value={phraseValue} placeholder={phrasePlaceholder}
         exporting={exporting} left={F.margin} top={F.margin} width={headWidth}
         size={type.subtitle} caret={ink}
       />
-      <Grain opacity={0.05} />
+      <Grain opacity={0.11} />
       <Mark brand={brand} format={format} slot="top-right" color={ink} width={F.short * 0.13} />
     </div>
   );
