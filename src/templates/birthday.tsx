@@ -26,6 +26,7 @@ const render = (ctx: RenderContext) => {
       phraseField="greeting"
       phraseValue={v<string>('greeting')}
       phrasePlaceholder="FELIZ ANIVERSÁRIO"
+      label="Aniversário"
       extra={v<boolean>('showDate') ? (
         <EditableText
           field="dateLabel"

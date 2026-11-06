@@ -1,7 +1,7 @@
 import React from 'react';
 import type { FieldSpec, RenderContext } from '../types';
-import { BRANDS, FONT_DISPLAY, FONT_TEXT, typeScale } from '../../design/brand';
-import { GradientField, Grain, Spheres, inkFor, mutedFor, paperFor } from './Surface';
+import { BRANDS, FONT_DISPLAY, FONT_TEXT, gradient, typeScale } from '../../design/brand';
+import { Grain, inkFor, mutedFor, paperFor } from './Surface';
 import { EditableText } from './Editable';
 import { FitText } from './FitText';
 import { Subject } from './Subject';
@@ -10,20 +10,16 @@ import { Mark, frameFor } from './Layout';
 // The shared person card.
 //
 // Aniversário and Momentos had grown near-identical copies of the same solo
-// layout — same frame, same gradient, same centred figure, differing only in
-// which words they put on it. Two compositions times two templates would
-// have been four copies, so the layout lives here once and the templates
-// supply their own phrase and their own extra line.
+// layout, so it lives here once and the templates supply their own words.
+//
+// The composition is the one every working spotlight poster uses: the figure
+// is cut out and placed in front of ONE geometric form, and the type sits in
+// clear space beside it. The previous version set the phrase as a wall of
+// type *behind* the person — that only works with a full-length figure and a
+// condensed face; with a half-body corporate headshot the letters came out
+// of the model's head and nothing could be read.
 
-export type Composition = 'typewall' | 'edge';
-
-/** Mix a hex colour towards black. `amount` 0 = unchanged, 1 = black. */
-const shade = (hex: string, amount: number): string => {
-  const n = parseInt(hex.slice(1), 16);
-  const f = 1 - Math.max(0, Math.min(1, amount));
-  const ch = (shift: number) => Math.round(((n >> shift) & 255) * f).toString(16).padStart(2, '0');
-  return `#${ch(16)}${ch(8)}${ch(0)}`;
-};
+export type Composition = 'spotlight' | 'edge';
 
 /**
  * Fields every person card needs. Spread into a template's own list so the
@@ -32,16 +28,14 @@ const shade = (hex: string, amount: number): string => {
  */
 export const personPosterFields: FieldSpec[] = [
   {
-    kind: 'select', id: 'composition', label: 'Composição', default: 'typewall', group: 'Composição',
+    kind: 'select', id: 'composition', label: 'Composição', default: 'spotlight', group: 'Composição',
     options: [
-      { value: 'typewall', label: 'Muro de texto' },
+      { value: 'spotlight', label: 'Holofote' },
       { value: 'edge', label: 'Bloco lateral' },
     ],
   },
   { kind: 'number', id: 'subjectScale', label: 'Tamanho da pessoa', default: 1, min: 0.75, max: 1.3, step: 0.01, group: 'Composição' },
-  { kind: 'number', id: 'bleed', label: 'Sangria do título', default: 0.12, min: 0, max: 0.7, step: 0.01, group: 'Composição', hint: 'Quanto o texto passa das bordas. No muro de texto isso é proposital — é o que deixa as letras cortadas.' },
-  { kind: 'number', id: 'wallLines', label: 'Linhas do muro', default: 4, min: 2, max: 6, step: 1, group: 'Composição', hint: 'Só no muro de texto. A frase se repete até preencher.' },
-  { kind: 'number', id: 'softness', label: 'Difusão da luz', default: 0.45, min: 0, max: 1, step: 0.01, group: 'Composição' },
+  { kind: 'number', id: 'discSize', label: 'Tamanho do disco', default: 1, min: 0.6, max: 1.35, step: 0.01, group: 'Composição', hint: 'A forma de marca atrás da pessoa.' },
   {
     kind: 'select', id: 'cut', label: 'Recorte da foto', default: 'arch', group: 'Composição',
     options: [
@@ -63,16 +57,18 @@ interface PersonPosterProps {
   /** Raw stored value of that field, which may be empty (meaning "default"). */
   phraseValue: string;
   phrasePlaceholder: string;
+  /** Small caps line above the headline. */
+  label?: string;
   /** An optional extra line under the role — a date, a previous role. */
   extra?: React.ReactNode;
 }
 
 export const PersonPoster: React.FC<PersonPosterProps> = ({
-  ctx, phrase, phraseField, phraseValue, phrasePlaceholder, extra,
+  ctx, phrase, phraseField, phraseValue, phrasePlaceholder, label, extra,
 }) => {
   const { v, format, theme, brand, people, exporting } = ctx;
   const mode = v<string>('composition') as Composition;
-  const F = frameFor(format, mode === 'edge' ? 'bottom-left' : 'bottom-right');
+  const F = frameFor(format, mode === 'edge' ? 'bottom-left' : 'top-right');
   const type = typeScale(F.short);
   const b = BRANDS[brand];
   const paper = paperFor(theme);
@@ -80,57 +76,11 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
   const muted = mutedFor(theme);
 
   const person = people[0];
-  const cutout = Boolean(person.cutout);
   const scale = v<number>('subjectScale');
-  const softness = v<number>('softness');
-  const bleed = v<number>('bleed');
+  const disc = v<number>('discSize');
 
-  // The wall is dark type on a bright gradient, like the reference: mixing
-  // the brand's far end down to ~35% gives a shade that belongs to the
-  // gradient instead of a neutral black sitting on top of it.
-  const wallInk = shade(b.to, 0.62);
-  const wallMuted = `${wallInk}B8`;
-
-  const backdrop = (
-    <>
-      <div style={{ position: 'absolute', inset: 0, opacity: mode === 'edge' ? 0.92 : 1 }}>
-        <GradientField brand={brand} angle={F.isWide ? 112 : 152} sweep={mode !== 'edge'}>
-          <Spheres brand={brand} shortEdge={F.short} softness={0.5 + softness * 0.5} variant="orbit" scale={1.3} />
-        </GradientField>
-      </div>
-      {mode === 'edge' && (
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute', inset: 0,
-            background: `linear-gradient(${F.isWide ? 98 : 172}deg, ${paper}F2 2%, ${paper}99 38%, transparent 78%)`,
-          }}
-        />
-      )}
-    </>
-  );
-
-  // The editable phrase is a transparent overlay rather than the visible
-  // text: the visible copy is laid out by FitText, which measures and may
-  // wrap it, and a contenteditable cannot be both.
-  const phraseEditor = (
-    <EditableText
-      field={phraseField}
-      value={phraseValue}
-      exporting={exporting}
-      placeholder={phrasePlaceholder}
-      style={{
-        position: 'absolute', zIndex: 8,
-        left: F.margin, top: F.margin,
-        width: F.content.width * 0.42, minHeight: type.subtitle,
-        fontFamily: FONT_DISPLAY, fontSize: type.subtitle,
-        color: 'transparent', caretColor: ink, opacity: exporting ? 0 : 1,
-      }}
-    />
-  );
-
-  const nameBlock = (align: 'left' | 'center', width: number, nameColor: string = ink, roleColor: string = muted) => (
-    <div style={{ width, textAlign: align, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+  const nameBlock = (width: number, nameColor: string = ink, roleColor: string = muted) => (
+    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
       <EditableText
         field="person:0:name"
         value={person.name}
@@ -138,7 +88,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         placeholder="Nome da pessoa"
         style={{
           fontFamily: FONT_DISPLAY, fontWeight: 700,
-          fontSize: type.subtitle, lineHeight: 1.0, letterSpacing: '0.01em',
+          fontSize: type.title, lineHeight: 1.0, letterSpacing: '0.01em',
           color: nameColor, textTransform: 'uppercase',
         }}
       />
@@ -150,7 +100,7 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         style={{
           fontFamily: FONT_TEXT, fontWeight: 400, fontSize: type.micro,
           letterSpacing: '0.22em', color: roleColor, textTransform: 'uppercase',
-          marginTop: Math.round(F.short * 0.012),
+          marginTop: Math.round(F.short * 0.014),
         }}
       />
       {extra}
@@ -158,22 +108,23 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
   );
 
   if (mode === 'edge') {
-    // --- C: asymmetric block --------------------------------------------
+    // --- Asymmetric block -------------------------------------------------
     // A solid brand block holds a third of the frame, the phrase runs up its
-    // inner edge, and the figure is cropped by the opposite edge. Most of
-    // the card is deliberately empty.
+    // inner edge, and the figure is cropped by the opposite edge.
     const blockW = Math.round(format.width * 0.33);
     const subjectH = Math.round(format.height * 0.96 * scale);
     const subjectW = Math.round(subjectH * 0.74);
-    // Cropped by the right edge: the figure runs past it on purpose.
     const subjectLeft = Math.round(format.width - subjectW * 0.82);
     const runLength = format.height - F.margin * 2;
 
     return (
       <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-        {backdrop}
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0,
+          background: `radial-gradient(70% 60% at 72% 30%, ${b.from}3D 0%, transparent 70%)`,
+        }} />
 
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: blockW, background: b.to, zIndex: 2 }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: blockW, background: gradient(brand, 165), zIndex: 2 }} />
 
         {/* Rotated so the fit width becomes the vertical run. */}
         <div
@@ -204,73 +155,82 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         />
 
         <div style={{ position: 'absolute', zIndex: 6, left: blockW + F.margin, bottom: F.margin }}>
-          {nameBlock('left', Math.round(format.width * 0.34))}
+          {nameBlock(Math.round(format.width * 0.34))}
         </div>
 
-        {phraseEditor}
+        <PhraseEditor
+          field={phraseField} value={phraseValue} placeholder={phrasePlaceholder}
+          exporting={exporting} left={blockW + F.margin} top={F.margin}
+          width={Math.round(F.content.width * 0.4)} size={type.subtitle} caret={ink}
+        />
         <Grain opacity={0.05} />
         <Mark brand={brand} format={format} slot="bottom-left" color={b.onGradient} width={F.short * 0.13} />
       </div>
     );
   }
 
-  // --- B: wall of type ---------------------------------------------------
+  // --- Spotlight ----------------------------------------------------------
   //
-  // The phrase IS the background. Not a headline sitting on a gradient: a
-  // stack of rows that each span the full card width, bleeding past both
-  // side edges, set dark against a bright gradient so the type reads as a
-  // printed wall with the person standing in front of it.
-  //
-  // A short phrase ("SEJA BEM-VINDO" is two words) would otherwise make two
-  // lines and leave two thirds of the card empty, so the words repeat until
-  // the wall is full — which is also what the reference does.
-  const rows = Math.round(v<number>('wallLines'));
-  const wallWidth = Math.round(format.width * (1 + bleed));
-  const wallLeft = Math.round((format.width - wallWidth) / 2);
-  // The wall stops short of the foot of the card: the name and the mark need
-  // clean gradient to sit on, and on top of the letters they were unreadable.
-  const captionH = Math.round(F.short * 0.15);
-  const wallH = format.height - captionH;
-  const rowH = wallH / rows;
-  const words = phrase.replace(/\n/g, ' ').toUpperCase().split(/\s+/).filter(Boolean);
-  const stream = words.length ? Array.from({ length: Math.ceil(rows / words.length) }, () => words).flat() : [''];
-  const lines = Array.from({ length: rows }, (_, i) =>
-    stream.slice(Math.floor((i * stream.length) / rows), Math.floor(((i + 1) * stream.length) / rows)).join(' ') || stream[0]);
+  // Reads on a diagonal: label and headline anchored to the top-left, the
+  // figure standing bottom-right in front of a single brand disc, the name
+  // in the clear corner the figure leaves behind. Nothing sits over the face
+  // and nothing sits over the type.
+  const wide = F.isWide;
+  const discD = Math.round((wide ? format.height * 1.1 : format.width * 0.9) * disc);
+  const discCx = Math.round(format.width * (wide ? 0.72 : 0.63));
+  const discCy = Math.round(format.height * (wide ? 0.58 : 0.57));
 
-  const subjectH = Math.round(wallH * 0.98 * scale);
-  const subjectW = Math.round(subjectH * 0.62);
+  const subjectH = Math.round(format.height * (wide ? 0.88 : 0.72) * scale);
+  const subjectW = Math.round(subjectH * 0.66);
+  const subjectLeft = Math.round(discCx - subjectW / 2);
+
+  // The headline takes the space the figure does not reach, plus a little of
+  // the figure's own box — a cutout is narrower than the box that holds it.
+  const headWidth = Math.round(Math.min(F.content.width, subjectLeft - F.margin + subjectW * 0.2));
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      {backdrop}
-
-      {/* Bleeding past both side edges is the composition here, so the
-          wrapper marks it exempt from the margin audit every other element
-          obeys. */}
+      {/* One shape, not a field of them: the disc is what the figure stands
+          in front of, and the only place the gradient appears. */}
       <div
-        data-bleed="1"
+        aria-hidden
         style={{
-          position: 'absolute', left: wallLeft, top: 0, width: wallWidth, height: wallH,
-          overflow: 'hidden',
-          zIndex: 2, pointerEvents: 'none', display: 'flex', flexDirection: 'column',
+          position: 'absolute', zIndex: 1,
+          left: discCx - discD / 2, top: discCy - discD / 2,
+          width: discD, height: discD, borderRadius: '50%',
+          background: gradient(brand, 155),
         }}
-      >
-        {lines.map((line, i) => (
-          // Each row gets an equal slice of the height and its own size, so
-          // every row reaches both edges. Letters overrun their row and
-          // touch the next one, which is the look, not a bug.
-          <div key={i} style={{ height: rowH, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
-            <FitText
-              text={line}
-              family={FONT_DISPLAY}
-              color={wallInk}
-              width={wallWidth}
-              maxSize={rowH * 1.9}
-              maxLines={1}
-              lineHeight={1}
-            />
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, zIndex: 1,
+          background: `radial-gradient(45% 40% at ${Math.round((discCx / format.width) * 100)}% ${Math.round((discCy / format.height) * 100)}%, ${b.from}2E 0%, transparent 75%)`,
+        }}
+      />
+
+      <div style={{
+        position: 'absolute', zIndex: 5, left: F.margin, top: F.margin,
+        width: headWidth, display: 'flex', flexDirection: 'column', gap: Math.round(F.short * 0.024),
+      }}>
+        {label && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018) }}>
+            <span style={{ width: Math.round(F.short * 0.05), height: 2, background: b.accent }} />
+            <span style={{
+              fontFamily: FONT_TEXT, fontWeight: 700, fontSize: type.micro,
+              letterSpacing: '0.28em', color: b.accent, textTransform: 'uppercase',
+            }}>{label}</span>
           </div>
-        ))}
+        )}
+        <FitText
+          text={phrase.replace(/\n/g, ' ').toUpperCase()}
+          family={FONT_DISPLAY}
+          color={ink}
+          width={headWidth}
+          maxHeight={Math.round(format.height * 0.34)}
+          maxLines={wide ? 2 : 3}
+          lineHeight={0.88}
+        />
       </div>
 
       <Subject
@@ -279,26 +239,43 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         exporting={exporting}
         short={F.short}
         cut={v<string>('cut') as never}
-        box={{
-          left: Math.round((format.width - subjectW) / 2),
-          top: cutout ? wallH - subjectH : Math.round(format.height * 0.14),
-          width: subjectW,
-          height: subjectH,
-        }}
+        box={{ left: subjectLeft, top: format.height - subjectH, width: subjectW, height: subjectH }}
         zIndex={4}
       />
 
-      <div style={{
-        position: 'absolute', zIndex: 6, left: F.margin, right: F.margin,
-        top: wallH, height: captionH,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {nameBlock('center', F.content.width, wallInk, wallMuted)}
+      <div style={{ position: 'absolute', zIndex: 6, left: F.margin, bottom: F.margin }}>
+        {nameBlock(Math.round(format.width * (wide ? 0.34 : 0.46)))}
       </div>
 
-      {phraseEditor}
-      <Grain opacity={0.07} />
-      <Mark brand={brand} format={format} slot="bottom-right" color={wallInk} width={F.short * 0.13} />
+      <PhraseEditor
+        field={phraseField} value={phraseValue} placeholder={phrasePlaceholder}
+        exporting={exporting} left={F.margin} top={F.margin} width={headWidth}
+        size={type.subtitle} caret={ink}
+      />
+      <Grain opacity={0.05} />
+      <Mark brand={brand} format={format} slot="top-right" color={ink} width={F.short * 0.13} />
     </div>
   );
 };
+
+/**
+ * The phrase stays editable through a transparent overlay: the visible copy
+ * is laid out by FitText, which measures and may re-wrap it, and one element
+ * cannot be both measured and contenteditable.
+ */
+const PhraseEditor: React.FC<{
+  field: string; value: string; placeholder: string; exporting: boolean;
+  left: number; top: number; width: number; size: number; caret: string;
+}> = ({ field, value, placeholder, exporting, left, top, width, size, caret }) => (
+  <EditableText
+    field={field}
+    value={value}
+    exporting={exporting}
+    placeholder={placeholder}
+    style={{
+      position: 'absolute', zIndex: 8, left, top, width, minHeight: size,
+      fontFamily: FONT_DISPLAY, fontSize: size,
+      color: 'transparent', caretColor: caret, opacity: exporting ? 0 : 1,
+    }}
+  />
+);

@@ -29,6 +29,13 @@ import { Subject } from './kit/Subject';
 
 const MAX_PEOPLE = 12;
 
+/** The small caps line above the headline. */
+const MOMENT_LABEL: Record<string, string> = {
+  welcome: 'Boas-vindas',
+  farewell: 'Despedida',
+  promotion: 'Novo cargo',
+};
+
 const momentPhrase = (moment: string, locale: Locale) => {
   switch (moment) {
     case 'farewell': return t(COPY.farewell, locale);
@@ -84,6 +91,7 @@ const SoloLayout: React.FC<Shared & { person: Person; moment: string }> = ({
       phraseField="phrase"
       phraseValue={v<string>('phrase')}
       phrasePlaceholder="SEJA BEM-VINDO"
+      label={MOMENT_LABEL[moment] ?? ''}
       extra={moment === 'promotion' && v<boolean>('showPrevious') && v<string>('previousRole') ? (
         <EditableText
           field="previousRole"
