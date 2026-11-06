@@ -171,99 +171,56 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
 
   // --- Spotlight ----------------------------------------------------------
   //
-  // Reads on a diagonal: label and headline anchored to the top-left, the
-  // figure standing bottom-right in front of a single brand disc, the name
-  // in the clear corner the figure leaves behind. Nothing sits over the face
-  // and nothing sits over the type.
+  // Clean and fluid, which is the whole brief. One flowing form, the figure
+  // in front of it, type in open space, and nothing else — the previous pass
+  // stacked a ring, a vignette, visible grain, an accent rule and a vertical
+  // caption on top of each other and the card stopped breathing.
+  //
+  // The form is asymmetric and tilted and runs off the right edge, so the
+  // movement comes from the shape itself rather than from decoration laid
+  // over it.
   const wide = F.isWide;
-  const discD = Math.round((wide ? format.height * 1.1 : format.width * 0.9) * disc);
-  const discCx = Math.round(format.width * (wide ? 0.72 : 0.63));
-  const discCy = Math.round(format.height * (wide ? 0.58 : 0.57));
+  const blobW = Math.round((wide ? format.width * 0.72 : format.width * 1.02) * disc);
+  const blobH = Math.round(blobW * 1.06);
+  const blobCx = Math.round(format.width * (wide ? 0.74 : 0.66));
+  const blobCy = Math.round(format.height * (wide ? 0.56 : 0.58));
+  const FLUID = '62% 38% 44% 56% / 48% 42% 58% 52%';
 
-  const subjectH = Math.round(format.height * (wide ? 0.88 : 0.72) * scale);
+  const subjectH = Math.round(format.height * (wide ? 0.86 : 0.7) * scale);
   const subjectW = Math.round(subjectH * 0.66);
-  const subjectLeft = Math.round(discCx - subjectW / 2);
+  const subjectLeft = Math.round(blobCx - subjectW / 2);
 
   // The headline takes the space the figure does not reach, plus a little of
   // the figure's own box — a cutout is narrower than the box that holds it.
-  const headWidth = Math.round(Math.min(F.content.width, subjectLeft - F.margin + subjectW * 0.2));
+  const headWidth = Math.round(Math.min(F.content.width, subjectLeft - F.margin + subjectW * 0.18));
+
+  const blob = (grow: number, style: React.CSSProperties) => ({
+    position: 'absolute' as const,
+    left: Math.round(blobCx - (blobW * grow) / 2),
+    top: Math.round(blobCy - (blobH * grow) / 2),
+    width: Math.round(blobW * grow), height: Math.round(blobH * grow),
+    borderRadius: FLUID,
+    ...style,
+  });
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: paper, fontFamily: FONT_TEXT, overflow: 'hidden' }}>
-      {/* The depth is built in layers, back to front: atmosphere, the disc
-          itself with its own lighting, the ring that proves it is a drawn
-          object and not a fill, then the backlight the figure stands in. A
-          flat circle behind a flat cutout is what made this read as a slide
-          rather than as a poster. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 0,
-          left: discCx - discD * 0.72, top: discCy - discD * 0.72,
-          width: discD * 1.44, height: discD * 1.44, borderRadius: '50%',
-          background: `radial-gradient(circle, ${b.from}6B 0%, ${b.to}3D 48%, transparent 72%)`,
-          filter: `blur(${Math.round(F.short * 0.075)}px)`,
-        }}
-      />
-
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 1,
-          left: discCx - discD * 0.55, top: discCy - discD * 0.55,
-          width: discD * 1.1, height: discD * 1.1, borderRadius: '50%',
-          border: `${Math.max(1, Math.round(F.short * 0.0018))}px solid ${b.from}4D`,
-        }}
-      />
-
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 2,
-          left: discCx - discD / 2, top: discCy - discD / 2,
-          width: discD, height: discD, borderRadius: '50%',
-          background: gradient(brand, 155),
-          boxShadow: `0 ${Math.round(F.short * 0.045)}px ${Math.round(F.short * 0.13)}px rgba(0,0,0,0.45), inset 0 0 ${Math.round(F.short * 0.09)}px ${b.to}80`,
-          overflow: 'hidden',
-        }}
-      >
-        {/* The highlight is what gives the disc a direction of light. */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `radial-gradient(58% 52% at 32% 24%, rgba(255,255,255,0.34) 0%, transparent 62%)`,
-        }} />
-      </div>
-
-      {/* Backlight: the figure separates from the disc because something is
-          lit behind it, not because of an outline. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 3,
-          left: Math.round(discCx - subjectW * 0.62), top: Math.round(format.height - subjectH * 0.92),
-          width: Math.round(subjectW * 1.24), height: Math.round(subjectH * 0.82),
-          background: 'radial-gradient(50% 46% at 50% 36%, rgba(255,255,255,0.30) 0%, transparent 70%)',
-          filter: `blur(${Math.round(F.short * 0.02)}px)`,
-        }}
-      />
-
-      {/* Contact shadow, so the figure stands on the card instead of floating
-          over it. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 3,
-          left: Math.round(discCx - subjectW * 0.42), bottom: Math.round(F.short * 0.012),
-          width: Math.round(subjectW * 0.84), height: Math.round(F.short * 0.045),
-          borderRadius: '50%',
-          background: 'radial-gradient(closest-side, rgba(0,0,0,0.55) 0%, transparent 100%)',
-          filter: `blur(${Math.round(F.short * 0.012)}px)`,
-        }}
-      />
+      {/* Two layers only: the form, and its own soft echo. */}
+      <div aria-hidden style={blob(1.3, {
+        zIndex: 0,
+        background: `radial-gradient(circle at 36% 30%, ${b.from}3D 0%, ${b.to}1F 55%, transparent 76%)`,
+        filter: `blur(${Math.round(F.short * 0.05)}px)`,
+        transform: 'rotate(-14deg)',
+      })} />
+      <div aria-hidden style={blob(1, {
+        zIndex: 1,
+        background: gradient(brand, 148),
+        transform: 'rotate(-8deg)',
+      })} />
 
       <div style={{
         position: 'absolute', zIndex: 5, left: F.margin, top: F.margin,
-        width: headWidth, display: 'flex', flexDirection: 'column', gap: Math.round(F.short * 0.024),
+        width: headWidth, display: 'flex', flexDirection: 'column', gap: Math.round(F.short * 0.026),
       }}>
         {label && (
           <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.018) }}>
@@ -279,10 +236,9 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
           family={FONT_DISPLAY}
           color={ink}
           width={headWidth}
-          maxHeight={Math.round(format.height * 0.34)}
+          maxHeight={Math.round(format.height * 0.32)}
           maxLines={wide ? 2 : 3}
-          lineHeight={0.88}
-          style={{ textShadow: `0 ${Math.round(F.short * 0.016)}px ${Math.round(F.short * 0.05)}px rgba(0,0,0,0.45)` }}
+          lineHeight={0.9}
         />
       </div>
 
@@ -296,48 +252,16 @@ export const PersonPoster: React.FC<PersonPosterProps> = ({
         zIndex={4}
       />
 
-      <div style={{
-        position: 'absolute', zIndex: 6, left: F.margin, bottom: F.margin,
-        display: 'flex', gap: Math.round(F.short * 0.022),
-      }}>
-        <span aria-hidden style={{ width: Math.max(2, Math.round(F.short * 0.004)), background: b.accent, borderRadius: 99 }} />
+      <div style={{ position: 'absolute', zIndex: 6, left: F.margin, bottom: F.margin }}>
         {nameBlock(Math.round(format.width * (wide ? 0.34 : 0.46)))}
       </div>
-
-      {/* Set up the right edge: the kind of mark a designer leaves and a
-          generator never does. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', zIndex: 6,
-          right: Math.round(F.margin * 0.38), bottom: F.margin,
-          writingMode: 'vertical-rl', transform: 'rotate(180deg)',
-          display: 'flex', alignItems: 'center', gap: Math.round(F.short * 0.016),
-          fontFamily: FONT_TEXT, fontWeight: 700, fontSize: Math.round(type.micro * 0.82),
-          letterSpacing: '0.34em', color: `${ink}8A`, textTransform: 'uppercase',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <span style={{ height: Math.round(F.short * 0.06), width: 1, background: `${ink}59` }} />
-        {b.label}
-      </div>
-
-      {/* Vignette, drawn last over everything but the grain: it is what pulls
-          the eye back to the centre of the frame. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0, zIndex: 7, pointerEvents: 'none',
-          background: `radial-gradient(78% 68% at 56% 48%, transparent 38%, rgba(0,0,0,0.42) 100%)`,
-        }}
-      />
 
       <PhraseEditor
         field={phraseField} value={phraseValue} placeholder={phrasePlaceholder}
         exporting={exporting} left={F.margin} top={F.margin} width={headWidth}
         size={type.subtitle} caret={ink}
       />
-      <Grain opacity={0.11} />
+      <Grain opacity={0.04} />
       <Mark brand={brand} format={format} slot="top-right" color={ink} width={F.short * 0.13} />
     </div>
   );
